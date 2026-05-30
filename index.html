@@ -369,26 +369,25 @@ class TileMap {
 
   canPlaceBuilding(tileX, tileY, w, h) {
     const gsY = this.groundSurfaceTileY();
-    // All footprint tiles must be empty, EXCEPT ground-surface buildings:
-    // a building whose bottom edge sits ON the ground surface is allowed to
-    // have ground tiles in its footprint (the building body is above ground)
-    const bottomTy = tileY + h - 1;
+    // A building sits on ground when its bottom edge is at gsY (ground surface row)
+    const sitsOnGround = (tileY + h - 1 === gsY - 1);
+    // All footprint tiles must be empty, EXCEPT ground tiles are allowed
+    // when the building sits on the ground surface (ground forms a solid base below)
     for (let tx = tileX; tx < tileX + w; tx++) {
       for (let ty = tileY; ty < tileY + h; ty++) {
         const tile = this.getTile(tx, ty);
-        // Ground tiles at the building's bottom edge are OK (building sits on top)
-        if (tile !== TILE_EMPTY && !(tile === TILE_GROUND && ty === bottomTy && ty === gsY - 1)) {
+        if (tile !== TILE_EMPTY && !(sitsOnGround && tile === TILE_GROUND)) {
           return false;
         }
       }
     }
     // Must have solid ground directly below the building's bottom edge
+    const bottomTy = tileY + h - 1;
     for (let tx = tileX; tx < tileX + w; tx++) {
       if (!this.isSolid(tx, bottomTy + 1)) return false;
     }
     return true;
   }
-
   findBridgeSpan(tileX, tileY) {
     if (this.isSolid(tileX, tileY)) return null;
     // Scan left for solid anchor
@@ -1719,7 +1718,8 @@ class FortressCommand {
     for (const p of this.players) {
       for (let i = 0; i < 3; i++) {
         const gy = this.tilemap.getGroundY(p.startX);
-        p.spawnUnit('soldier', p.startX + (Math.random() - 0.5) * 40, gy);
+        const u = p.spawnUnit('soldier', p.startX + (Math.random() - 0.5) * 40, gy);
+        if (u) u.y = gy - u.height; // bottom of unit sits on ground surface
       }
     }
 
@@ -1814,7 +1814,9 @@ class FortressCommand {
       const trained = p.update(dt);
       for (const [unitType, building] of trained) {
         const gy = this.tilemap.getGroundY(building.x);
-        p.spawnUnit(unitType, building.x + (Math.random() - 0.5) * 20, gy);
+        const u = new Unit(unitType, building.x + (Math.random() - 0.5) * 20, gy, p.id);
+        u.y = gy - u.height; // bottom of unit sits on ground surface
+        p.units.push(u);
       }
     }
 
