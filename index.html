@@ -1636,7 +1636,6 @@ class FortressCommand {
         if (this.human && this.human.canAfford(cfg.cost)) {
           this.human.enterBuildMode(t);
           this._closeBuildMenu();
-          this._updateBuildMenu();
         }
       });
       buildList.appendChild(item);
