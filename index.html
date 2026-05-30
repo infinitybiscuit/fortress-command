@@ -117,7 +117,7 @@ const TILE_SIZE = 32;
 const MAP_WIDTH_TILES = 200;
 const MAP_HEIGHT_TILES = 20;
 const GROUND_LEVEL_TILE = 3;
-const PLATFORM_ROWS = [7, 11, 15];
+const PLATFORM_ROWS = [3, 7, 11]; // tiles ABOVE ground surface;
 const PLATFORM_MIN_LEN = 4;
 const PLATFORM_MAX_LEN = 12;
 
@@ -261,15 +261,18 @@ class TileMap {
   }
 
   generate() {
-    // Ground layer
+    // Ground at the BOTTOM of the map (y increases downward in screen coords)
+    const groundTop = this.height - GROUND_LEVEL_TILE;
     for (let x = 0; x < this.width; x++) {
-      for (let y = 0; y < GROUND_LEVEL_TILE; y++) {
+      for (let y = groundTop; y < this.height; y++) {
         this.tiles[x][y] = TILE_GROUND;
       }
     }
-    // Platforms
-    for (const row_y of PLATFORM_ROWS) {
-      if (row_y >= this.height) continue;
+    // Platforms float above ground level (tiles below groundTop)
+    // row_y here is tiles above the ground surface, not absolute tile coords
+    for (const rowDelta of PLATFORM_ROWS) {
+      const row_y = groundTop - rowDelta - 1;
+      if (row_y < 1 || row_y >= this.height - 1) continue;
       let x = 3 + floor(Math.random() * 8);
       while (x < this.width - 5) {
         const length = PLATFORM_MIN_LEN + floor(Math.random() * (PLATFORM_MAX_LEN - PLATFORM_MIN_LEN + 1));
@@ -280,9 +283,9 @@ class TileMap {
         x += length + gap;
       }
     }
-    // Clear starting areas for HQs
-    this._clearArea(2, GROUND_LEVEL_TILE, 6, 5);
-    this._clearArea(this.width - 8, GROUND_LEVEL_TILE, 6, 5);
+    // Clear starting areas for HQs (just above ground surface)
+    this._clearArea(2, groundTop, 6, 5);
+    this._clearArea(this.width - 8, groundTop, 6, 5);
   }
 
   _clearArea(x, y, w, h) {
@@ -295,9 +298,14 @@ class TileMap {
 
   getTile(x, y) {
     if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
-      return y < GROUND_LEVEL_TILE ? TILE_GROUND : TILE_EMPTY;
+      return TILE_EMPTY; // treat out-of-bounds as empty (no infinite ground)
     }
     return this.tiles[x][y];
+  }
+
+  // Returns the tile y coordinate of the ground surface (first ground tile from bottom)
+  groundSurfaceTileY() {
+    return this.height - GROUND_LEVEL_TILE;
   }
 
   isSolid(x, y) {
@@ -313,11 +321,12 @@ class TileMap {
   }
 
   getGroundY(worldX) {
+    // Ground surface = first solid tile from bottom upward
     const { tx } = this.worldToTile(worldX);
     for (let ty = this.height - 1; ty >= 0; ty--) {
-      if (this.isSolid(tx, ty)) return (ty + 1) * TILE_SIZE;
+      if (this.isSolid(tx, ty)) return ty * TILE_SIZE;
     }
-    return GROUND_LEVEL_TILE * TILE_SIZE;
+    return (this.height - GROUND_LEVEL_TILE) * TILE_SIZE;
   }
 
   rectCollides(left, bottom, width, height) {
@@ -340,9 +349,10 @@ class TileMap {
         if (this.getTile(tx, ty) !== TILE_EMPTY) return false;
       }
     }
-    // Must have solid ground directly below entire width
+    // Must have solid ground directly below the building's bottom edge
+    const bottomTy = tileY + h - 1;
     for (let tx = tileX; tx < tileX + w; tx++) {
-      if (!this.isSolid(tx, tileY - 1)) return false;
+      if (!this.isSolid(tx, bottomTy + 1)) return false;
     }
     return true;
   }
@@ -738,7 +748,7 @@ class Player {
 
   _placeHq(worldX) {
     const tileX = floor(worldX / TILE_SIZE);
-    const tileY = GROUND_LEVEL_TILE;
+    const tileY = this.tilemap.groundSurfaceTileY();
     const hq = new Building('hq', tileX, tileY, this.id);
     this.buildings.push(hq);
     return hq;
@@ -987,7 +997,7 @@ class CpuPlayer extends Player {
     const cfg = BUILDING_TYPES[buildingType];
     const w = cfg.width_tiles, h = cfg.height_tiles;
     const baseTx = floor(this.startX / TILE_SIZE);
-    const ty = GROUND_LEVEL_TILE;
+    const ty = this.tilemap.groundSurfaceTileY();
     for (let offset = 0; offset < 40; offset++) {
       for (const sign of [1, -1]) {
         const tx = baseTx + offset * sign;
