@@ -952,6 +952,11 @@ class HumanPlayer extends Player {
   enterBuildMode(buildingType) {
     this.buildMode = buildingType;
     this._deselectAll();
+    // Initialize preview near map center so it appears immediately
+    const centerTX = floor(MAP_WIDTH_TILES / 2);
+    const groundTY = this.tilemap.groundSurfaceTileY() - 1;
+    this.buildPreviewTx = centerTX;
+    this.buildPreviewTy = groundTY;
   }
 
   updateBuildPreview(worldX, worldY) {
@@ -1250,9 +1255,8 @@ class InputHandler {
     if (e.clientX < this._EDGE_THRESHOLD && !this._swipeStarted) {
       this._swipeStarted = true;
     }
-    if (this._swipeStarted) {
-      this.onBuildHover && this.onBuildHover(e.clientX, e.clientY);
-    }
+    // Always update build preview on move so cursor follows mouse in build mode
+    this.onBuildHover && this.onBuildHover(e.clientX, e.clientY);
     const dx = e.clientX - this._panStartX;
     if (Math.abs(dx) > 8) {
       this.onPan && this.onPan(dx);
@@ -1815,7 +1819,9 @@ class FortressCommand {
     const selUnits = this.human.selectedUnits;
     const selBldg = this.human.selectedBuilding;
     let info = 'TAP A UNIT OR BUILDING';
-    if (selUnits.length === 1) {
+    if (this.human.buildMode) {
+      info = `${this.human.buildMode.toUpperCase()} \u2014 CLICK TO PLACE`;
+    } else if (selUnits.length === 1) {
       const u = selUnits[0];
       info = `${u.type.toUpperCase()}  HP:${u.hp}/${u.maxHp}`;
     } else if (selUnits.length > 1) {
