@@ -258,6 +258,8 @@ class TileMap {
     this.width = width;
     this.height = height;
     this.tiles = Array.from({length: width}, () => Array(height).fill(TILE_EMPTY));
+    // Tracks tiles occupied by buildings: Map "tx,ty" -> buildingId
+    this._buildingTiles = new Map();
   }
 
   generate() {
@@ -308,10 +310,30 @@ class TileMap {
     return this.height - GROUND_LEVEL_TILE;
   }
 
+  // Mark tiles as occupied by a building (so units can't fall through)
+  markBuildingTiles(tileX, tileY, w, h, buildingId) {
+    for (let tx = tileX; tx < tileX + w; tx++) {
+      for (let ty = tileY; ty < tileY + h; ty++) {
+        this._buildingTiles.set(`${tx},${ty}`, buildingId);
+      }
+    }
+  }
+
+  // Clear tiles when a building is destroyed or removed
+  clearBuildingTiles(tileX, tileY, w, h) {
+    for (let tx = tileX; tx < tileX + w; tx++) {
+      for (let ty = tileY; ty < tileY + h; ty++) {
+        this._buildingTiles.delete(`${tx},${ty}`);
+      }
+    }
+  }
+
   isSolid(x, y) {
     // Out of bounds = solid (boundary wall)
     if (y < 0 || y >= this.height) return true;
     if (x < 0 || x >= this.width) return true;
+    // Building tiles act as solid
+    if (this._buildingTiles.has(`${x},${y}`)) return true;
     return this.tiles[x][y] !== TILE_EMPTY;
   }
 
@@ -346,14 +368,21 @@ class TileMap {
   }
 
   canPlaceBuilding(tileX, tileY, w, h) {
-    // All footprint tiles must be empty
+    const gsY = this.groundSurfaceTileY();
+    // All footprint tiles must be empty, EXCEPT ground-surface buildings:
+    // a building whose bottom edge sits ON the ground surface is allowed to
+    // have ground tiles in its footprint (the building body is above ground)
+    const bottomTy = tileY + h - 1;
     for (let tx = tileX; tx < tileX + w; tx++) {
       for (let ty = tileY; ty < tileY + h; ty++) {
-        if (this.getTile(tx, ty) !== TILE_EMPTY) return false;
+        const tile = this.getTile(tx, ty);
+        // Ground tiles at the building's bottom edge are OK (building sits on top)
+        if (tile !== TILE_EMPTY && !(tile === TILE_GROUND && ty === bottomTy && ty === gsY - 1)) {
+          return false;
+        }
       }
     }
     // Must have solid ground directly below the building's bottom edge
-    const bottomTy = tileY + h - 1;
     for (let tx = tileX; tx < tileX + w; tx++) {
       if (!this.isSolid(tx, bottomTy + 1)) return false;
     }
@@ -751,7 +780,9 @@ class Player {
 
   _placeHq(worldX) {
     const tileX = floor(worldX / TILE_SIZE);
-    const tileY = this.tilemap.groundSurfaceTileY();
+    const gsY = this.tilemap.groundSurfaceTileY();
+    const hqH = BUILDING_TYPES.hq.height_tiles;
+    const tileY = gsY - hqH;
     const hq = new Building('hq', tileX, tileY, this.id);
     this.buildings.push(hq);
     return hq;
@@ -771,6 +802,7 @@ class Player {
     if (!this.spend(cost)) return null;
     const b = new Building(buildingType, tileX, tileY, this.id);
     this.buildings.push(b);
+    this.tilemap.markBuildingTiles(tileX, tileY, w, h, b.id);
     return b;
   }
 
@@ -810,11 +842,14 @@ class Player {
         this.tilemap.setBridgeTiles(b.tileX, b.tileY, b.wTiles);
         b.bridgeTilesPlaced = true;
       }
-    }
-    for (const b of this.buildings) {
-      if (!b.alive && b.isBridge && b.bridgeTilesPlaced) {
-        this.tilemap.clearBridgeTiles(b.tileX, b.tileY, b.wTiles);
-        b.bridgeTilesPlaced = false;
+      if (!b.alive) {
+        if (b.isBridge && b.bridgeTilesPlaced) {
+          this.tilemap.clearBridgeTiles(b.tileX, b.tileY, b.wTiles);
+          b.bridgeTilesPlaced = false;
+        }
+        if (b.built) {
+          this.tilemap.clearBuildingTiles(b.tileX, b.tileY, b.wTiles, b.hTiles);
+        }
       }
     }
     this.buildings = this.buildings.filter(b => b.alive);
@@ -1000,7 +1035,8 @@ class CpuPlayer extends Player {
     const cfg = BUILDING_TYPES[buildingType];
     const w = cfg.width_tiles, h = cfg.height_tiles;
     const baseTx = floor(this.startX / TILE_SIZE);
-    const ty = this.tilemap.groundSurfaceTileY();
+    const gsY = this.tilemap.groundSurfaceTileY();
+    const ty = gsY - h;
     for (let offset = 0; offset < 40; offset++) {
       for (const sign of [1, -1]) {
         const tx = baseTx + offset * sign;
