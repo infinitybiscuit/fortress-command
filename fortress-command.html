@@ -539,6 +539,10 @@ class Unit {
   }
 
   _applyPhysics(dt, tilemap) {
+    // Gravity
+    this.vy += GRAVITY * dt;
+    if (this.vy > TERMINAL_VELOCITY) this.vy = TERMINAL_VELOCITY;
+
     // Horizontal
     let newX = this.x + this.vx * dt;
     const halfW = this.width / 2;
@@ -557,26 +561,29 @@ class Unit {
     }
     this.x = newX;
 
-    // Vertical
+    // Vertical — check ground beneath the unit's feet
     let newY = this.y + this.vy * dt;
     this.onGround = false;
-    if (this.vy <= 0) {
-      const txL = floor((this.x - halfW + 2) / TILE_SIZE);
-      const txR = floor((this.x + halfW - 2) / TILE_SIZE);
-      const ty = floor((newY + this.height) / TILE_SIZE);
-      for (let checkTx = txL; checkTx <= txR; checkTx++) {
-        if (tilemap.isSolid(checkTx, ty)) {
-          newY = ty * TILE_SIZE - this.height;
-          this.vy = 0;
-          this.onGround = true;
-          break;
-        }
+    // Check a small margin below the feet to catch the platform surface
+    const checkY = newY + this.height + 2; // 2px below feet
+    const txL = floor((this.x - halfW + 2) / TILE_SIZE);
+    const txR = floor((this.x + halfW - 2) / TILE_SIZE);
+    const tyGnd = floor(checkY / TILE_SIZE);
+    for (let checkTx = txL; checkTx <= txR; checkTx++) {
+      if (tilemap.isSolid(checkTx, tyGnd)) {
+        // Place unit on top of this tile
+        newY = tyGnd * TILE_SIZE - this.height;
+        this.vy = 0;
+        this.onGround = true;
+        break;
       }
-    } else if (this.vy > 0) {
+    }
+    // Ceiling check (upward movement)
+    if (this.vy < 0) {
       const ty = floor(newY / TILE_SIZE);
       const tx = floor(this.x / TILE_SIZE);
       if (tilemap.isSolid(tx, ty)) {
-        newY = ty * TILE_SIZE - this.height;
+        newY = ty * TILE_SIZE + TILE_SIZE;
         this.vy = 0;
       }
     }
@@ -736,15 +743,37 @@ class Projectile {
     this.x = x;
     this.y = y;
     this.vx = direction * PROJECTILE_SPEED;
-    // Ballistic arc: compute vy so the projectile lands at (targetX, targetY)
-    if (targetX !== null && targetY !== null) {
-      const distX = Math.abs(targetX - x);
-      const s = direction * PROJECTILE_SPEED; // sign is in direction
-      const t = distX / Math.abs(s);          // time-of-flight
-      this.vy = (targetY - y) / t - 0.5 * GRAVITY * t;
-      // Store for rendering (angle of velocity vector)
-      this._angle = Math.atan2(this.vy, this.vx);
-    } else if (targetY !== null) {
+    // Ballistic arc: use quadratic solution so targets at same height get
+  // correct horizontal shots, not zero-vy shots that overshoot.
+  // Solves: y + vy*t + 0.5*g*t² = targetY  with  vx*t = targetX - x
+  if (targetX !== null && targetY !== null) {
+    const distX = Math.abs(targetX - x);
+    const s = direction * PROJECTILE_SPEED; // signed horizontal speed
+    let t, vy;
+    if (distX < 1) {
+      // Nearly vertical shot — use time to reach target height under gravity
+      const dy = targetY - y;
+      t = (PROJECTILE_SPEED + Math.sqrt(PROJECTILE_SPEED * PROJECTILE_SPEED - GRAVITY * Math.abs(dy))) / GRAVITY;
+      vy = (dy - 0.5 * GRAVITY * t * t) / t;
+      // Clamp to projectile speed
+      const spd = Math.sqrt(vx * vx + vy * vy);
+      if (spd > PROJECTILE_SPEED) { vy = vy / spd * PROJECTILE_SPEED; }
+    } else {
+      t = distX / Math.abs(s);
+      // Quadratic: 0.5*g*t² + vy*t + (y - targetY) = 0
+      // Solve for vy using the root that gives sensible arc direction
+      const a = 0.5 * GRAVITY * t * t;
+      const bplus = targetY - y + a;
+      const disc = bplus * bplus + 2 * a * (targetY - y);
+      if (disc >= 0) {
+        vy = (-bplus + Math.sqrt(disc)) / t;
+      } else {
+        vy = (targetY - y) / t - 0.5 * GRAVITY * t;
+      }
+    }
+    this.vy = vy;
+    this._angle = Math.atan2(this.vy, this.vx);
+  } else if (targetY !== null) {
       this.vy = (targetY - y) * 0.5;
       this._angle = Math.atan2(this.vy, this.vx);
     } else {
