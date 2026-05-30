@@ -1,0 +1,118 @@
+================================================================================
+ENTITIES — Fortress Command Web Game
+================================================================================
+
+## Unit Class
+--------------------------------------------------------------------------------
+Properties:
+  - id: unique identifier
+  - type: string — 'soldier' | 'archer' | 'knight' | 'cavalry'
+  - owner: player index (0 = human, 1+ = CPU)
+  - x, y: world position in pixels
+  - vx, vy: velocity (px/s)
+  - hp, maxHp: current and maximum health points
+  - damage: attack damage value
+  - speed: movement speed (px/s)
+  - attackRange: range in pixels for melee/ranged attacks
+  - attackCooldown: time between attacks (seconds)
+  - attackTimer: countdown to next attack
+  - state: 'idle' | 'moving' | 'attacking' | 'dead'
+  - target: reference to target Unit or Building
+  - width, height: collision box dimensions (typically 24×24 px)
+  - selected: boolean for selection state
+
+Methods:
+  - update(dt): process movement, AI decisions, cooldowns
+  - takeDamage(amount, source): reduce HP, trigger damage flash, check death
+  - performAttack(target): deal damage to target if in range and cooldown ready
+  - moveTo(x, y): set target position for movement
+  - attackMove(x, y): move toward position while attacking nearby enemies
+  - die(): remove unit, trigger death effects
+  - draw(ctx, camX): render unit with facing triangle and state visuals
+
+## Building Class
+--------------------------------------------------------------------------------
+Properties:
+  - id: unique identifier
+  - type: string — 'hq' | 'barracks' | 'workshop' | 'mine' | 'tower' | 'bridge'
+  - owner: player index
+  - x, y: world position (top-left corner in pixels)
+  - width, height: footprint dimensions in pixels
+  - hp, maxHp: current and maximum health points
+  - state: 'constructing' | 'operational' | 'destroyed'
+  - constructionProgress: 0–1 progress toward completion
+  - buildTime: total seconds to construct
+  - trainQueue: array of unit types pending training
+  - trainProgress: current training progress (seconds)
+  - isSelected: boolean for selection state
+  - incomeRate: credits per tick generated (for economic buildings)
+  - attackRange: range in pixels (for defensive buildings)
+  - attackDamage: damage per shot (for towers/workshops)
+
+Methods:
+  - update(dt): process construction, training queue, attacks
+  - queueTrain(unitType): add unit to training queue if affordable
+  - cancelTraining(): clear training queue
+  - spawnUnit(): create trained unit at building exit position
+  - takeDamage(amount): reduce HP, check destruction
+  - die(): remove building, stop income/attacks
+  - canTrain(unitType): check if building can train this unit type
+  - getTrainCost(unitType): return credit cost for unit type
+  - getTrainTime(unitType): return build time for unit type
+  - draw(ctx, camX): render building with type-specific interior details
+
+## Projectile Class
+--------------------------------------------------------------------------------
+Properties:
+  - id: unique identifier
+  - x, y: current world position in pixels
+  - vx, vy: velocity (px/s)
+  - radius: visual and collision radius (default 4px)
+  - damage: damage value on impact
+  - owner: player index who fired
+  - target: reference to target Unit or Building
+  - targetX, targetY: last known target position for homing
+  - type: string — 'arrow' | 'cannonball' | 'magic'
+  - active: boolean for alive/dead state
+
+Methods:
+  - update(dt): move projectile, check collision with targets
+  - checkHit(): detect if projectile reached target position
+  - onHit(target): apply damage to target, destroy projectile
+  - die(): remove projectile from game
+  - draw(ctx, camX): render projectile as colored circle
+
+## Entity Base Properties
+--------------------------------------------------------------------------------
+All entities share:
+  - id: globally unique integer (incremented on creation)
+  - owner: player ownership (0 = human player, 1+ = CPU players)
+  - hp: current health points
+  - maxHp: maximum health points
+  - x, y: world position
+  - active: alive state (false when dead/removing)
+  - type: entity type string for identification
+
+## Selection System
+--------------------------------------------------------------------------------
+  - selectedEntities: Set of currently selected entity IDs
+  - addToSelection(entity): add entity to selection
+  - removeFromSelection(entity): remove from selection
+  - clearSelection(): deselect all
+  - isSelected(entity): check selection state
+  - Selection renders as green ring (#00FF66) around entity
+
+## Entity Spawning
+--------------------------------------------------------------------------------
+  - Units spawn at building exit (building.x + building.width/2, building.y)
+  - Units face direction of nearest enemy or move target
+  - Projectiles originate from attacker's position toward target position
+  - Construction starts with 0 progress, completes at buildTime seconds
+
+## Entity Limits
+--------------------------------------------------------------------------------
+  - Max units per player: 50
+  - Max buildings per player: 20
+  - Max projectiles active: 100 (oldest removed if exceeded)
+
+================================================================================

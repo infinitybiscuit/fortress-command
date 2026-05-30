@@ -1,0 +1,84 @@
+# Fortress Command — FOUNDATION
+
+## 1. Concept & Vision
+
+**Fortress Command** is a side-scrolling platformer/RTS crossover that runs in any modern browser — desktop and mobile. Players build bases on procedurally generated terrain, train armies, and crush the opposition. The feel is nostalgic Command & Conquer meets Lemmings: chunky pixel-adjacent art drawn procedurally, satisfying micro-management, and frantic platformer traversal.
+
+**Target:** Single HTML file (no build step) using vanilla JS + HTML5 Canvas. Deployable to GitHub Pages or any static host. Touch-first mobile design with desktop keyboard/mouse support.
+
+---
+
+## 2. Design Language
+
+### Aesthetic Direction
+Retro pixel-art-adjacent but drawn procedurally with Canvas primitives — bold flat colors, clean geometric shapes, no external sprites.
+
+### Color Palette
+```
+Sky gradient top:  #141A38
+Sky gradient bot:  #2D3850
+Ground:            #4D3D2E
+Platform:          #595248
+Bridge:            #734D26
+UI Background:     rgba(26, 26, 38, 0.85)
+UI Accent:         #3380FF
+UI Text:           #FFFFFF
+Selection ring:    #00FF66
+Unit friendly:     #3366FF
+Unit enemy:        #FF4D4D
+Damage flash:      #FFFFFF
+```
+
+### Typography
+- Primary: `'Courier New', monospace` for terminal feel
+- HUD: bold, 14–20px, high contrast
+- No external font dependencies (inline everything)
+
+### Spatial System
+- Tile size: 32px (same as original)
+- Map: 200 tiles wide × 20 tiles tall (scrolling world)
+- HUD: 80px tall at top
+- Build menu: 260px wide, slides in from left edge
+- Minimap: 180×40px, bottom-right corner
+
+### Motion Philosophy
+- Camera: smooth lerp (factor 0.08), edge-scrolling when cursor near viewport edge
+- UI: instant transitions, no animation
+- Damage flash: 150ms white overlay on hit
+- Building placement: green/red tile preview for valid/invalid placement
+
+### Visual Assets
+- All drawn procedurally with Canvas 2D API — no external images or sprites
+- Units: colored rounded rectangles with facing triangle
+- Buildings: outlined rectangles with type-specific interior marks
+- Terrain: solid color rectangles per tile type
+- Projectiles: yellow filled circles
+
+---
+
+## 3. Layout & Structure
+
+### Screen Flow
+```
+[Menu Screen]  → tap "START" →  [Game Screen]  →  game over  →  [Game Over Overlay]
+                                   ↑↓ restart                    ↓ tap button
+                              [Menu Screen]
+```
+
+### Game Screen Layers
+```
+┌─────────────────────────────────────────┐
+│ HUD (80px) — credits, income, selection info │
+├────────┬────────────────────────┬───────┤
+│ Build  │                        │Minimap│
+│ Menu   │   Scrolling Game World  │(180×40│
+│(260px) │      (main canvas)      │       │
+│        │                        │       │
+└────────┴────────────────────────┴───────┘
+```
+
+### Responsive Strategy
+- Canvas fills entire viewport at device pixel ratio
+- Build menu: fixed 260px on desktop; full-width bottom sheet on mobile (< 600px wide)
+- All touch targets minimum 44px for mobile accessibility
+- HUD font scales with viewport width (clamp between 12–20px)

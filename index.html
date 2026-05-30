@@ -346,10 +346,10 @@ class TileMap {
   }
 
   getGroundY(worldX) {
-    // Ground surface = first solid tile from bottom upward
+    // Ground surface = first solid tile from bottom upward, return its TOP surface
     const { tx } = this.worldToTile(worldX);
     for (let ty = this.height - 1; ty >= 0; ty--) {
-      if (this.isSolid(tx, ty)) return ty * TILE_SIZE;
+      if (this.isSolid(tx, ty)) return (ty + 1) * TILE_SIZE;
     }
     return (this.height - GROUND_LEVEL_TILE) * TILE_SIZE;
   }
@@ -560,17 +560,17 @@ class Unit {
     if (this.vy <= 0) {
       const txL = floor((this.x - halfW + 2) / TILE_SIZE);
       const txR = floor((this.x + halfW - 2) / TILE_SIZE);
-      const ty = floor(newY / TILE_SIZE);
+      const ty = floor((newY + this.height) / TILE_SIZE);
       for (let checkTx = txL; checkTx <= txR; checkTx++) {
         if (tilemap.isSolid(checkTx, ty)) {
-          newY = (ty + 1) * TILE_SIZE;
+          newY = ty * TILE_SIZE - this.height;
           this.vy = 0;
           this.onGround = true;
           break;
         }
       }
     } else if (this.vy > 0) {
-      const ty = floor((newY + this.height) / TILE_SIZE);
+      const ty = floor(newY / TILE_SIZE);
       const tx = floor(this.x / TILE_SIZE);
       if (tilemap.isSolid(tx, ty)) {
         newY = ty * TILE_SIZE - this.height;
