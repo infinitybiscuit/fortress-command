@@ -1661,6 +1661,11 @@ class FortressCommand {
     const trainSection = document.getElementById('train-section');
     const trainList = document.getElementById('train-list');
     if (selB && selB.canTrain && selB.canTrain.length > 0) {
+      // Open menu if a training building is selected and menu is closed
+      if (!this._buildMenuOpen) {
+        this._buildMenuOpen = true;
+        document.getElementById('build-menu').classList.add('open');
+      }
       trainSection.style.display = 'block';
       trainList.innerHTML = '';
       for (const ut of selB.canTrain) {
