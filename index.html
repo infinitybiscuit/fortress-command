@@ -355,12 +355,12 @@ class TileMap {
     return (this.height - GROUND_LEVEL_TILE) * TILE_SIZE;
   }
 
-  // Find the topmost platform surface y for spawn positions
-  getTopPlatformY() {
-    for (let ty = 0; ty < this.height - GROUND_LEVEL_TILE; ty++) {
-      for (let tx = 0; tx < this.width; tx++) {
-        if (this.isSolid(tx, ty)) return ty * TILE_SIZE;
-      }
+  // Find the topmost solid surface at a specific x column (used for unit spawn)
+  // Returns the platform/ground surface directly below the spawn point
+  getTopPlatformY(startX) {
+    const { tx } = this.worldToTile(startX);
+    for (let ty = 0; ty < this.height; ty++) {
+      if (this.isSolid(tx, ty)) return ty * TILE_SIZE;
     }
     return (this.height - GROUND_LEVEL_TILE) * TILE_SIZE;
   }
@@ -1729,7 +1729,7 @@ class FortressCommand {
     // Spawn initial soldiers
     for (const p of this.players) {
       for (let i = 0; i < 3; i++) {
-        const gy = this.tilemap.getTopPlatformY();
+        const gy = this.tilemap.getTopPlatformY(p.startX);
         const u = p.spawnUnit('soldier', p.startX + (Math.random() - 0.5) * 40, gy - 20);
         if (u) u.y = gy - u.height; // bottom of unit sits on ground surface
       }
