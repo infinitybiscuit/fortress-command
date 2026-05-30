@@ -1275,7 +1275,8 @@ class InputHandler {
     const wasSwipe = this._swipeStarted;
     this._pointerDown = null;
     this._swipeStarted = false;
-    if (!wasSwipe) {
+    const dx = Math.abs(e.clientX - this._panStartCamX);
+    if (!wasSwipe || dx < 4) {
       this.onTap && this.onTap(e.clientX, e.clientY);
     }
   }
@@ -1636,6 +1637,7 @@ class FortressCommand {
         if (this.human && this.human.canAfford(cfg.cost)) {
           this.human.enterBuildMode(t);
           this._closeBuildMenu();
+          this._updateHUD();
         }
       });
       buildList.appendChild(item);
