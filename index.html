@@ -84,6 +84,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#141A38;font-family:
 <div id="build-tab">▸</div>
 <div id="build-menu">
   <div id="menu-close">✕</div>
+  <div id="menu-credits" style="padding:8px 10px;border-bottom:1px solid #3380FF;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+    <span style="font-size:16px;">💰</span>
+    <span id="menu-credit-val" style="color:#3380FF;font-weight:bold;font-size:15px;">300</span>
+    <span id="menu-income-val" style="color:#00FF66;font-size:11px;margin-left:4px;">+5/s</span>
+  </div>
   <div id="structures-section">
     <div class="menu-section-title">Structures</div>
     <div id="build-list"></div>
@@ -1656,6 +1661,9 @@ class FortressCommand {
   _updateBuildMenu() {
     if (!this.human) return;
     const p = this.human;
+    // Sync credits display in build menu
+    document.getElementById('menu-credit-val').textContent = p.credits;
+    document.getElementById('menu-income-val').textContent = `+${p.totalIncome}/s`;
     // Building items
     document.querySelectorAll('#build-list .menu-item').forEach(item => {
       const t = item.dataset.type;
@@ -1780,6 +1788,7 @@ class FortressCommand {
     const result = this.human.handleTap(wx, wy, allUnits, allBuildings);
     if (result === 'select_building') this._updateBuildMenu();
     if (result === 'built') this._updateBuildMenu();
+    if (result === 'build_failed') this._flashInvalid();
     this._updateHUD();
   }
 
@@ -1811,10 +1820,26 @@ class FortressCommand {
     document.getElementById('gameover-screen').classList.remove('hidden');
   }
 
+  _flashInvalid() {
+    // Briefly show "INVALID" in the HUD center info area
+    const el = document.getElementById('sel-info');
+    el.textContent = 'INVALID PLACEMENT';
+    el.style.color = '#FF4D4D';
+    setTimeout(() => {
+      el.style.color = '';
+      this._updateHUD();
+    }, 800);
+  }
+
   _updateHUD() {
     if (!this.human) return;
     document.getElementById('hud-credits').textContent = `💰 ${this.human.credits}`;
     document.getElementById('hud-income').textContent = `+${this.human.totalIncome}/s`;
+    // Keep menu credits in sync when menu is open
+    if (this._buildMenuOpen) {
+      document.getElementById('menu-credit-val').textContent = this.human.credits;
+      document.getElementById('menu-income-val').textContent = `+${this.human.totalIncome}/s`;
+    }
 
     const selUnits = this.human.selectedUnits;
     const selBldg = this.human.selectedBuilding;
