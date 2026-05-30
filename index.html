@@ -309,7 +309,10 @@ class TileMap {
   }
 
   isSolid(x, y) {
-    return this.getTile(x, y) !== TILE_EMPTY;
+    // Out of bounds = solid (boundary wall)
+    if (y < 0 || y >= this.height) return true;
+    if (x < 0 || x >= this.width) return true;
+    return this.tiles[x][y] !== TILE_EMPTY;
   }
 
   worldToTile(wx, wy) {
