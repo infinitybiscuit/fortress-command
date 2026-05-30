@@ -731,12 +731,26 @@ class Building {
 let _nextProjectileId = 0;
 
 class Projectile {
-  constructor(x, y, direction, damage, ownerId, targetY = null) {
+  constructor(x, y, direction, damage, ownerId, targetX = null, targetY = null) {
     this.id = _nextProjectileId++;
     this.x = x;
     this.y = y;
     this.vx = direction * PROJECTILE_SPEED;
-    this.vy = (targetY !== null ? (targetY - y) * 0.5 : 0);
+    // Ballistic arc: compute vy so the projectile lands at (targetX, targetY)
+    if (targetX !== null && targetY !== null) {
+      const distX = Math.abs(targetX - x);
+      const s = direction * PROJECTILE_SPEED; // sign is in direction
+      const t = distX / Math.abs(s);          // time-of-flight
+      this.vy = (targetY - y) / t - 0.5 * GRAVITY * t;
+      // Store for rendering (angle of velocity vector)
+      this._angle = Math.atan2(this.vy, this.vx);
+    } else if (targetY !== null) {
+      this.vy = (targetY - y) * 0.5;
+      this._angle = Math.atan2(this.vy, this.vx);
+    } else {
+      this.vy = 0;
+      this._angle = direction > 0 ? 0 : Math.PI;
+    }
     this.damage = damage;
     this.ownerId = ownerId;
     this.alive = true;
@@ -746,6 +760,8 @@ class Projectile {
   update(dt) {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
+    this.vy += GRAVITY * dt;  // gravity each frame for proper arc
+    this._angle = Math.atan2(this.vy, this.vx);
     if (this.x < -500 || this.x > MAP_WIDTH_TILES * TILE_SIZE + 500) {
       this.alive = false;
     }
@@ -1116,7 +1132,9 @@ class CombatSystem {
       }
       if (nearest) {
         u.performAttack();
-        nearest.takeDamage(u.damage);
+        const dir = nearest.x > u.x ? 1 : -1;
+        // Spawn a visible bullet projectile for unit-vs-unit combat
+        this.projectiles.push(new Projectile(u.x, u.centerY, dir, u.damage, u.ownerId, nearest.x, nearest.centerY));
         if (!u.target) u.target = nearest;
       }
     }
@@ -1134,7 +1152,8 @@ class CombatSystem {
       const dx = Math.abs(u.x - t.x), dy = Math.abs(u.centerY - t.centerY);
       if (dx < t.width / 2 + u.attackRange && dy < t.height / 2 + 20) {
         u.performAttack();
-        t.takeDamage(u.damage);
+        const dir = t.x > u.x ? 1 : -1;
+        this.projectiles.push(new Projectile(u.x, u.centerY, dir, u.damage, u.ownerId, t.centerX, t.centerY));
       }
     }
   }
@@ -1151,7 +1170,7 @@ class CombatSystem {
       if (nearest) {
         b.performAttack();
         const dir = nearest.x > b.x ? 1 : -1;
-        this.projectiles.push(new Projectile(b.x, b.centerY, dir, b.attackDamage, b.ownerId, nearest.centerY));
+        this.projectiles.push(new Projectile(b.x, b.centerY, dir, b.attackDamage, b.ownerId, nearest.x, nearest.centerY));
       }
     }
   }
@@ -1444,9 +1463,23 @@ class Renderer {
   drawProjectile(p, camX) {
     const ctx = this.ctx;
     const { sx, sy } = this._worldToScreen(p.x, p.y);
+    // Directional trail - length based on speed
+    const trailLen = 14;
+    const angle = p._angle;
+    const tx = sx - Math.cos(angle) * trailLen;
+    const ty = sy - Math.sin(angle) * trailLen;
+    // Trail line
+    ctx.strokeStyle = 'rgba(255,220,80,0.4)';
+    ctx.lineWidth = p.radius * 1.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(sx, sy);
+    ctx.stroke();
+    // Bullet head
     ctx.fillStyle = '#FFFF80';
     ctx.beginPath();
-    ctx.arc(sx, sy, PROJECTILE_RADIUS, 0, Math.PI * 2);
+    ctx.arc(sx, sy, p.radius, 0, Math.PI * 2);
     ctx.fill();
   }
 
