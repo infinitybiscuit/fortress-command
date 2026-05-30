@@ -349,7 +349,7 @@ class TileMap {
     // Ground surface = first solid tile from bottom upward, return its TOP surface
     const { tx } = this.worldToTile(worldX);
     for (let ty = this.height - 1; ty >= 0; ty--) {
-      if (this.isSolid(tx, ty)) return (ty + 1) * TILE_SIZE;
+      if (this.isSolid(tx, ty)) return ty * TILE_SIZE;
     }
     return (this.height - GROUND_LEVEL_TILE) * TILE_SIZE;
   }
@@ -376,7 +376,8 @@ class TileMap {
     for (let tx = tileX; tx < tileX + w; tx++) {
       for (let ty = tileY; ty < tileY + h; ty++) {
         const tile = this.getTile(tx, ty);
-        if (tile !== TILE_EMPTY && !(sitsOnGround && tile === TILE_GROUND)) {
+        const hasBuilding = this._buildingTiles.has(`${tx},${ty}`);
+        if (tile !== TILE_EMPTY && !(sitsOnGround && tile === TILE_GROUND) && !hasBuilding) {
           return false;
         }
       }
