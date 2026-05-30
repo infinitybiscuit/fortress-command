@@ -345,22 +345,11 @@ class TileMap {
     return { x: tx * TILE_SIZE, y: ty * TILE_SIZE };
   }
 
-  // Returns the HIGHEST solid tile surface (scans top-to-bottom)
-  // Used for unit/building placement — finds platform or ground surface above empty tiles
   getGroundY(worldX) {
+    // Ground surface = first solid tile from bottom upward, return its TOP surface
     const { tx } = this.worldToTile(worldX);
-    for (let ty = 0; ty < this.height; ty++) {
+    for (let ty = this.height - 1; ty >= 0; ty--) {
       if (this.isSolid(tx, ty)) return ty * TILE_SIZE;
-    }
-    return (this.height - GROUND_LEVEL_TILE) * TILE_SIZE;
-  }
-
-  // Find the topmost platform surface y for spawn positions
-  getTopPlatformY() {
-    for (let ty = 0; ty < this.height - GROUND_LEVEL_TILE; ty++) {
-      for (let tx = 0; tx < this.width; tx++) {
-        if (this.isSolid(tx, ty)) return ty * TILE_SIZE;
-      }
     }
     return (this.height - GROUND_LEVEL_TILE) * TILE_SIZE;
   }
@@ -384,6 +373,7 @@ class TileMap {
     const sitsOnGround = (tileY + h - 1 === gsY - 1);
     // All footprint tiles must be empty, EXCEPT ground tiles are allowed
     // when the building sits on the ground surface (ground forms a solid base below)
+    // Also allow footprint tiles occupied by other buildings (building-on-building)
     for (let tx = tileX; tx < tileX + w; tx++) {
       for (let ty = tileY; ty < tileY + h; ty++) {
         const tile = this.getTile(tx, ty);
@@ -394,6 +384,7 @@ class TileMap {
       }
     }
     // Must have solid ground directly below the building's bottom edge
+    // (this.isSolid also returns true for buildings in _buildingTiles)
     const bottomTy = tileY + h - 1;
     for (let tx = tileX; tx < tileX + w; tx++) {
       if (!this.isSolid(tx, bottomTy + 1)) return false;
@@ -1729,8 +1720,8 @@ class FortressCommand {
     // Spawn initial soldiers
     for (const p of this.players) {
       for (let i = 0; i < 3; i++) {
-        const gy = this.tilemap.getTopPlatformY();
-        const u = p.spawnUnit('soldier', p.startX + (Math.random() - 0.5) * 40, gy - 20);
+        const gy = this.tilemap.getGroundY(p.startX);
+        const u = p.spawnUnit('soldier', p.startX + (Math.random() - 0.5) * 40, gy);
         if (u) u.y = gy - u.height; // bottom of unit sits on ground surface
       }
     }
