@@ -1029,6 +1029,26 @@ class HumanPlayer extends Player {
     this.selectedBuilding = null;
   }
 
+  // Select all own units whose center falls within the given screen-space box
+  // (sx1,sy1) = top-left, (sx2,sy2) = bottom-right in screen pixels
+  selectUnitsInBox(sx1, sy1, sx2, sy2, camera) {
+    const { wx: wx1, wy: wy1 } = camera.screenToWorld(sx1, sy1);
+    const { wx: wx2, wy: wy2 } = camera.screenToWorld(sx2, sy2);
+    const left = Math.min(wx1, wx2);
+    const right = Math.max(wx1, wx2);
+    const top = Math.min(wy1, wy2);
+    const bottom = Math.max(wy1, wy2);
+    this._deselectAll();
+    for (const u of this.units) {
+      if (!u.alive) continue;
+      const cx = u.x, cy = u.y + u.height / 2;
+      if (cx >= left && cx <= right && cy >= top && cy <= bottom) {
+        u.selected = true;
+        this.selectedUnits.push(u);
+      }
+    }
+  }
+
   _findUnitAt(wx, wy, units) {
     const margin = 30;
     for (const u of units) {
@@ -1278,10 +1298,11 @@ class EconomySystem {
 // SECTION 14: INPUT HANDLER
 // ═══════════════════════════════════════════════════════════════
 class InputHandler {
-  constructor(onTap, onPan, onBuildHover) {
+  constructor(onTap, onPan, onBuildHover, onSelectionBox) {
     this.onTap = onTap;
     this.onPan = onPan;
     this.onBuildHover = onBuildHover;
+    this.onSelectionBox = onSelectionBox;
     this._pointerDown = null;
     this._panStartCamX = 0;
     this._panStartX = 0;
@@ -1289,8 +1310,13 @@ class InputHandler {
     this._swipeStartX = 0;
     this._EDGE_THRESHOLD = 30;
     this._SWIPE_THRESHOLD = 30;
+    this._DRAG_THRESHOLD = 8;
     this._lastX = 0;
     this._lastY = 0;
+    // Drag-selection tracking
+    this._dragStartX = 0;
+    this._dragStartY = 0;
+    this._isDragging = false;
   }
 
   fireHoverAtLastPosition() {
@@ -1314,6 +1340,9 @@ class InputHandler {
     this._lastX = e.clientX;
     this._lastY = e.clientY;
     this._swipeStarted = false;
+    this._isDragging = false;
+    this._dragStartX = e.clientX;
+    this._dragStartY = e.clientY;
     if (e.clientX < this._EDGE_THRESHOLD) this._swipeStarted = true;
   }
 
@@ -1331,15 +1360,40 @@ class InputHandler {
       this.onPan && this.onPan(dx);
       this._panStartX = e.clientX;
     }
+    // Detect drag-selection: non-edge drag with enough movement
+    if (!this._swipeStarted && !this._isDragging) {
+      const ddx = e.clientX - this._dragStartX;
+      const ddy = e.clientY - this._dragStartY;
+      if (Math.sqrt(ddx*ddx + ddy*ddy) > this._DRAG_THRESHOLD) {
+        this._isDragging = true;
+      }
+    }
+    // Live update: report current drag box whenever actively dragging
+    if (this._isDragging && !this._swipeStarted) {
+      const sx1 = Math.min(this._dragStartX, this._lastX);
+      const sy1 = Math.min(this._dragStartY, this._lastY);
+      const sx2 = Math.max(this._dragStartX, this._lastX);
+      const sy2 = Math.max(this._dragStartY, this._lastY);
+      this.onSelectionDrag && this.onSelectionDrag(sx1, sy1, sx2, sy2);
+    }
   }
 
   _onPointerUp(e) {
     e.preventDefault();
     if (this._pointerDown !== e.pointerId) return;
     const wasSwipe = this._swipeStarted;
+    const wasDrag = this._isDragging;
     this._pointerDown = null;
     this._swipeStarted = false;
-    if (!wasSwipe) {
+    this._isDragging = false;
+    if (wasDrag && !wasSwipe) {
+      // Fire selection box: normalize to min/max corners
+      const sx1 = Math.min(this._dragStartX, this._lastX);
+      const sy1 = Math.min(this._dragStartY, this._lastY);
+      const sx2 = Math.max(this._dragStartX, this._lastX);
+      const sy2 = Math.max(this._dragStartY, this._lastY);
+      this.onSelectionBox && this.onSelectionBox(sx1, sy1, sx2, sy2);
+    } else if (!wasSwipe) {
       this.onTap && this.onTap(e.clientX, e.clientY);
     }
   }
@@ -1811,6 +1865,8 @@ class FortressCommand {
     this.camera.worldW = MAP_WIDTH_TILES * TILE_SIZE;
     this.camera.worldH = MAP_HEIGHT_TILES * TILE_SIZE;
 
+    this.selectionBox = null; // {sx1,sy1,sx2,sy2} screen-space, set during drag
+
     const leftX = 4 * TILE_SIZE;
     const rightX = (MAP_WIDTH_TILES - 8) * TILE_SIZE;
 
@@ -1858,7 +1914,9 @@ class FortressCommand {
     this.input = new InputHandler(
       (sx, sy) => this._onTap(sx, sy),
       (dx) => this._onPan(dx),
-      (sx, sy) => this._onBuildHover(sx, sy)
+      (sx, sy) => this._onBuildHover(sx, sy),
+      (sx1, sy1, sx2, sy2) => this._onSelectionBox(sx1, sy1, sx2, sy2),
+      (sx1, sy1, sx2, sy2) => this._onSelectionDrag(sx1, sy1, sx2, sy2)
     );
     this.input.attach(this.canvas);
 
@@ -1882,6 +1940,24 @@ class FortressCommand {
     const result = this.human.handleTap(wx, wy, allUnits, allBuildings);
     if (result === 'select_building') this._updateBuildMenu();
     if (result === 'built') this._updateBuildMenu();
+    this._updateHUD();
+  }
+
+  // Called during drag by InputHandler — tracks live box for rendering
+  _onSelectionDrag(sx1, sy1, sx2, sy2) {
+    if (this.scene !== 'game') return;
+    this.selectionBox = { sx1, sy1, sx2, sy2 };
+  }
+
+  _onSelectionBox(sx1, sy1, sx2, sy2) {
+    if (this.scene !== 'game' || !this.camera) return;
+    // Ignore if box is entirely in HUD area
+    if (sy1 <= HUD_HEIGHT && sy2 <= HUD_HEIGHT) {
+      this.selectionBox = null;
+      return;
+    }
+    this.human.selectUnitsInBox(sx1, sy1, sx2, sy2, this.camera);
+    this.selectionBox = null;
     this._updateHUD();
   }
 
@@ -2061,6 +2137,19 @@ class FortressCommand {
     // Projectiles
     for (const p of this.combatSys.projectiles) {
       if (p.alive) this.renderer.drawProjectile(p, this.camera.x);
+    }
+
+    // Selection box (screen coordinates — draw before ctx.restore)
+    if (this.selectionBox) {
+      const { sx1, sy1, sx2, sy2 } = this.selectionBox;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // screen space
+      ctx.fillStyle = 'rgba(50,120,255,0.18)';
+      ctx.fillRect(sx1, sy1, sx2 - sx1, sy2 - sy1);
+      ctx.strokeStyle = 'rgba(50,120,255,0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(sx1 + 0.75, sy1 + 0.75, sx2 - sx1 - 1.5, sy2 - sy1 - 1.5);
+      ctx.restore();
     }
 
     ctx.restore();
