@@ -2280,9 +2280,12 @@ _updateHUD() {
         const fs = this.ctf[p.id];
         const flagCol = C.PLAYER[p.id % C.PLAYER.length];
         if (fs.atBase && p.hq && p.hq.alive) {
-          // Flag on the ground at the center of the HQ
-          const flagX = p.hq.x;
-          const flagY = p.hq.y + p.hq.height; // ground level (top edge of ground tiles)
+          // Flag behind the HQ — opposite side from the enemy's approach.
+          // Player 0 is on the left, enemy approaches from the right → flag behind (left).
+          // Player 1 is on the right, enemy approaches from the left → flag behind (right).
+          const behindSign = p.id === 0 ? -1 : 1;
+          const flagX = p.hq.x + behindSign * (p.hq.width / 2 + 16);
+          const flagY = p.hq.y + p.hq.height;
           this.renderer.drawCtfFlag(flagX, flagY, flagCol, this.camera.x);
         }
         // Draw carried flag above carrier unit
