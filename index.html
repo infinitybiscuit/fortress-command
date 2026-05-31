@@ -1528,7 +1528,7 @@ class SpriteLib {
         ]
       },
       soldier: {
-        w:8, h:8, scale:4,
+        w:8, h:8, scale:4, feetInset:4,
         rows:[
           '___DD___',
           '___DD___',
@@ -1541,7 +1541,7 @@ class SpriteLib {
         ]
       },
       heavy: {
-        w:10, h:10, scale:5,
+        w:10, h:10, scale:5, feetInset:5,
         rows:[
           '____DDDD____',
           '___DHHHH___',
@@ -1556,7 +1556,7 @@ class SpriteLib {
         ]
       },
       scout: {
-        w:7, h:7, scale:4,
+        w:7, h:7, scale:4, feetInset:4,
         rows:[
           '__GGG__',
           '__GLG__',
@@ -1678,9 +1678,11 @@ drawUnit(u, camX, playerColors) {
       ctx.imageSmoothingEnabled = false;
       const sw = sprite.width;
       const sh = sprite.height;
-      // Center the sprite in the unit's screen footprint
+      const def = this.sprites.DATA[spriteType];
+      const inset = def ? (def.feetInset || 0) : 0;
+      // Anchor sprite top to unit top, shift up by feetInset so art feet land on ground
       const dx = screen.sx + (u.width - sw) / 2;
-      const dy = screen.sy + (u.height - sh) / 2;
+      const dy = screen.sy - inset;
       ctx.drawImage(sprite, dx, dy, sw, sh);
     }
 
@@ -1854,12 +1856,10 @@ drawUnit(u, camX, playerColors) {
     const cfg = BUILDING_TYPES[buildingType];
     const w = cfg.width_tiles * TILE_SIZE, h = cfg.height_tiles * TILE_SIZE;
     const { sx, sy } = this._worldToScreen(tx * TILE_SIZE, ty * TILE_SIZE);
-    ctx.fillStyle = valid ? 'rgba(0,255,100,0.3)' : 'rgba(255,50,50,0.3)';
-    ctx.strokeStyle = valid ? '#00FF66' : '#FF4D4D';
+    ctx.strokeStyle = valid ? 'rgba(0,255,100,0.6)' : 'rgba(255,50,50,0.6)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.roundRect(sx, sy, w, h, 3);
-    ctx.fill();
     ctx.stroke();
   }
 
