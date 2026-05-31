@@ -205,9 +205,11 @@ const BUILDING_TYPES = {
   },
   wall: {
     hp:300, width_tiles:1, height_tiles:2, cost:40, build_time:2.0,
+    blocksUnits:true,
   },
   mine: {
     hp:100, width_tiles:2, height_tiles:2, cost:200, build_time:8.0,
+    blocksUnits:true,
     provides_income:true, income_amount:15,
   },
   workshop: {
@@ -223,6 +225,7 @@ const BUILDING_TYPES = {
 // Projectile
 const PROJECTILE_SPEED = 350;
 const PROJECTILE_RADIUS = 3;
+const MINE_DAMAGE = 80;
 
 // AI
 const AI_THINK_INTERVAL = 2.0;
@@ -260,6 +263,8 @@ class TileMap {
     this.tiles = Array.from({length: width}, () => Array(height).fill(TILE_EMPTY));
     // Tracks tiles occupied by buildings: Map "tx,ty" -> buildingId
     this._buildingTiles = new Map();
+    // Separate map for tiles that block unit movement (only walls/mines)
+    this._unitBlockingTiles = new Map();
   }
 
   generate() {
@@ -311,10 +316,14 @@ class TileMap {
   }
 
   // Mark tiles as occupied by a building (so units can't fall through)
-  markBuildingTiles(tileX, tileY, w, h, buildingId) {
+  markBuildingTiles(tileX, tileY, w, h, buildingId, buildingType) {
     for (let tx = tileX; tx < tileX + w; tx++) {
       for (let ty = tileY; ty < tileY + h; ty++) {
         this._buildingTiles.set(`${tx},${ty}`, buildingId);
+        // Only register in unit-blocking map if this building type blocks units
+        if (BUILDING_TYPES[buildingType]?.blocksUnits) {
+          this._unitBlockingTiles.set(`${tx},${ty}`, buildingId);
+        }
       }
     }
   }
@@ -324,6 +333,7 @@ class TileMap {
     for (let tx = tileX; tx < tileX + w; tx++) {
       for (let ty = tileY; ty < tileY + h; ty++) {
         this._buildingTiles.delete(`${tx},${ty}`);
+        this._unitBlockingTiles.delete(`${tx},${ty}`);
       }
     }
   }
@@ -332,8 +342,8 @@ class TileMap {
     // Out of bounds = solid (boundary wall)
     if (y < 0 || y >= this.height) return true;
     if (x < 0 || x >= this.width) return true;
-    // Building tiles act as solid
-    if (this._buildingTiles.has(`${x},${y}`)) return true;
+    // Only unit-blocking buildings (walls, mines) act as solid for unit physics
+    if (this._unitBlockingTiles.has(`${x},${y}`)) return true;
     return this.tiles[x][y] !== TILE_EMPTY;
   }
 
@@ -628,7 +638,7 @@ class Unit {
 let _nextBuildingId = 0;
 
 class Building {
-  constructor(buildingType, tileX, tileY, ownerId, overrideWTiles = null) {
+  constructor(buildingType, tileX, tileY, ownerId, overrideWTiles = null, tilemap = null) {
     const cfg = BUILDING_TYPES[buildingType];
     this.id = _nextBuildingId++;
     this.type = buildingType;
@@ -642,6 +652,7 @@ class Building {
     this.y = tileY * TILE_SIZE;
     this.width = this.wTiles * TILE_SIZE;
     this.height = this.hTiles * TILE_SIZE;
+    this.tilemap = tilemap;
 
     this.maxHp = cfg.hp;
     this.hp = this.maxHp;
@@ -661,6 +672,7 @@ class Building {
     this.attackRange = cfg.attack_range || 0;
     this.attackRate = cfg.attack_rate || 1.0;
     this.attackTimer = 0;
+    this.hasExploded = false; // mines: set true when unit walks into mine
 
     this.trainQueue = [];
     this.trainTimer = 0;
@@ -717,7 +729,14 @@ class Building {
 
   takeDamage(amount) {
     this.hp -= amount;
-    if (this.hp <= 0) { this.hp = 0; this.alive = false; }
+    if (this.hp <= 0) {
+      this.hp = 0;
+      this.alive = false;
+      // Clear this building's tiles from the tilemap so it no longer blocks units
+      if (this.tilemap) {
+        this.tilemap.clearBuildingTiles(this.tileX, this.tileY, this.wTiles, this.hTiles);
+      }
+    }
     return this.alive;
   }
 
@@ -822,6 +841,7 @@ class Player {
     this.buildings = [];
     this.startX = startX;
     this.tilemap = tilemap;
+    this.game = null; // set by FortressCommand after player creation
     this.hq = this._placeHq(startX);
   }
 
@@ -830,7 +850,7 @@ class Player {
     const gsY = this.tilemap.groundSurfaceTileY();
     const hqH = BUILDING_TYPES.hq.height_tiles;
     const tileY = gsY - hqH;
-    const hq = new Building('hq', tileX, tileY, this.id);
+    const hq = new Building('hq', tileX, tileY, this.id, null, this.tilemap);
     this.buildings.push(hq);
     return hq;
   }
@@ -847,9 +867,13 @@ class Player {
     const w = cfg.width_tiles, h = cfg.height_tiles;
     if (!this.tilemap.canPlaceBuilding(tileX, tileY, w, h)) return null;
     if (!this.spend(cost)) return null;
-    const b = new Building(buildingType, tileX, tileY, this.id);
+    const b = new Building(buildingType, tileX, tileY, this.id, null, this.tilemap);
     this.buildings.push(b);
-    this.tilemap.markBuildingTiles(tileX, tileY, w, h, b.id);
+    this.tilemap.markBuildingTiles(tileX, tileY, w, h, b.id, buildingType);
+    // Track mines for proximity explosion detection
+    if (buildingType === 'mine' && this.game && this.game.mines) {
+      this.game.mines.push(b);
+    }
     return b;
   }
 
@@ -859,7 +883,7 @@ class Player {
     const cost = (cfg.cost_per_tile || 15) * span.width;
     if (!this.canAfford(cost)) return null;
     if (!this.spend(cost)) return null;
-    const b = new Building('bridge', span.start, tileY, this.id, span.width);
+    const b = new Building('bridge', span.start, tileY, this.id, span.width, this.tilemap);
     this.buildings.push(b);
     return b;
   }
@@ -1773,7 +1797,11 @@ class FortressCommand {
       this.players.push(new CpuPlayer(3, rightX, this.tilemap));
     }
 
+    // Wire game reference into players so buildings can access this.mines
+    for (const p of this.players) p.game = this;
+
     this.human = this.players[0];
+    this.mines = []; // mines are tracked separately for proximity explosion detection
     this.camera.focusOn(this.human.startX);
     this.camera.x = this.camera.targetX;
 
@@ -1889,6 +1917,49 @@ class FortressCommand {
     for (const p of this.players) {
       for (const u of p.units) {
         u.update(dt, this.tilemap);
+      }
+    }
+
+    // Mine proximity — check units walking into unexploded mines
+    for (const mine of this.mines) {
+      if (!mine.alive || mine.hasExploded) continue;
+      const halfW = mine.width / 2;
+      const halfH = mine.height / 2;
+      for (const p of this.players) {
+        for (const u of p.units) {
+          if (!u.alive) continue;
+          const uHalfW = u.width / 2;
+          const uBottom = u.y, uTop = u.y + u.height;
+          const mLeft = mine.x - halfW, mRight = mine.x + halfW;
+          const mBottom = mine.y, mTop = mine.y + mine.height;
+          // AABB overlap check
+          if (u.x + uHalfW > mLeft && u.x - uHalfW < mRight &&
+              uBottom < mTop && uTop > mBottom) {
+            // Unit triggered the mine — explode!
+            mine.hasExploded = true;
+            mine.alive = false;
+            mine.tilemap && mine.tilemap.clearBuildingTiles(mine.tileX, mine.tileY, mine.wTiles, mine.hTiles);
+            // Visual explosion projectile (large, centered on mine)
+            this.combatSys.projectiles.push(new Projectile(mine.x, mine.centerY, 0, 0, -1, null, null));
+            const lastP = this.combatSys.projectiles[this.combatSys.projectiles.length - 1];
+            lastP.radius = 8;
+            lastP.vx = 0; lastP.vy = 0; // stationary explosion visual
+            lastP._angle = 0;
+            lastP.alive = true;
+            // Damage all units near the mine (2 tiles radius)
+            const blastRadius = TILE_SIZE * 2.5;
+            for (const op of this.players) {
+              for (const other of op.units) {
+                if (!other.alive) continue;
+                const dx = other.x - mine.x, dy = other.centerY - mine.centerY;
+                if (Math.sqrt(dx*dx + dy*dy) < blastRadius) {
+                  other.takeDamage(MINE_DAMAGE);
+                }
+              }
+            }
+            break; // mine exploded, move to next mine
+          }
+        }
       }
     }
 
