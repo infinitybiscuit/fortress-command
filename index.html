@@ -682,6 +682,8 @@ class Building {
     this.trainCurrent = null;
   }
 
+  get centerY() { return this.y + this.height / 2; }
+
   update(dt) {
     if (!this.alive) return null;
     if (!this.built) {
