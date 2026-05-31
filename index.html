@@ -7,7 +7,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{width:100%;height:100%;overflow:hidden;background:#141A38;font-family:'Courier New',monospace;}
-#canvas{display:block;touch-action:none;cursor:default;user-select:none;-webkit-user-select:none;}
+#canvas{display:block;touch-action:none;cursor:default;user-select:none;-webkit-user-select:none;image-rendering:pixelated;image-rendering:crisp-edges;}
 #minimap-canvas{display:block;position:fixed;bottom:8px;right:8px;width:180px;height:40px;background:rgba(26,26,38,0.8);border:1px solid #3380FF;border-radius:4px;z-index:10;cursor:pointer;}
 
 /* HUD */
@@ -1418,11 +1418,207 @@ class InputHandler {
 // ═══════════════════════════════════════════════════════════════
 // SECTION 15: RENDERER
 // ═══════════════════════════════════════════════════════════════
+// PIXEL ART SPRITE LIBRARY — NES 16-color palette, pixel-by-pixel
+// ═══════════════════════════════════════════════════════════════
+class SpriteLib {
+  constructor() {
+    this._spriteCache = {}; // "type:ownerId" -> OffscreenCanvas
+
+    // NES-inspired 16-color palette: char -> [r,g,b]
+    this.P = {
+      _: [0,0,0],        // 0: transparent
+      K: [30,30,40],     // 1: black / outline
+      W: [90,90,115],    // 2: dark wall gray-blue
+      w: [130,130,160],  // 3: light wall gray-blue
+      R: [185,50,50],    // 4: red / roof
+      r: [220,80,80],    // 5: light red
+      B: [50,50,165],    // 6: blue (barracks)
+      b: [80,80,210],    // 7: light blue
+      G: [40,120,40],    // 8: dark green
+      Y: [240,200,55],   // 9: yellow / sand / antenna
+      O: [160,110,55],   // A: brown (barracks door, wall stone)
+      o: [200,145,75],   // B: light brown
+      D: [18,18,28],     // C: dark ground
+      T: [160,160,180],  // D: turret metal
+      t: [200,200,220],  // E: turret metal light
+      H: [90,60,35],     // F: heavy body / helmet
+      L: [210,170,90],   // G: scout body / light skin
+      N: [120,70,35],    // H: heavy dark
+      M: [80,180,80],    // I: mine green glow
+      m: [180,255,100],  // J: mine bright
+      X: [255,255,255],  // K: white / highlight
+    };
+    this._pal = this.P;
+
+    // Sprite data: each row is a string of palette-key characters
+    // Dimensions in "art pixels" (each art pixel = SCALE canvas px)
+    this.DATA = {
+      hq: {
+        w:16, h:12, scale:8,
+        rows:[
+          '________________',
+          '______rrrr______',
+          '_____rrrrrr_____',
+          '____rrrrrrrr____',
+          '___rrrrrrrrrr___',
+          'WWWWWWWWWWWWWWWW',
+          'WwWWWWWWWWWWwWWW',
+          'WwWWWWWWWWWWwWWW',
+          'WwWWWWWWWWWWwWWW',
+          'WwWWKKWWKKWWKwWW',
+          'WwWDDOOWWDDOOWWW',
+          'WWWWWWWWWWWWWWWW',
+        ]
+      },
+      barracks: {
+        w:12, h:8, scale:8,
+        rows:[
+          '______BBBB______',
+          '_____BBBBBB_____',
+          '____BBBBBBBB____',
+          '___BBBBBBBBBB___',
+          'OOOoBBBBBBBBOOOo',
+          'OoooBBBBBBBBOooo',
+          'OoooBoBBBoBBoooo',
+          'OOOOOOOOOOOOOOOO',
+        ]
+      },
+      turret: {
+        w:8, h:8, scale:8,
+        rows:[
+          '____TTTT____',
+          '___TTTTTT___',
+          '__TTttTTtt__',
+          '_TTttTTTTtt_',
+          'TTttTTTTTTtt',
+          'TTTTTTTTTTTT',
+          'TTTTKKTTKKTT',
+          'DDTTTTTTDDTD',
+        ]
+      },
+      wall: {
+        w:4, h:4, scale:8,
+        rows:[
+          'OoOo',
+          'oOOo',
+          'OoOo',
+          'oO_o',
+        ]
+      },
+      mine: {
+        w:4, h:4, scale:8,
+        rows:[
+          '__Mm',
+          '_MmmM',
+          'MmmIj',
+          '_MmM_',
+        ]
+      },
+      workshop: {
+        w:12, h:8, scale:8,
+        rows:[
+          '____YYYY____',
+          '___YYYYYY___',
+          '__OOOOOOOOOO_',
+          '_oOOOOOOOOo__',
+          '_oOGGGOOGGGo_',
+          '_oOGGGOOGGGo_',
+          '__DoOOOooD__',
+          '__DDDDDDDD__',
+        ]
+      },
+      soldier: {
+        w:8, h:8, scale:6,
+        rows:[
+          '___DD___',
+          '___DD___',
+          '__HHHH__',
+          '__hHHh__',
+          '_SSSSSSS',
+          '_SSSS_SS',
+          '__SSS__S',
+          '__S___S_',
+        ]
+      },
+      heavy: {
+        w:10, h:10, scale:6,
+        rows:[
+          '____DDDD____',
+          '___DHHHH___',
+          '__HHHHHHH__',
+          '__hHHHHHh__',
+          '_NSSSSSSS_N',
+          '_NSSSSSSSSN',
+          '_NSSSSS_SSN',
+          '__NSSSS__NN',
+          '___NSS__NN_',
+          '____NN__N__',
+        ]
+      },
+      scout: {
+        w:7, h:7, scale:6,
+        rows:[
+          '__GGG__',
+          '__GLG__',
+          '_GGGGG_',
+          '_LGGGL_',
+          '_GGGGG_',
+          '__G_G__',
+          '_GG_GG_',
+        ]
+      },
+    };
+  }
+
+  // Draw one sprite data array to an offscreen canvas, scaled up by SCALE
+  _drawSprite(rows, artW, artH, SCALE, ownerColor) {
+    const oc = document.createElement('canvas');
+    oc.width = artW * SCALE;
+    oc.height = artH * SCALE;
+    const cx = oc.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+
+    for (let row = 0; row < artH; row++) {
+      const line = rows[row];
+      for (let col = 0; col < artW; col++) {
+        const key = line[col] || '_';
+        let color = this._pal[key];
+        if (!color) continue;
+
+        // 'S' = body (player-colored), 'G' = scout body, 'N' = heavy body
+        if (key === 'S' || key === 'G' || key === 'N') {
+          color = ownerColor;
+        }
+        cx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+        cx.fillRect(col * SCALE, row * SCALE, SCALE, SCALE);
+      }
+    }
+    return oc;
+  }
+
+  // Get (or create) the offscreen canvas for a given type + owner
+  getSprite(type, ownerId, playerColors) {
+    const key = `${type}:${ownerId}`;
+    if (this._spriteCache[key]) return this._spriteCache[key];
+
+    const def = this.DATA[type];
+    if (!def) return null;
+
+    const pc = playerColors[ownerId % playerColors.length];
+    const oc = this._drawSprite(def.rows, def.w, def.h, def.scale, pc);
+    this._spriteCache[key] = oc;
+    return oc;
+  }
+}
+// ═══════════════════════════════════════════════════════════════
+// RENDERER
+// ═══════════════════════════════════════════════════════════════
 class Renderer {
   constructor(ctx, canvasW, canvasH) {
     this.ctx = ctx;
     this.canvasW = canvasW;
     this.canvasH = canvasH;
+    this.sprites = new SpriteLib();
   }
 
   clear() {
@@ -1460,11 +1656,9 @@ class Renderer {
     }
   }
 
-  drawUnit(u, camX, playerColors) {
+drawUnit(u, camX, playerColors) {
     const ctx = this.ctx;
     const screen = this._worldToScreen(u.x - u.width / 2, u.y);
-    const pc = playerColors[u.ownerId % playerColors.length];
-    const flash = u.damageFlash > 0;
 
     // Selection ring
     if (u.selected) {
@@ -1475,13 +1669,28 @@ class Renderer {
       ctx.stroke();
     }
 
-    // Unit body
-    ctx.fillStyle = flash ? '#fff' : rgb(pc);
-    ctx.beginPath();
-    ctx.roundRect(screen.sx, screen.sy, u.width, u.height, 3);
-    ctx.fill();
+    // Sprite
+    const typeMap = { soldier:'soldier', heavy:'heavy', scout:'scout', tank:'heavy' };
+    const spriteType = typeMap[u.type] || 'soldier';
+    const sprite = this.sprites.getSprite(spriteType, u.ownerId, playerColors);
 
-    // Facing triangle
+    if (sprite) {
+      ctx.imageSmoothingEnabled = false;
+      const sw = sprite.width;
+      const sh = sprite.height;
+      // Center the sprite in the unit's screen footprint
+      const dx = screen.sx + (u.width - sw) / 2;
+      const dy = screen.sy + (u.height - sh) / 2;
+      ctx.drawImage(sprite, dx, dy, sw, sh);
+    }
+
+    // Damage flash overlay
+    if (u.damageFlash > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fillRect(screen.sx, screen.sy, u.width, u.height);
+    }
+
+    // Facing indicator
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
     const fx = u.facing > 0 ? screen.sx + u.width - 4 : screen.sx + 2;
     ctx.beginPath();
@@ -1491,8 +1700,8 @@ class Renderer {
     ctx.closePath();
     ctx.fill();
 
-    // HP bar (only when damaged or selected)
-    if (u.selected || u.hp < u.maxHp) {
+    // HP bar
+    if (u.hp < u.maxHp) {
       const barW = u.width;
       const barH = 3;
       const barX = screen.sx, barY = screen.sy - 6;
@@ -1506,7 +1715,6 @@ class Renderer {
   drawBuilding(b, camX, playerColors) {
     const ctx = this.ctx;
     const screen = this._worldToScreen(b.x - b.width / 2, b.y);
-    const pc = playerColors[b.ownerId % playerColors.length];
 
     // Selection ring
     if (b.selected) {
@@ -1517,47 +1725,45 @@ class Renderer {
       ctx.stroke();
     }
 
-    // Body fill (dimmer when under construction)
-    ctx.fillStyle = b.built ? rgb(pc) : `rgba(${Math.round(pc[0]*200)},${Math.round(pc[1]*200)},${Math.round(pc[2]*200)},0.5)`;
-    ctx.beginPath();
-    ctx.roundRect(screen.sx, screen.sy, b.width, b.height, 2);
-    ctx.fill();
-
-    // Border
-    ctx.strokeStyle = rgb([pc[0]+0.2, pc[1]+0.2, pc[2]+0.2]);
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(screen.sx, screen.sy, b.width, b.height, 2);
-    ctx.stroke();
-
-    // Type-specific interior detail
-    ctx.fillStyle = b.built ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)';
-    if (b.type === 'hq') {
-      // Flag pole
-      const poleX = screen.sx + b.width * 0.7, poleY = screen.sy + 2;
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.fillRect(poleX, poleY, 2, b.height * 0.5);
-      ctx.fillStyle = rgb(pc);
-      ctx.fillRect(poleX + 2, poleY, 8, 6);
-    } else if (b.type === 'turret') {
-      // Barrel
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      ctx.fillRect(screen.sx + b.width * 0.35, screen.sy + b.height * 0.3, b.width * 0.3, 6);
-    } else if (b.type === 'mine') {
-      // Diamond
-      const cx = screen.sx + b.width / 2, cy = screen.sy + b.height / 2;
-      ctx.fillStyle = 'rgba(255,200,0,0.7)';
+    // Sprite
+    const sprite = this.sprites.getSprite(b.type, b.ownerId, playerColors);
+    if (sprite) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(sprite, screen.sx, screen.sy, b.width, b.height);
+    } else {
+      // Fallback: colored rect for unknown types
+      const pc = playerColors[b.ownerId % playerColors.length];
+      ctx.fillStyle = b.built ? rgb(pc) : `rgba(${Math.round(pc[0]*200)},${Math.round(pc[1]*200)},${Math.round(pc[2]*200)},0.5)`;
       ctx.beginPath();
-      ctx.moveTo(cx, cy - 8); ctx.lineTo(cx + 7, cy);
-      ctx.lineTo(cx, cy + 8); ctx.lineTo(cx - 7, cy);
-      ctx.closePath(); ctx.fill();
-    } else if (b.type === 'barracks' || b.type === 'workshop') {
-      // Figure silhouette
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.beginPath();
-      ctx.arc(screen.sx + b.width / 2, screen.sy + b.height * 0.35, 4, 0, Math.PI * 2);
+      ctx.roundRect(screen.sx, screen.sy, b.width, b.height, 2);
       ctx.fill();
-      ctx.fillRect(screen.sx + b.width / 2 - 3, screen.sy + b.height * 0.4, 6, 8);
+    }
+
+    // Under-construction overlay (hatched + progress bar)
+    if (!b.built) {
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = '#1a2a4a';
+      ctx.fillRect(screen.sx, screen.sy, b.width, b.height);
+      // Diagonal hatch lines
+      ctx.strokeStyle = '#3380FF';
+      ctx.lineWidth = 1;
+      for (let i = -b.height; i < b.width; i += 6) {
+        ctx.beginPath();
+        ctx.moveTo(screen.sx + i, screen.sy);
+        ctx.lineTo(screen.sx + i + b.height, screen.sy + b.height);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      const barW = b.width;
+      const barH = 4;
+      const barX = screen.sx, barY = screen.sy + b.height + 2;
+      ctx.fillStyle = '#222';
+      ctx.fillRect(barX, barY, barW, barH);
+      ctx.fillStyle = '#3380FF';
+      ctx.fillRect(barX, barY, barW * b.buildProgress, barH);
+      return;
     }
 
     // HP bar
@@ -1569,17 +1775,6 @@ class Renderer {
       ctx.fillRect(barX, barY, barW, barH);
       ctx.fillStyle = b.hp > b.maxHp * 0.5 ? '#00FF66' : b.hp > b.maxHp * 0.25 ? '#FFAA00' : '#FF4D4D';
       ctx.fillRect(barX, barY, barW * (b.hp / b.maxHp), barH);
-    }
-
-    // Construction progress bar
-    if (!b.built) {
-      const barW = b.width;
-      const barH = 4;
-      const barX = screen.sx, barY = screen.sy + b.height + 2;
-      ctx.fillStyle = '#222';
-      ctx.fillRect(barX, barY, barW, barH);
-      ctx.fillStyle = '#3380FF';
-      ctx.fillRect(barX, barY, barW * b.buildProgress, barH);
     }
   }
 
