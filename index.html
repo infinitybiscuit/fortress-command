@@ -1255,6 +1255,12 @@ class InputHandler {
     this._swipeStartX = 0;
     this._EDGE_THRESHOLD = 30;
     this._SWIPE_THRESHOLD = 30;
+    this._lastX = 0;
+    this._lastY = 0;
+  }
+
+  fireHoverAtLastPosition() {
+    this.onBuildHover && this.onBuildHover(this._lastX, this._lastY);
   }
 
   attach(canvas) {
@@ -1271,12 +1277,16 @@ class InputHandler {
     this._pointerDown = e.pointerId;
     this._panStartCamX = e.clientX;
     this._panStartX = e.clientX;
+    this._lastX = e.clientX;
+    this._lastY = e.clientY;
     this._swipeStarted = false;
     if (e.clientX < this._EDGE_THRESHOLD) this._swipeStarted = true;
   }
 
   _onPointerMove(e) {
     e.preventDefault();
+    this._lastX = e.clientX;
+    this._lastY = e.clientY;
     if (this._pointerDown !== e.pointerId) return;
     if (e.clientX < this._EDGE_THRESHOLD && !this._swipeStarted) {
       this._swipeStarted = true;
@@ -1656,6 +1666,19 @@ class FortressCommand {
   }
 
   _setupBuildMenuDOM() {
+    // Delegated listener for train items — survives innerHTML rebuilds
+    document.getElementById('train-list').addEventListener('click', (e) => {
+      const item = e.target.closest('.train-item');
+      if (!item || item.classList.contains('disabled')) return;
+      const ut = item.dataset.unit;
+      const p = this.human;
+      const selB = p && p.selectedBuilding;
+      if (p && selB && ut) {
+        p.trainUnit(selB, ut);
+        this._updateBuildMenu();
+      }
+    });
+
     const buildList = document.getElementById('build-list');
     buildList.innerHTML = '';
     const order = ['barracks','turret','wall','mine','workshop'];
@@ -1669,7 +1692,7 @@ class FortressCommand {
         if (this.human && this.human.canAfford(cfg.cost)) {
           this.human.enterBuildMode(t);
           this._closeBuildMenu();
-          this._updateBuildMenu();
+          this.input && this.input.fireHoverAtLastPosition();
         }
       });
       buildList.appendChild(item);
@@ -1692,9 +1715,9 @@ class FortressCommand {
   }
 
   _updateBuildMenu() {
-    if (!this.human) return;
+    if (!this.human || !this._buildMenuOpen) return;
     const p = this.human;
-    // Building items
+    // Building items — just toggle disabled state
     document.querySelectorAll('#build-list .menu-item').forEach(item => {
       const t = item.dataset.type;
       const cost = BUILDING_TYPES[t].cost;
@@ -1711,13 +1734,8 @@ class FortressCommand {
         const cfg = UNIT_TYPES[ut];
         const item = document.createElement('div');
         item.className = 'train-item' + (p.canAfford(cfg.cost) ? '' : ' disabled');
+        item.dataset.unit = ut;
         item.innerHTML = `<div class="menu-name">${ut.toUpperCase()}</div><div class="menu-cost">$${cfg.cost}</div>`;
-        item.addEventListener('click', () => {
-          if (p.canAfford(cfg.cost)) {
-            p.trainUnit(selB, ut);
-            this._updateBuildMenu();
-          }
-        });
         trainList.appendChild(item);
       }
     } else {
