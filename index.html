@@ -347,8 +347,8 @@ class TileMap {
 
   getGroundY(worldX) {
     const { tx } = this.worldToTile(worldX);
-    // Ground surface = first solid tile from bottom upward, return its TOP surface
-    for (let ty = this.height - 1; ty >= 0; ty--) {
+    // Surface = topmost solid tile (first hit scanning top-to-bottom)
+    for (let ty = 0; ty < this.height; ty++) {
       if (this.isSolid(tx, ty)) return ty * TILE_SIZE;
     }
     return (this.height - GROUND_LEVEL_TILE) * TILE_SIZE;
@@ -1281,9 +1281,7 @@ class InputHandler {
     if (e.clientX < this._EDGE_THRESHOLD && !this._swipeStarted) {
       this._swipeStarted = true;
     }
-    if (this._swipeStarted) {
-      this.onBuildHover && this.onBuildHover(e.clientX, e.clientY);
-    }
+    this.onBuildHover && this.onBuildHover(e.clientX, e.clientY);
     const dx = e.clientX - this._panStartX;
     if (Math.abs(dx) > 8) {
       this.onPan && this.onPan(dx);
