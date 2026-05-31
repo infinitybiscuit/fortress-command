@@ -1527,8 +1527,8 @@ class SpriteLib {
           '__DDDDDDDD__',
         ]
       },
-      soldier: {
-        w:8, h:8, scale:4, feetInset:4,
+soldier: {
+        w:8, h:8, scale:4, groundOffset:12,
         rows:[
           '___DD___',
           '___DD___',
@@ -1541,7 +1541,7 @@ class SpriteLib {
         ]
       },
       heavy: {
-        w:10, h:10, scale:5, feetInset:5,
+        w:10, h:10, scale:5, groundOffset:28,
         rows:[
           '____DDDD____',
           '___DHHHH___',
@@ -1556,7 +1556,7 @@ class SpriteLib {
         ]
       },
       scout: {
-        w:7, h:7, scale:4, feetInset:4,
+        w:7, h:7, scale:4, groundOffset:10,
         rows:[
           '__GGG__',
           '__GLG__',
@@ -1679,10 +1679,10 @@ drawUnit(u, camX, playerColors) {
       const sw = sprite.width;
       const sh = sprite.height;
       const def = this.sprites.DATA[spriteType];
-      const inset = def ? (def.feetInset || 0) : 0;
-      // Anchor sprite top to unit top, shift up by feetInset so art feet land on ground
+      const go = def ? (def.groundOffset || 0) : 0;
+      // Shift sprite up so its bottom lands at collision bottom (u.y + u.height)
       const dx = screen.sx + (u.width - sw) / 2;
-      const dy = screen.sy - inset;
+      const dy = screen.sy - go;
       ctx.drawImage(sprite, dx, dy, sw, sh);
     }
 
