@@ -1606,23 +1606,24 @@ class Renderer {
 
   // Draw a CTF flag pennant at world position (wx, wy).
   // ownerCol is [r,g,b] of the flag's owner.
+  // wy is the GROUND LEVEL — pole base sits here, pennant extends upward.
   drawCtfFlag(wx, wy, ownerCol, camX) {
     const ctx = this.ctx;
     const { sx, sy } = this._worldToScreen(wx - 10, wy - 32);
     const col = rgb(ownerCol);
-    // Pole
+    // Pole — base at (sx+10, sy), top at (sx+10, sy-28)
     ctx.strokeStyle = 'rgba(255,255,255,0.7)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(sx + 10, sy);
-    ctx.lineTo(sx + 10, sy + 28);
+    ctx.moveTo(sx + 10, sy);        // base on ground
+    ctx.lineTo(sx + 10, sy - 28);   // top of pole
     ctx.stroke();
-    // Pennant (pointing right)
+    // Pennant (pointing right) — hangs from top of pole
     ctx.fillStyle = col;
     ctx.beginPath();
-    ctx.moveTo(sx + 10, sy);
-    ctx.lineTo(sx + 28, sy + 7);
-    ctx.lineTo(sx + 10, sy + 14);
+    ctx.moveTo(sx + 10, sy - 28);  // top of pole
+    ctx.lineTo(sx + 28, sy - 21);  // tip
+    ctx.lineTo(sx + 10, sy - 14);  // bottom of pennant
     ctx.closePath();
     ctx.fill();
   }
@@ -2279,9 +2280,9 @@ _updateHUD() {
         const fs = this.ctf[p.id];
         const flagCol = C.PLAYER[p.id % C.PLAYER.length];
         if (fs.atBase && p.hq && p.hq.alive) {
-          // Draw flag next to HQ (offset to the side based on player id)
-          const flagX = p.hq.x + (p.id % 2 === 0 ? p.hq.width / 2 + 8 : -p.hq.width / 2 - 8);
-          const flagY = p.hq.y + 4;
+          // Flag on the ground at the center of the HQ
+          const flagX = p.hq.x;
+          const flagY = p.hq.y + p.hq.height; // ground level (top edge of ground tiles)
           this.renderer.drawCtfFlag(flagX, flagY, flagCol, this.camera.x);
         }
         // Draw carried flag above carrier unit
