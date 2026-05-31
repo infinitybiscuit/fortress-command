@@ -103,6 +103,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#141A38;font-family:
   <button class="mode-btn" data-mode="1v1_local">1 vs 1 Local</button>
   <button class="mode-btn" data-mode="ffa_3">Free-for-All (3)</button>
   <button class="mode-btn" data-mode="ffa_4">Free-for-All (4)</button>
+  <button class="mode-btn" data-mode="ctf_1v1_cpu" style="border-color:#FFCC00;color:#FFCC00;">Capture the Flag</button>
 </div>
 
 <div id="gameover-screen" class="hidden">
@@ -510,6 +511,8 @@ class Unit {
     this.selected = false;
     this.state = 'idle';
     this.damageFlash = 0;
+    // CTF: which playerId's flag this unit is carrying (null = not carrying)
+    this.flagCarrying = null;
   }
 
   update(dt, tilemap) {
@@ -1601,6 +1604,54 @@ class Renderer {
     ctx.fill();
   }
 
+  // Draw a CTF flag pennant at world position (wx, wy).
+  // ownerCol is [r,g,b] of the flag's owner.
+  drawCtfFlag(wx, wy, ownerCol, camX) {
+    const ctx = this.ctx;
+    const { sx, sy } = this._worldToScreen(wx - 10, wy - 32);
+    const col = rgb(ownerCol);
+    // Pole
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx + 10, sy);
+    ctx.lineTo(sx + 10, sy + 28);
+    ctx.stroke();
+    // Pennant (pointing right)
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(sx + 10, sy);
+    ctx.lineTo(sx + 28, sy + 7);
+    ctx.lineTo(sx + 10, sy + 14);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Draw a small flag icon above a unit that is carrying a flag.
+  // carrierCol is the color of the flag being carried.
+  drawFlagCarrier(u, carrierCol, camX) {
+    const ctx = this.ctx;
+    const screen = this._worldToScreen(u.x - u.width / 2, u.y);
+    const col = rgb(carrierCol);
+    const fx = screen.sx + u.width / 2;
+    const fy = screen.sy - 10;
+    // Mini pennant
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(fx - 4, fy);
+    ctx.lineTo(fx + 6, fy + 4);
+    ctx.lineTo(fx - 4, fy + 8);
+    ctx.closePath();
+    ctx.fill();
+    // Pole
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(fx - 4, fy + 8);
+    ctx.lineTo(fx - 4, fy + 16);
+    ctx.stroke();
+  }
+
   drawBuildPreview(tx, ty, valid, buildingType, camX) {
     const ctx = this.ctx;
     const cfg = BUILDING_TYPES[buildingType];
@@ -1871,7 +1922,7 @@ class FortressCommand {
     const rightX = (MAP_WIDTH_TILES - 8) * TILE_SIZE;
 
     this.players = [];
-    if (this.mode === '1v1_cpu') {
+    if (this.mode === '1v1_cpu' || this.mode === 'ctf_1v1_cpu') {
       this.players.push(new HumanPlayer(0, leftX, this.tilemap));
       this.players.push(new CpuPlayer(1, rightX, this.tilemap));
     } else if (this.mode === '1v1_local') {
@@ -1896,6 +1947,15 @@ class FortressCommand {
 
     this.human = this.players[0];
     this.mines = []; // mines are tracked separately for proximity explosion detection
+    // CTF state — initialized only when CTF mode is active
+    this.ctf = null;
+    if (this.mode.startsWith('ctf')) {
+      // Each player's flag starts at their base (alongside their HQ)
+      this.ctf = {};
+      for (const p of this.players) {
+        this.ctf[p.id] = { atBase: true, carrierId: null };
+      }
+    }
     this.camera.focusOn(this.human.startX);
     this.camera.x = this.camera.targetX;
 
@@ -1922,7 +1982,7 @@ class FortressCommand {
 
     document.getElementById('menu-screen').classList.add('hidden');
     document.getElementById('gameover-screen').classList.add('hidden');
-    document.getElementById('mode-label').textContent = { '1v1_cpu':'1 vs CPU', '1v1_local':'1 vs 1 Local', 'ffa_3':'Free-for-All (3)', 'ffa_4':'Free-for-All (4)' }[this.mode] || this.mode;
+    document.getElementById('mode-label').textContent = { '1v1_cpu':'1 vs CPU', '1v1_local':'1 vs 1 Local', 'ffa_3':'Free-for-All (3)', 'ffa_4':'Free-for-All (4)', 'ctf_1v1_cpu':'Capture the Flag' }[this.mode] || this.mode;
     this._updateHUD();
     window._fc_game = this;
   }
@@ -1985,12 +2045,16 @@ class FortressCommand {
     this._winner = winner;
     const title = document.getElementById('go-title');
     const isVictory = winner && winner.id === 0;
-    title.textContent = isVictory ? 'VICTORY' : 'DEFEAT';
+    if (this.ctf) {
+      title.textContent = isVictory ? 'FLAG CAPTURED!' : 'FLAG LOST';
+    } else {
+      title.textContent = isVictory ? 'VICTORY' : 'DEFEAT';
+    }
     title.className = 'go-title ' + (isVictory ? 'victory' : 'defeat');
     document.getElementById('gameover-screen').classList.remove('hidden');
   }
 
-  _updateHUD() {
+_updateHUD() {
     if (!this.human) return;
     document.getElementById('hud-credits').textContent = `💰 ${this.human.credits}`;
     document.getElementById('hud-income').textContent = `+${this.human.totalIncome}/s`;
@@ -1998,6 +2062,15 @@ class FortressCommand {
     const selUnits = this.human.selectedUnits;
     const selBldg = this.human.selectedBuilding;
     let info = 'TAP A UNIT OR BUILDING';
+    if (this.ctf) {
+      const myFlag = this.ctf[this.human.id];
+      const enemyFlag = this.ctf[1 - this.human.id];
+      if (myFlag && !myFlag.atBase) {
+        info = '⚑ YOUR FLAG TAKEN — RECOVER IT!';
+      } else if (enemyFlag && !enemyFlag.atBase) {
+        info = '⚑ ENEMY FLAG CAPTURED — RETURN TO BASE!';
+      }
+    }
     if (selUnits.length === 1) {
       const u = selUnits[0];
       info = `${u.type.toUpperCase()}  HP:${u.hp}/${u.maxHp}`;
@@ -2033,6 +2106,11 @@ class FortressCommand {
       for (const u of p.units) {
         u.update(dt, this.tilemap);
       }
+    }
+
+    // CTF: flag pickup, drop-on-death, and capture
+    if (this.ctf) {
+      this._ctfUpdate();
     }
 
     // Mine proximity — check units walking into unexploded mines
@@ -2098,6 +2176,62 @@ class FortressCommand {
     this._tickMenuAffordability();
   }
 
+  // CTF: pickup, drop-on-death, capture
+  _ctfUpdate() {
+    const CAPTURE_DIST = 80; // pixels — distance to own HQ to capture
+
+    for (const carrierPlayer of this.players) {
+      for (const u of carrierPlayer.units) {
+        if (!u.alive || u.flagCarrying === null) continue;
+
+        // Flag pickup: unit walks over enemy flag at base
+        for (const flagPlayer of this.players) {
+          if (flagPlayer.id === carrierPlayer.id) continue;
+          const fs = this.ctf[flagPlayer.id];
+          if (!fs.atBase) continue;
+          if (!flagPlayer.hq || !flagPlayer.hq.alive) continue;
+
+          // Check if unit is near the enemy HQ (flag location)
+          const dx = Math.abs(u.x - flagPlayer.hq.x);
+          const dy = Math.abs(u.centerY - flagPlayer.hq.y);
+          if (dx < 60 && dy < 80) {
+            // Pick up the flag!
+            u.flagCarrying = flagPlayer.id;
+            fs.atBase = false;
+            fs.carrierId = u.id;
+            // Flag carrier must return to their own HQ — clear attack orders, set move home
+            u.target = null;
+            u.moveTargetX = carrierPlayer.hq.x;
+            u.state = 'moving';
+          }
+        }
+
+        // Flag drop: carrier died — return flag to base
+        if (!u.alive && u.flagCarrying !== null) {
+          const fs = this.ctf[u.flagCarrying];
+          if (fs) {
+            fs.atBase = true;
+            fs.carrierId = null;
+          }
+          u.flagCarrying = null;
+          continue;
+        }
+
+        // Flag capture: carrier reached their own HQ
+        if (carrierPlayer.hq && carrierPlayer.hq.alive) {
+          const dx = Math.abs(u.x - carrierPlayer.hq.x);
+          const dy = Math.abs(u.centerY - carrierPlayer.hq.y);
+          if (dx < CAPTURE_DIST && dy < CAPTURE_DIST) {
+            // Captured! The carrier's player wins
+            this._gameOver = true;
+            setTimeout(() => this._showGameOver(carrierPlayer), 300);
+            return;
+          }
+        }
+      }
+    }
+  }
+
   _render() {
     if (this.scene === 'menu') return;
 
@@ -2137,6 +2271,30 @@ class FortressCommand {
     // Projectiles
     for (const p of this.combatSys.projectiles) {
       if (p.alive) this.renderer.drawProjectile(p, this.camera.x);
+    }
+
+    // CTF flags
+    if (this.ctf) {
+      for (const p of this.players) {
+        const fs = this.ctf[p.id];
+        const flagCol = C.PLAYER[p.id % C.PLAYER.length];
+        if (fs.atBase && p.hq && p.hq.alive) {
+          // Draw flag next to HQ (offset to the side based on player id)
+          const flagX = p.hq.x + (p.id % 2 === 0 ? p.hq.width / 2 + 8 : -p.hq.width / 2 - 8);
+          const flagY = p.hq.y + 4;
+          this.renderer.drawCtfFlag(flagX, flagY, flagCol, this.camera.x);
+        }
+        // Draw carried flag above carrier unit
+        if (fs.carrierId !== null) {
+          for (const op of this.players) {
+            for (const u of op.units) {
+              if (u.id === fs.carrierId && u.alive && u.flagCarrying !== null) {
+                this.renderer.drawFlagCarrier(u, flagCol, this.camera.x);
+              }
+            }
+          }
+        }
+      }
     }
 
     // Selection box (screen coordinates — draw before ctx.restore)
