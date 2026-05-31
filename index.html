@@ -11,7 +11,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#141A38;font-family:
 #minimap-canvas{display:block;position:fixed;bottom:8px;right:8px;width:180px;height:40px;background:rgba(26,26,38,0.8);border:1px solid #3380FF;border-radius:4px;z-index:10;cursor:pointer;}
 
 /* HUD */
-#hud{position:fixed;top:0;left:0;right:0;height:80px;background:rgba(26,26,38,0.9);display:flex;align-items:center;padding:0 20px;gap:20px;color:#fff;font-size:14px;z-index:10;pointer-events:none;}
+#hud{position:fixed;top:0;left:0;right:0;height:80px;background:rgba(26,26,38,0.9);display:flex;align-items:center;padding:0 20px;gap:20px;color:#fff;font-size:14px;z-index:10;pointer-events:none;transition:padding-left 0.15s;}
+#hud.menu-open{padding-left:280px;}
 #hud-left{display:flex;flex-direction:column;gap:2px;min-width:100px;}
 #hud-center{flex:1;text-align:center;}
 #hud-right{text-align:right;min-width:80px;}
@@ -38,9 +39,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#141A38;font-family:
 .menu-time{color:#555;font-size:11px;}
 
 #train-section{margin-top:8px;}
-.train-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;margin-bottom:3px;}
+.train-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;margin-bottom:3px;border:1px solid transparent;transition:background 0.1s;}
 .train-item:hover{background:rgba(51,128,255,0.2);}
 .train-item.disabled{opacity:0.35;pointer-events:none;}
+.train-item.queued{background:rgba(0,255,102,0.25);border-color:#00FF66;}
 
 #menu-close{position:absolute;top:12px;right:12px;font-size:18px;color:#557;cursor:pointer;padding:4px 8px;}
 #menu-close:hover{color:#fff;}
@@ -1674,8 +1676,12 @@ class FortressCommand {
       const p = this.human;
       const selB = p && p.selectedBuilding;
       if (p && selB && ut) {
-        p.trainUnit(selB, ut);
-        this._updateBuildMenu();
+        if (p.trainUnit(selB, ut)) {
+          item.classList.add('queued');
+          setTimeout(() => item.classList.remove('queued'), 350);
+          this._updateBuildMenu();
+          this._updateHUD();
+        }
       }
     });
 
@@ -1706,12 +1712,27 @@ class FortressCommand {
   _toggleBuildMenu() {
     this._buildMenuOpen = !this._buildMenuOpen;
     document.getElementById('build-menu').classList.toggle('open', this._buildMenuOpen);
+    document.getElementById('hud').classList.toggle('menu-open', this._buildMenuOpen);
     if (this._buildMenuOpen) this._updateBuildMenu();
   }
 
   _closeBuildMenu() {
     this._buildMenuOpen = false;
     document.getElementById('build-menu').classList.remove('open');
+    document.getElementById('hud').classList.remove('menu-open');
+  }
+
+  _tickMenuAffordability() {
+    if (!this._buildMenuOpen || !this.human) return;
+    const p = this.human;
+    document.querySelectorAll('#build-list .menu-item').forEach(item => {
+      const cost = BUILDING_TYPES[item.dataset.type]?.cost;
+      if (cost !== undefined) item.classList.toggle('disabled', !p.canAfford(cost));
+    });
+    document.querySelectorAll('#train-list .train-item').forEach(item => {
+      const cost = UNIT_TYPES[item.dataset.unit]?.cost;
+      if (cost !== undefined) item.classList.toggle('disabled', !p.canAfford(cost));
+    });
   }
 
   _updateBuildMenu() {
@@ -1919,7 +1940,7 @@ class FortressCommand {
     }
 
     this._updateHUD();
-    this._updateBuildMenu();
+    this._tickMenuAffordability();
   }
 
   _render() {
