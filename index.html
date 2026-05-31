@@ -1606,12 +1606,12 @@ class Renderer {
 
   // Draw a CTF flag pennant at world position (wx, wy).
   // ownerCol is [r,g,b] of the flag's owner.
-  // wy is the GROUND LEVEL — pole base sits here, pennant extends upward.
+  // wx, wy = GROUND LEVEL base of the flag pole.
   drawCtfFlag(wx, wy, ownerCol, camX) {
     const ctx = this.ctx;
-    const { sx, sy } = this._worldToScreen(wx - 10, wy - 32);
+    const { sx, sy } = this._worldToScreen(wx - 10, wy);
     const col = rgb(ownerCol);
-    // Pole — base at (sx+10, sy), top at (sx+10, sy-28)
+    // Pole — base at ground (sx+10, sy), top at (sx+10, sy-28)
     ctx.strokeStyle = 'rgba(255,255,255,0.7)';
     ctx.lineWidth = 2;
     ctx.beginPath();
