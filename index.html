@@ -11,7 +11,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#141A38;font-family:
 #minimap-canvas{display:block;position:fixed;bottom:8px;right:8px;width:180px;height:40px;background:rgba(26,26,38,0.8);border:1px solid #3380FF;border-radius:4px;z-index:10;cursor:pointer;}
 
 /* HUD */
-#hud{position:fixed;top:0;left:0;right:0;height:80px;background:rgba(26,26,38,0.9);display:flex;align-items:center;padding:0 20px;gap:20px;color:#fff;font-size:14px;z-index:10;pointer-events:none;}
+#hud{position:fixed;top:0;left:0;right:0;height:80px;background:rgba(26,26,38,0.9);display:flex;align-items:center;padding:0 20px;gap:20px;color:#fff;font-size:14px;z-index:10;pointer-events:none;transition:padding-left 0.15s;}
+#hud.menu-open{padding-left:280px;}
 #hud-left{display:flex;flex-direction:column;gap:2px;min-width:100px;}
 #hud-center{flex:1;text-align:center;}
 #hud-right{text-align:right;min-width:80px;}
@@ -38,9 +39,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#141A38;font-family:
 .menu-time{color:#555;font-size:11px;}
 
 #train-section{margin-top:8px;}
-.train-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;margin-bottom:3px;}
+.train-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;margin-bottom:3px;border:1px solid transparent;transition:background 0.1s;}
 .train-item:hover{background:rgba(51,128,255,0.2);}
 .train-item.disabled{opacity:0.35;pointer-events:none;}
+.train-item.queued{background:rgba(0,255,102,0.25);border-color:#00FF66;}
 
 #menu-close{position:absolute;top:12px;right:12px;font-size:18px;color:#557;cursor:pointer;padding:4px 8px;}
 #menu-close:hover{color:#fff;}
@@ -356,9 +358,9 @@ class TileMap {
   }
 
   getGroundY(worldX) {
-    // Ground surface = first solid tile from bottom upward, return its TOP surface
     const { tx } = this.worldToTile(worldX);
-    for (let ty = this.height - 1; ty >= 0; ty--) {
+    // Surface = topmost solid tile (first hit scanning top-to-bottom)
+    for (let ty = 0; ty < this.height; ty++) {
       if (this.isSolid(tx, ty)) return ty * TILE_SIZE;
     }
     return (this.height - GROUND_LEVEL_TILE) * TILE_SIZE;
@@ -383,7 +385,6 @@ class TileMap {
     const sitsOnGround = (tileY + h - 1 === gsY - 1);
     // All footprint tiles must be empty, EXCEPT ground tiles are allowed
     // when the building sits on the ground surface (ground forms a solid base below)
-    // Also allow footprint tiles occupied by other buildings (building-on-building)
     for (let tx = tileX; tx < tileX + w; tx++) {
       for (let ty = tileY; ty < tileY + h; ty++) {
         const tile = this.getTile(tx, ty);
@@ -394,7 +395,6 @@ class TileMap {
       }
     }
     // Must have solid ground directly below the building's bottom edge
-    // (this.isSolid also returns true for buildings in _buildingTiles)
     const bottomTy = tileY + h - 1;
     for (let tx = tileX; tx < tileX + w; tx++) {
       if (!this.isSolid(tx, bottomTy + 1)) return false;
@@ -571,25 +571,28 @@ class Unit {
     }
     this.x = newX;
 
-    // Vertical — check ground beneath the unit's feet
+    // Vertical — sweep from old feet to new feet to prevent tunnelling on large dt
     let newY = this.y + this.vy * dt;
     this.onGround = false;
-    // Check a small margin below the feet to catch the platform surface
-    const checkY = newY + this.height + 2; // 2px below feet
     const txL = floor((this.x - halfW + 2) / TILE_SIZE);
     const txR = floor((this.x + halfW - 2) / TILE_SIZE);
-    const tyGnd = floor(checkY / TILE_SIZE);
-    for (let checkTx = txL; checkTx <= txR; checkTx++) {
-      if (tilemap.isSolid(checkTx, tyGnd)) {
-        // Place unit on top of this tile
-        newY = tyGnd * TILE_SIZE - this.height;
-        this.vy = 0;
-        this.onGround = true;
-        break;
+    if (this.vy >= 0) {
+      // Falling / standing: sweep downward from old feet tile to new feet tile
+      const oldFeetTy = floor((this.y + this.height) / TILE_SIZE);
+      const newFeetTy = floor((newY + this.height + 1) / TILE_SIZE);
+      outer:
+      for (let ty = oldFeetTy; ty <= newFeetTy; ty++) {
+        for (let tx = txL; tx <= txR; tx++) {
+          if (tilemap.isSolid(tx, ty)) {
+            newY = ty * TILE_SIZE - this.height;
+            this.vy = 0;
+            this.onGround = true;
+            break outer;
+          }
+        }
       }
-    }
-    // Ceiling check (upward movement)
-    if (this.vy < 0) {
+    } else {
+      // Rising: ceiling check
       const ty = floor(newY / TILE_SIZE);
       const tx = floor(this.x / TILE_SIZE);
       if (tilemap.isSolid(tx, ty)) {
@@ -762,47 +765,43 @@ class Projectile {
     this.x = x;
     this.y = y;
     this.vx = direction * PROJECTILE_SPEED;
+    this.damage = damage;
+    this.ownerId = ownerId;
+    this.alive = true;
+    this.radius = PROJECTILE_RADIUS;
     // Ballistic arc: use quadratic solution so targets at same height get
-  // correct horizontal shots, not zero-vy shots that overshoot.
-  // Solves: y + vy*t + 0.5*g*t² = targetY  with  vx*t = targetX - x
-  if (targetX !== null && targetY !== null) {
-    const distX = Math.abs(targetX - x);
-    const s = direction * PROJECTILE_SPEED; // signed horizontal speed
-    let t, vy;
-    if (distX < 1) {
-      // Nearly vertical shot — use time to reach target height under gravity
-      const dy = targetY - y;
-      t = (PROJECTILE_SPEED + Math.sqrt(PROJECTILE_SPEED * PROJECTILE_SPEED - GRAVITY * Math.abs(dy))) / GRAVITY;
-      vy = (dy - 0.5 * GRAVITY * t * t) / t;
-      // Clamp to projectile speed
-      const spd = Math.sqrt(vx * vx + vy * vy);
-      if (spd > PROJECTILE_SPEED) { vy = vy / spd * PROJECTILE_SPEED; }
-    } else {
-      t = distX / Math.abs(s);
-      // Quadratic: 0.5*g*t² + vy*t + (y - targetY) = 0
-      // Solve for vy using the root that gives sensible arc direction
-      const a = 0.5 * GRAVITY * t * t;
-      const bplus = targetY - y + a;
-      const disc = bplus * bplus + 2 * a * (targetY - y);
-      if (disc >= 0) {
-        vy = (-bplus + Math.sqrt(disc)) / t;
+    // correct horizontal shots, not zero-vy shots that overshoot.
+    // Solves: y + vy*t + 0.5*g*t² = targetY  with  vx*t = targetX - x
+    if (targetX !== null && targetY !== null) {
+      const distX = Math.abs(targetX - x);
+      const s = direction * PROJECTILE_SPEED;
+      let t, vy;
+      if (distX < 1) {
+        const dy = targetY - y;
+        t = (PROJECTILE_SPEED + Math.sqrt(PROJECTILE_SPEED * PROJECTILE_SPEED - GRAVITY * Math.abs(dy))) / GRAVITY;
+        vy = (dy - 0.5 * GRAVITY * t * t) / t;
+        const spd = Math.sqrt(this.vx * this.vx + vy * vy);
+        if (spd > PROJECTILE_SPEED) { vy = vy / spd * PROJECTILE_SPEED; }
       } else {
-        vy = (targetY - y) / t - 0.5 * GRAVITY * t;
+        t = distX / Math.abs(s);
+        const a = 0.5 * GRAVITY * t * t;
+        const bplus = targetY - y + a;
+        const disc = bplus * bplus + 2 * a * (targetY - y);
+        if (disc >= 0) {
+          vy = (-bplus + Math.sqrt(disc)) / t;
+        } else {
+          vy = (targetY - y) / t - 0.5 * GRAVITY * t;
+        }
       }
-    }
-    this.vy = vy;
-    this._angle = Math.atan2(this.vy, this.vx);
-  } else if (targetY !== null) {
+      this.vy = vy;
+      this._angle = Math.atan2(this.vy, this.vx);
+    } else if (targetY !== null) {
       this.vy = (targetY - y) * 0.5;
       this._angle = Math.atan2(this.vy, this.vx);
     } else {
       this.vy = 0;
       this._angle = direction > 0 ? 0 : Math.PI;
     }
-    this.damage = damage;
-    this.ownerId = ownerId;
-    this.alive = true;
-    this.radius = PROJECTILE_RADIUS;
   }
 
   update(dt) {
@@ -1285,6 +1284,12 @@ class InputHandler {
     this._swipeStartX = 0;
     this._EDGE_THRESHOLD = 30;
     this._SWIPE_THRESHOLD = 30;
+    this._lastX = 0;
+    this._lastY = 0;
+  }
+
+  fireHoverAtLastPosition() {
+    this.onBuildHover && this.onBuildHover(this._lastX, this._lastY);
   }
 
   attach(canvas) {
@@ -1301,19 +1306,21 @@ class InputHandler {
     this._pointerDown = e.pointerId;
     this._panStartCamX = e.clientX;
     this._panStartX = e.clientX;
+    this._lastX = e.clientX;
+    this._lastY = e.clientY;
     this._swipeStarted = false;
     if (e.clientX < this._EDGE_THRESHOLD) this._swipeStarted = true;
   }
 
   _onPointerMove(e) {
     e.preventDefault();
+    this._lastX = e.clientX;
+    this._lastY = e.clientY;
     if (this._pointerDown !== e.pointerId) return;
     if (e.clientX < this._EDGE_THRESHOLD && !this._swipeStarted) {
       this._swipeStarted = true;
     }
-    if (this._swipeStarted) {
-      this.onBuildHover && this.onBuildHover(e.clientX, e.clientY);
-    }
+    this.onBuildHover && this.onBuildHover(e.clientX, e.clientY);
     const dx = e.clientX - this._panStartX;
     if (Math.abs(dx) > 8) {
       this.onPan && this.onPan(dx);
@@ -1521,7 +1528,6 @@ class Renderer {
     const angle = p._angle;
     const tx = sx - Math.cos(angle) * trailLen;
     const ty = sy - Math.sin(angle) * trailLen;
-    // Trail line
     ctx.strokeStyle = 'rgba(255,220,80,0.4)';
     ctx.lineWidth = p.radius * 1.2;
     ctx.lineCap = 'round';
@@ -1689,6 +1695,23 @@ class FortressCommand {
   }
 
   _setupBuildMenuDOM() {
+    // Delegated listener for train items — survives innerHTML rebuilds
+    document.getElementById('train-list').addEventListener('click', (e) => {
+      const item = e.target.closest('.train-item');
+      if (!item || item.classList.contains('disabled')) return;
+      const ut = item.dataset.unit;
+      const p = this.human;
+      const selB = p && p.selectedBuilding;
+      if (p && selB && ut) {
+        if (p.trainUnit(selB, ut)) {
+          item.classList.add('queued');
+          setTimeout(() => item.classList.remove('queued'), 350);
+          this._updateBuildMenu();
+          this._updateHUD();
+        }
+      }
+    });
+
     const buildList = document.getElementById('build-list');
     buildList.innerHTML = '';
     const order = ['barracks','turret','wall','mine','workshop'];
@@ -1702,7 +1725,7 @@ class FortressCommand {
         if (this.human && this.human.canAfford(cfg.cost)) {
           this.human.enterBuildMode(t);
           this._closeBuildMenu();
-          this._updateBuildMenu();
+          this.input && this.input.fireHoverAtLastPosition();
         }
       });
       buildList.appendChild(item);
@@ -1716,18 +1739,33 @@ class FortressCommand {
   _toggleBuildMenu() {
     this._buildMenuOpen = !this._buildMenuOpen;
     document.getElementById('build-menu').classList.toggle('open', this._buildMenuOpen);
+    document.getElementById('hud').classList.toggle('menu-open', this._buildMenuOpen);
     if (this._buildMenuOpen) this._updateBuildMenu();
   }
 
   _closeBuildMenu() {
     this._buildMenuOpen = false;
     document.getElementById('build-menu').classList.remove('open');
+    document.getElementById('hud').classList.remove('menu-open');
+  }
+
+  _tickMenuAffordability() {
+    if (!this._buildMenuOpen || !this.human) return;
+    const p = this.human;
+    document.querySelectorAll('#build-list .menu-item').forEach(item => {
+      const cost = BUILDING_TYPES[item.dataset.type]?.cost;
+      if (cost !== undefined) item.classList.toggle('disabled', !p.canAfford(cost));
+    });
+    document.querySelectorAll('#train-list .train-item').forEach(item => {
+      const cost = UNIT_TYPES[item.dataset.unit]?.cost;
+      if (cost !== undefined) item.classList.toggle('disabled', !p.canAfford(cost));
+    });
   }
 
   _updateBuildMenu() {
-    if (!this.human) return;
+    if (!this.human || !this._buildMenuOpen) return;
     const p = this.human;
-    // Building items
+    // Building items — just toggle disabled state
     document.querySelectorAll('#build-list .menu-item').forEach(item => {
       const t = item.dataset.type;
       const cost = BUILDING_TYPES[t].cost;
@@ -1744,13 +1782,8 @@ class FortressCommand {
         const cfg = UNIT_TYPES[ut];
         const item = document.createElement('div');
         item.className = 'train-item' + (p.canAfford(cfg.cost) ? '' : ' disabled');
+        item.dataset.unit = ut;
         item.innerHTML = `<div class="menu-name">${ut.toUpperCase()}</div><div class="menu-cost">$${cfg.cost}</div>`;
-        item.addEventListener('click', () => {
-          if (p.canAfford(cfg.cost)) {
-            p.trainUnit(selB, ut);
-            this._updateBuildMenu();
-          }
-        });
         trainList.appendChild(item);
       }
     } else {
@@ -1924,7 +1957,6 @@ class FortressCommand {
     for (const mine of this.mines) {
       if (!mine.alive || mine.hasExploded) continue;
       const halfW = mine.width / 2;
-      const halfH = mine.height / 2;
       for (const p of this.players) {
         for (const u of p.units) {
           if (!u.alive) continue;
@@ -1946,7 +1978,7 @@ class FortressCommand {
             lastP.vx = 0; lastP.vy = 0; // stationary explosion visual
             lastP._angle = 0;
             lastP.alive = true;
-            // Damage all units near the mine (2 tiles radius)
+            // Damage all units near the mine (2.5 tiles radius)
             const blastRadius = TILE_SIZE * 2.5;
             for (const op of this.players) {
               for (const other of op.units) {
@@ -1981,7 +2013,7 @@ class FortressCommand {
     }
 
     this._updateHUD();
-    this._updateBuildMenu();
+    this._tickMenuAffordability();
   }
 
   _render() {
