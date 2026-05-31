@@ -561,25 +561,28 @@ class Unit {
     }
     this.x = newX;
 
-    // Vertical — check ground beneath the unit's feet
+    // Vertical — sweep from old feet to new feet to prevent tunnelling on large dt
     let newY = this.y + this.vy * dt;
     this.onGround = false;
-    // Check a small margin below the feet to catch the platform surface
-    const checkY = newY + this.height + 2; // 2px below feet
     const txL = floor((this.x - halfW + 2) / TILE_SIZE);
     const txR = floor((this.x + halfW - 2) / TILE_SIZE);
-    const tyGnd = floor(checkY / TILE_SIZE);
-    for (let checkTx = txL; checkTx <= txR; checkTx++) {
-      if (tilemap.isSolid(checkTx, tyGnd)) {
-        // Place unit on top of this tile
-        newY = tyGnd * TILE_SIZE - this.height;
-        this.vy = 0;
-        this.onGround = true;
-        break;
+    if (this.vy >= 0) {
+      // Falling / standing: sweep downward from old feet tile to new feet tile
+      const oldFeetTy = floor((this.y + this.height) / TILE_SIZE);
+      const newFeetTy = floor((newY + this.height + 1) / TILE_SIZE);
+      outer:
+      for (let ty = oldFeetTy; ty <= newFeetTy; ty++) {
+        for (let tx = txL; tx <= txR; tx++) {
+          if (tilemap.isSolid(tx, ty)) {
+            newY = ty * TILE_SIZE - this.height;
+            this.vy = 0;
+            this.onGround = true;
+            break outer;
+          }
+        }
       }
-    }
-    // Ceiling check (upward movement)
-    if (this.vy < 0) {
+    } else {
+      // Rising: ceiling check
       const ty = floor(newY / TILE_SIZE);
       const tx = floor(this.x / TILE_SIZE);
       if (tilemap.isSolid(tx, ty)) {
