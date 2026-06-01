@@ -1619,6 +1619,7 @@ drawUnit(u, camX, playerColors) {
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(sprite, screen.sx, screen.sy, b.width, b.height);
     } else {
+      const pc = playerColors[b.ownerId % playerColors.length];
       this._drawRealisticBuilding(b, screen, pc);
     }
 
