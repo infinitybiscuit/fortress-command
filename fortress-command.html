@@ -394,7 +394,8 @@ class TileMap {
       for (let ty = tileY; ty < tileY + h; ty++) {
         const tile = this.getTile(tx, ty);
         const hasBuilding = this._buildingTiles.has(`${tx},${ty}`);
-        if (tile !== TILE_EMPTY && !(sitsOnGround && tile === TILE_GROUND) && !hasBuilding) {
+        if (hasBuilding) return false;
+        if (tile !== TILE_EMPTY && !(sitsOnGround && tile === TILE_GROUND)) {
           return false;
         }
       }
@@ -1205,18 +1206,24 @@ class CombatSystem {
     for (const u of allUnits) {
       if (!u.alive || !u.canAttack()) continue;
       if (u.target && (!u.target.alive || typeof u.target.x !== 'number')) u.target = null;
-      let nearest = null, nearestDist = u.attackRange + 1;
-      for (const other of allUnits) {
-        if (!other.alive || other.ownerId === u.ownerId) continue;
-        const dist = Math.abs(u.x - other.x);
-        if (dist < nearestDist) { nearestDist = dist; nearest = other; }
-      }
-      if (nearest) {
+      // Use manual target if set and still valid; otherwise find nearest enemy
+      if (u.target) {
         u.performAttack();
-        const dir = nearest.x > u.x ? 1 : -1;
-        // Spawn a visible bullet projectile for unit-vs-unit combat
-        this.projectiles.push(new Projectile(u.x, u.centerY, dir, u.damage, u.ownerId, nearest.x, nearest.centerY));
-        if (!u.target) u.target = nearest;
+        const dir = u.target.x > u.x ? 1 : -1;
+        this.projectiles.push(new Projectile(u.x, u.centerY, dir, u.damage, u.ownerId, u.target.x, u.target.centerY));
+      } else {
+        let nearest = null, nearestDist = u.attackRange + 1;
+        for (const other of allUnits) {
+          if (!other.alive || other.ownerId === u.ownerId) continue;
+          const dist = Math.abs(u.x - other.x);
+          if (dist < nearestDist) { nearestDist = dist; nearest = other; }
+        }
+        if (nearest) {
+          u.performAttack();
+          const dir = nearest.x > u.x ? 1 : -1;
+          this.projectiles.push(new Projectile(u.x, u.centerY, dir, u.damage, u.ownerId, nearest.x, nearest.centerY));
+          u.target = nearest;
+        }
       }
     }
   }
@@ -1302,11 +1309,13 @@ class EconomySystem {
 // SECTION 14: INPUT HANDLER
 // ═══════════════════════════════════════════════════════════════
 class InputHandler {
-  constructor(onTap, onPan, onBuildHover, onSelectionBox) {
+  constructor(onTap, onPan, onBuildHover, onSelectionBox, onSelectionDrag, onDoubleTap) {
     this.onTap = onTap;
     this.onPan = onPan;
     this.onBuildHover = onBuildHover;
     this.onSelectionBox = onSelectionBox;
+    this.onSelectionDrag = onSelectionDrag;
+    this.onDoubleTap = onDoubleTap;
     this._pointerDown = null;
     this._panStartCamX = 0;
     this._panStartX = 0;
@@ -1321,6 +1330,12 @@ class InputHandler {
     this._dragStartX = 0;
     this._dragStartY = 0;
     this._isDragging = false;
+    // Double-click tracking
+    this._lastTapTime = 0;
+    this._lastTapX = 0;
+    this._lastTapY = 0;
+    this._DOUBLE_TAP_MS = 300;
+    this._DOUBLE_TAP_DIST = 20;
   }
 
   fireHoverAtLastPosition() {
@@ -1398,7 +1413,18 @@ class InputHandler {
       const sy2 = Math.max(this._dragStartY, this._lastY);
       this.onSelectionBox && this.onSelectionBox(sx1, sy1, sx2, sy2);
     } else if (!wasSwipe) {
-      this.onTap && this.onTap(e.clientX, e.clientY);
+      const now = performance.now();
+      const dx = e.clientX - this._lastTapX, dy = e.clientY - this._lastTapY;
+      const isDbl = (now - this._lastTapTime < this._DOUBLE_TAP_MS)
+                  && (dx*dx + dy*dy < this._DOUBLE_TAP_DIST * this._DOUBLE_TAP_DIST);
+      this._lastTapTime = now;
+      this._lastTapX = e.clientX;
+      this._lastTapY = e.clientY;
+      if (isDbl) {
+        this.onDoubleTap && this.onDoubleTap(e.clientX, e.clientY);
+      } else {
+        this.onTap && this.onTap(e.clientX, e.clientY);
+      }
     }
   }
 
@@ -2605,7 +2631,8 @@ class FortressCommand {
       (dx) => this._onPan(dx),
       (sx, sy) => this._onBuildHover(sx, sy),
       (sx1, sy1, sx2, sy2) => this._onSelectionBox(sx1, sy1, sx2, sy2),
-      (sx1, sy1, sx2, sy2) => this._onSelectionDrag(sx1, sy1, sx2, sy2)
+      (sx1, sy1, sx2, sy2) => this._onSelectionDrag(sx1, sy1, sx2, sy2),
+      (sx, sy) => this._onDoubleTap(sx, sy)
     );
     this.input.attach(this.canvas);
 
@@ -2630,6 +2657,28 @@ class FortressCommand {
     if (result === 'select_building') this._updateBuildMenu();
     if (result === 'built') this._updateBuildMenu();
     this._updateHUD();
+  }
+
+  // Double-click on an enemy unit/building while units are selected → set attack target
+  _onDoubleTap(sx, sy) {
+    if (this.scene !== 'game' || !this.camera) return;
+    if (sy <= HUD_HEIGHT) return;
+    const { wx, wy } = this.camera.screenToWorld(sx, sy);
+    const allUnits = this.players.flatMap(p => p.units);
+    const allBuildings = this.players.flatMap(p => p.buildings);
+    // Find the entity (enemy unit or building) at the tap location
+    const hitUnit = allUnits.find(u => u.alive && u.ownerId !== this.human.id
+      && wx >= u.x - u.width/2 - 15 && wx <= u.x + u.width/2 + 15
+      && wy >= u.y - u.height/2 - 15 && wy <= u.y + u.height/2 + 15);
+    const hitBuilding = allBuildings.find(b => b.alive && b.ownerId !== this.human.id
+      && wx >= b.x - b.width/2 - 15 && wx <= b.x + b.width/2 + 15
+      && wy >= b.y - b.height/2 - 15 && wy <= b.y + b.height/2 + 15);
+    const target = hitUnit || hitBuilding;
+    if (!target) return;
+    // Set target on all selected units of the human player
+    for (const u of this.human.units) {
+      if (u.selected) u.target = target;
+    }
   }
 
   // Called during drag by InputHandler — tracks live box for rendering
