@@ -2181,6 +2181,33 @@ drawUnit(u, camX, playerColors) {
           ctx.roundRect(swX, swY, swW, swH, 2);
           ctx.fill();
         }
+
+      } else if (b.type === 'bridge') {
+        // Plank deck: draw planks across the bridge span
+        const plankW = 7, plankGap = 2, plankCount = Math.floor(w / (plankW + plankGap));
+        const deckY = sy + 4, deckH = h - 8;
+        // Support posts at each end
+        ctx.fillStyle = rgb(this._lerpColor(pc, [0, 0, 0], 0.38));
+        ctx.fillRect(sx + 2, sy, 5, h);
+        ctx.fillRect(sx + w - 7, sy, 5, h);
+        // Post highlights
+        ctx.fillStyle = rgb(this._lerpColor(pc, [1, 1, 1], 0.18));
+        ctx.fillRect(sx + 2, sy, 2, h);
+        ctx.fillRect(sx + w - 7, sy, 2, h);
+        // Planks
+        for (let i = 0; i < plankCount; i++) {
+          const px = sx + 10 + i * (plankW + plankGap);
+          if (px + plankW > sx + w - 10) break;
+          const plankGrad = ctx.createLinearGradient(px, deckY, px, deckY + deckH);
+          plankGrad.addColorStop(0, rgb(this._lerpColor(pc, [1, 1, 1], 0.28)));
+          plankGrad.addColorStop(0.4, rgb(pc));
+          plankGrad.addColorStop(1, rgb(this._lerpColor(pc, [0, 0, 0], 0.2)));
+          ctx.fillStyle = plankGrad;
+          ctx.fillRect(px, deckY, plankW, deckH);
+          // Plank edge highlight
+          ctx.fillStyle = 'rgba(255,255,255,0.18)';
+          ctx.fillRect(px, deckY, plankW, 1);
+        }
       }
     }
   }
@@ -2426,7 +2453,7 @@ class FortressCommand {
 
     const buildList = document.getElementById('build-list');
     buildList.innerHTML = '';
-    const order = ['barracks','turret','wall','mine','workshop'];
+    const order = ['barracks','turret','wall','mine','workshop','bridge'];
     for (const t of order) {
       const cfg = BUILDING_TYPES[t];
       const item = document.createElement('div');
