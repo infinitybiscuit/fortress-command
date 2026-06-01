@@ -1569,6 +1569,7 @@ drawUnit(u, camX, playerColors) {
       const dy = screen.sy - go;
       ctx.drawImage(sprite, dx, dy, sw, sh);
     } else {
+      const pc = playerColors[u.ownerId % playerColors.length];
       this._drawRealisticUnit(u, screen, pc);
     }
 
