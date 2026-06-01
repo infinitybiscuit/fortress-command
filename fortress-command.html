@@ -1569,13 +1569,7 @@ drawUnit(u, camX, playerColors) {
       const dy = screen.sy - go;
       ctx.drawImage(sprite, dx, dy, sw, sh);
     } else {
-      // Fallback: colored body rect
-      const pc = playerColors[u.ownerId % playerColors.length];
-      const flash = u.damageFlash > 0;
-      ctx.fillStyle = flash ? '#fff' : rgb(pc);
-      ctx.beginPath();
-      ctx.roundRect(screen.sx, screen.sy, u.width, u.height, 3);
-      ctx.fill();
+      this._drawRealisticUnit(u, screen, pc);
     }
 
     // Damage flash overlay
@@ -1625,47 +1619,7 @@ drawUnit(u, camX, playerColors) {
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(sprite, screen.sx, screen.sy, b.width, b.height);
     } else {
-      // Fallback: colored rect for unknown types
-      const pc = playerColors[b.ownerId % playerColors.length];
-
-      // Body fill
-      ctx.fillStyle = b.built ? rgb(pc) : `rgba(${Math.round(pc[0]*200)},${Math.round(pc[1]*200)},${Math.round(pc[2]*200)},0.5)`;
-      ctx.beginPath();
-      ctx.roundRect(screen.sx, screen.sy, b.width, b.height, 2);
-      ctx.fill();
-
-      // Border
-      ctx.strokeStyle = rgb([Math.min(1, pc[0]+0.2), Math.min(1, pc[1]+0.2), Math.min(1, pc[2]+0.2)]);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.roundRect(screen.sx, screen.sy, b.width, b.height, 2);
-      ctx.stroke();
-
-      // Type-specific interior detail
-      ctx.fillStyle = b.built ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)';
-      if (b.type === 'hq') {
-        const poleX = screen.sx + b.width * 0.7, poleY = screen.sy + 2;
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';
-        ctx.fillRect(poleX, poleY, 2, b.height * 0.5);
-        ctx.fillStyle = rgb(pc);
-        ctx.fillRect(poleX + 2, poleY, 8, 6);
-      } else if (b.type === 'turret') {
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.fillRect(screen.sx + b.width * 0.35, screen.sy + b.height * 0.3, b.width * 0.3, 6);
-      } else if (b.type === 'mine') {
-        const cx = screen.sx + b.width / 2, cy = screen.sy + b.height / 2;
-        ctx.fillStyle = 'rgba(255,200,0,0.7)';
-        ctx.beginPath();
-        ctx.moveTo(cx, cy - 8); ctx.lineTo(cx + 7, cy);
-        ctx.lineTo(cx, cy + 8); ctx.lineTo(cx - 7, cy);
-        ctx.closePath(); ctx.fill();
-      } else if (b.type === 'barracks' || b.type === 'workshop') {
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.beginPath();
-        ctx.arc(screen.sx + b.width / 2, screen.sy + b.height * 0.35, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillRect(screen.sx + b.width / 2 - 3, screen.sy + b.height * 0.4, 6, 8);
-      }
+      this._drawRealisticBuilding(b, screen, pc);
     }
 
     // Under-construction overlay (hatched + progress bar)
@@ -1704,6 +1658,301 @@ drawUnit(u, camX, playerColors) {
       ctx.fillRect(barX, barY, barW, barH);
       ctx.fillStyle = b.hp > b.maxHp * 0.5 ? '#00FF66' : b.hp > b.maxHp * 0.25 ? '#FFAA00' : '#FF4D4D';
       ctx.fillRect(barX, barY, barW * (b.hp / b.maxHp), barH);
+    }
+  }
+
+  // ---- Realistic layered rendering helpers ----
+
+  // Lerp two [r,g,b] color arrays by t
+  _lerpColor(a, b, t) {
+    return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+  }
+
+  // Draw realistic unit body (helmet, gradient fill, shadows)
+  // u: unit object, screen: {sx,sy}, pc: playerColor [r,g,b]
+  _drawRealisticUnit(u, screen, pc) {
+    const ctx = this.ctx;
+    const { sx, sy } = screen;
+    const w = u.width, h = u.height;
+
+    // Ground shadow
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0)';
+    const gs = ctx.createLinearGradient(sx, sy + h, sx, sy + h + 7);
+    gs.addColorStop(0, 'rgba(0,0,0,0.28)');
+    gs.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gs;
+    ctx.beginPath();
+    ctx.ellipse(sx + w/2 + 3, sy + h + 3, w/2 + 3, 4, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // Drop shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 4;
+
+    // Body gradient fill
+    const bodyGrad = ctx.createLinearGradient(sx, sy, sx, sy + h);
+    bodyGrad.addColorStop(0, rgb(this._lerpColor(pc, [1,1,1], 0.28)));
+    bodyGrad.addColorStop(0.4, rgb(pc));
+    bodyGrad.addColorStop(1, rgb(this._lerpColor(pc, [0,0,0], 0.32)));
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.roundRect(sx, sy, w, h, 3);
+    ctx.fill();
+
+    ctx.shadowColor = 'rgba(0,0,0,0)';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Top rim highlight
+    const topG = ctx.createLinearGradient(sx, sy, sx, sy + 8);
+    topG.addColorStop(0, 'rgba(255,255,255,0.38)');
+    topG.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = topG;
+    ctx.beginPath();
+    ctx.roundRect(sx, sy, w, h, 3);
+    ctx.fill();
+
+    // Bottom inner shadow
+    const botG = ctx.createLinearGradient(sx, sy + h - 10, sx, sy + h);
+    botG.addColorStop(0, 'rgba(0,0,0,0)');
+    botG.addColorStop(1, 'rgba(0,0,0,0.28)');
+    ctx.fillStyle = botG;
+    ctx.beginPath();
+    ctx.roundRect(sx, sy, w, h, 3);
+    ctx.fill();
+
+    // Helmet
+    const helmW = w * 0.78;
+    const helmH = h * 0.36;
+    const helmX = sx + (w - helmW) / 2;
+    const helmY = sy + 2;
+    const helmGrad = ctx.createLinearGradient(helmX, helmY, helmX, helmY + helmH);
+    helmGrad.addColorStop(0, '#606060');
+    helmGrad.addColorStop(1, '#242424');
+    ctx.fillStyle = helmGrad;
+    ctx.beginPath();
+    ctx.roundRect(helmX, helmY, helmW, helmH, [2, 2, 1, 1]);
+    ctx.fill();
+    // Helmet brim
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.roundRect(helmX - 2, helmY + helmH - 4, helmW + 4, 5, 1);
+    ctx.fill();
+  }
+
+  // Draw realistic building body (gradient fill, shadows, rim lights, type details)
+  // b: building object, screen: {sx,sy}, pc: playerColor [r,g,b]
+  _drawRealisticBuilding(b, screen, pc) {
+    const ctx = this.ctx;
+    const { sx, sy } = screen;
+    const w = b.width, h = b.height;
+    const r = 3;
+
+    // Ground shadow (perspective cast right)
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0)';
+    const gs = ctx.createLinearGradient(sx, sy + h, sx, sy + h + 12);
+    gs.addColorStop(0, 'rgba(0,0,0,0.32)');
+    gs.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gs;
+    ctx.beginPath();
+    ctx.moveTo(sx + 5, sy + h);
+    ctx.lineTo(sx + w - 5, sy + h);
+    ctx.lineTo(sx + w + 4, sy + h + 12);
+    ctx.lineTo(sx - 3, sy + h + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // Drop shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.42)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetX = 5;
+    ctx.shadowOffsetY = 7;
+
+    // Body gradient
+    const dimmed = !b.built;
+    const faceGrad = ctx.createLinearGradient(sx, sy, sx, sy + h);
+    if (dimmed) {
+      faceGrad.addColorStop(0, rgba(this._lerpColor(pc,[1,1,1],0.14), 0.62));
+      faceGrad.addColorStop(1, rgba(this._lerpColor(pc,[0,0,0],0.22), 0.62));
+    } else {
+      faceGrad.addColorStop(0, rgb(this._lerpColor(pc, [1,1,1], 0.26)));
+      faceGrad.addColorStop(0.3, rgb(pc));
+      faceGrad.addColorStop(0.72, rgb(this._lerpColor(pc, [0,0,0], 0.16)));
+      faceGrad.addColorStop(1, rgb(this._lerpColor(pc, [0,0,0], 0.38)));
+    }
+    ctx.fillStyle = faceGrad;
+    ctx.beginPath();
+    ctx.roundRect(sx, sy, w, h, r);
+    ctx.fill();
+
+    ctx.shadowColor = 'rgba(0,0,0,0)';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Top rim highlight
+    const topG = ctx.createLinearGradient(sx, sy, sx, sy + 9);
+    topG.addColorStop(0, rgb(this._lerpColor(pc, [1,1,1], 0.46)));
+    topG.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = topG;
+    ctx.beginPath();
+    ctx.moveTo(sx + r, sy);
+    ctx.lineTo(sx + w - r, sy);
+    ctx.quadraticCurveTo(sx + w, sy, sx + w, sy + r);
+    ctx.lineTo(sx + w, sy + 8);
+    ctx.lineTo(sx, sy + 8);
+    ctx.lineTo(sx, sy + r);
+    ctx.quadraticCurveTo(sx, sy, sx + r, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Left edge highlight
+    const leftG = ctx.createLinearGradient(sx, sy, sx + 8, sy);
+    leftG.addColorStop(0, rgb(this._lerpColor(pc, [1,1,1], 0.42)));
+    leftG.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = leftG;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy + r);
+    ctx.lineTo(sx + 6, sy + r);
+    ctx.lineTo(sx + 6, sy + h - r);
+    ctx.lineTo(sx, sy + h - r);
+    ctx.quadraticCurveTo(sx, sy + h, sx + r, sy + h);
+    ctx.lineTo(sx + r, sy);
+    ctx.quadraticCurveTo(sx, sy, sx, sy + r);
+    ctx.closePath();
+    ctx.fill();
+
+    // Bottom-right inner shadow
+    const botG = ctx.createLinearGradient(sx, sy + h - 12, sx, sy + h);
+    botG.addColorStop(0, 'rgba(0,0,0,0)');
+    botG.addColorStop(1, 'rgba(0,0,0,0.32)');
+    ctx.fillStyle = botG;
+    ctx.beginPath();
+    ctx.moveTo(sx + r, sy + h);
+    ctx.lineTo(sx + w - r, sy + h);
+    ctx.quadraticCurveTo(sx + w, sy + h, sx + w, sy + h - r);
+    ctx.lineTo(sx + w, sy + h - 12);
+    ctx.lineTo(sx, sy + h - 12);
+    ctx.lineTo(sx, sy + h - r);
+    ctx.quadraticCurveTo(sx, sy + h, sx + r, sy + h);
+    ctx.closePath();
+    ctx.fill();
+
+    // Right edge darkening
+    const rightG = ctx.createLinearGradient(sx + w - 9, sy, sx + w, sy);
+    rightG.addColorStop(0, 'rgba(0,0,0,0)');
+    rightG.addColorStop(1, 'rgba(0,0,0,0.22)');
+    ctx.fillStyle = rightG;
+    ctx.beginPath();
+    ctx.moveTo(sx + w - 9, sy + r);
+    ctx.lineTo(sx + w, sy + r);
+    ctx.quadraticCurveTo(sx + w, sy, sx + w - r, sy);
+    ctx.lineTo(sx + w - 9, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    // ---- Type-specific interior details ----
+    if (b.built) {
+      const detAlpha = 'rgba(255,255,255,0.82)';
+      const detAlpha2 = 'rgba(255,255,255,0.5)';
+
+      if (b.type === 'hq') {
+        // Flag pole
+        const poleX = sx + w * 0.72, poleTop = sy + 4, poleBot = sy + h * 0.55;
+        ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(poleX, poleTop);
+        ctx.lineTo(poleX, poleBot);
+        ctx.stroke();
+        // Pennant
+        ctx.fillStyle = rgb(pc);
+        ctx.beginPath();
+        ctx.moveTo(poleX, poleTop);
+        ctx.lineTo(poleX + 18, poleTop + 5);
+        ctx.lineTo(poleX, poleTop + 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        // Window row — three windows
+        const winY = sy + h * 0.36, winH = 10, winW = 12, gap = 6;
+        const totalW = winW * 3 + gap * 2;
+        const startX = sx + (w - totalW) / 2;
+        for (let i = 0; i < 3; i++) {
+          const wx = startX + i * (winW + gap);
+          ctx.fillStyle = 'rgba(0,0,0,0.44)';
+          ctx.beginPath();
+          ctx.roundRect(wx + 1, winY + 1, winW, winH, 2);
+          ctx.fill();
+          const wg = ctx.createLinearGradient(wx, winY, wx, winY + winH);
+          wg.addColorStop(0, '#6699CC');
+          wg.addColorStop(0.5, '#88BBEE');
+          wg.addColorStop(1, '#4477AA');
+          ctx.fillStyle = wg;
+          ctx.beginPath();
+          ctx.roundRect(wx, winY, winW, winH, 2);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(wx + winW/2, winY + 1);
+          ctx.lineTo(wx + winW/2, winY + winH - 1);
+          ctx.moveTo(wx + 1, winY + winH/2);
+          ctx.lineTo(wx + winW - 1, winY + winH/2);
+          ctx.stroke();
+        }
+
+        // Door
+        const doorW = 18, doorH = 22;
+        const doorX = sx + (w - doorW) / 2;
+        const doorY = sy + h - doorH - 4;
+        ctx.fillStyle = 'rgba(0,0,0,0.52)';
+        ctx.beginPath();
+        ctx.roundRect(doorX, doorY, doorW, doorH, [2, 2, 0, 0]);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(doorX, doorY, doorW, doorH, [2, 2, 0, 0]);
+        ctx.stroke();
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.arc(doorX + doorW - 5, doorY + doorH/2, 2, 0, Math.PI*2);
+        ctx.fill();
+
+      } else if (b.type === 'turret') {
+        // Barrel
+        ctx.fillStyle = 'rgba(255,255,255,0.62)';
+        ctx.fillRect(sx + w * 0.34, sy + h * 0.3, w * 0.32, 7);
+      } else if (b.type === 'mine') {
+        // Diamond
+        const cx = sx + w/2, cy = sy + h/2;
+        ctx.fillStyle = 'rgba(255,200,0,0.72)';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - 9); ctx.lineTo(cx + 8, cy);
+        ctx.lineTo(cx, cy + 9); ctx.lineTo(cx - 8, cy);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      } else if (b.type === 'barracks' || b.type === 'workshop') {
+        // Figure silhouette (head + body)
+        ctx.fillStyle = 'rgba(255,255,255,0.52)';
+        ctx.beginPath();
+        ctx.arc(sx + w/2, sy + h * 0.34, 4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillRect(sx + w/2 - 3, sy + h * 0.40, 6, 9);
+      }
     }
   }
 
