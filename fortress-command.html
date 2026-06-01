@@ -1450,124 +1450,8 @@ class SpriteLib {
     };
     this._pal = this.P;
 
-    // Sprite data: each row is a string of palette-key characters
-    // Dimensions in "art pixels" (each art pixel = SCALE canvas px)
-    this.DATA = {
-      hq: {
-        w:16, h:12, scale:8,
-        rows:[
-          '________________',
-          '______rrrr______',
-          '_____rrrrrr_____',
-          '____rrrrrrrr____',
-          '___rrrrrrrrrr___',
-          'WWWWWWWWWWWWWWWW',
-          'WwWWWWWWWWWWwWWW',
-          'WwWWWWWWWWWWwWWW',
-          'WwWWWWWWWWWWwWWW',
-          'WwWWKKWWKKWWKwWW',
-          'WwWDDOOWWDDOOWWW',
-          'WWWWWWWWWWWWWWWW',
-        ]
-      },
-      barracks: {
-        w:12, h:8, scale:8,
-        rows:[
-          '______BBBB______',
-          '_____BBBBBB_____',
-          '____BBBBBBBB____',
-          '___BBBBBBBBBB___',
-          'OOOoBBBBBBBBOOOo',
-          'OoooBBBBBBBBOooo',
-          'OoooBoBBBoBBoooo',
-          'OOOOOOOOOOOOOOOO',
-        ]
-      },
-      turret: {
-        w:8, h:8, scale:8,
-        rows:[
-          '____TTTT____',
-          '___TTTTTT___',
-          '__TTttTTtt__',
-          '_TTttTTTTtt_',
-          'TTttTTTTTTtt',
-          'TTTTTTTTTTTT',
-          'TTTTKKTTKKTT',
-          'DDTTTTTTDDTD',
-        ]
-      },
-      wall: {
-        w:4, h:4, scale:8,
-        rows:[
-          'OoOo',
-          'oOOo',
-          'OoOo',
-          'oO_o',
-        ]
-      },
-      mine: {
-        w:4, h:4, scale:8,
-        rows:[
-          '__Mm',
-          '_MmmM',
-          'MmmIj',
-          '_MmM_',
-        ]
-      },
-      workshop: {
-        w:12, h:8, scale:8,
-        rows:[
-          '____YYYY____',
-          '___YYYYYY___',
-          '__OOOOOOOOOO_',
-          '_oOOOOOOOOo__',
-          '_oOGGGOOGGGo_',
-          '_oOGGGOOGGGo_',
-          '__DoOOOooD__',
-          '__DDDDDDDD__',
-        ]
-      },
-      soldier: {
-        w:8, h:8, scale:6,
-        rows:[
-          '___DD___',
-          '___DD___',
-          '__HHHH__',
-          '__hHHh__',
-          '_SSSSSSS',
-          '_SSSS_SS',
-          '__SSS__S',
-          '__S___S_',
-        ]
-      },
-      heavy: {
-        w:10, h:10, scale:6,
-        rows:[
-          '____DDDD____',
-          '___DHHHH___',
-          '__HHHHHHH__',
-          '__hHHHHHh__',
-          '_NSSSSSSS_N',
-          '_NSSSSSSSSN',
-          '_NSSSSS_SSN',
-          '__NSSSS__NN',
-          '___NSS__NN_',
-          '____NN__N__',
-        ]
-      },
-      scout: {
-        w:7, h:7, scale:6,
-        rows:[
-          '__GGG__',
-          '__GLG__',
-          '_GGGGG_',
-          '_LGGGL_',
-          '_GGGGG_',
-          '__G_G__',
-          '_GG_GG_',
-        ]
-      },
-    };
+    // Sprite data — empty means all types fall back to colored rects
+    this.DATA = {};
   }
 
   // Draw one sprite data array to an offscreen canvas, scaled up by SCALE
@@ -1678,10 +1562,20 @@ drawUnit(u, camX, playerColors) {
       ctx.imageSmoothingEnabled = false;
       const sw = sprite.width;
       const sh = sprite.height;
-      // Center the sprite in the unit's screen footprint
+      const def = this.sprites.DATA[spriteType];
+      const go = def ? (def.groundOffset || 0) : 0;
+      // Shift sprite up so its bottom lands at collision bottom (u.y + u.height)
       const dx = screen.sx + (u.width - sw) / 2;
-      const dy = screen.sy + (u.height - sh) / 2;
+      const dy = screen.sy - go;
       ctx.drawImage(sprite, dx, dy, sw, sh);
+    } else {
+      // Fallback: colored body rect
+      const pc = playerColors[u.ownerId % playerColors.length];
+      const flash = u.damageFlash > 0;
+      ctx.fillStyle = flash ? '#fff' : rgb(pc);
+      ctx.beginPath();
+      ctx.roundRect(screen.sx, screen.sy, u.width, u.height, 3);
+      ctx.fill();
     }
 
     // Damage flash overlay
@@ -1733,10 +1627,45 @@ drawUnit(u, camX, playerColors) {
     } else {
       // Fallback: colored rect for unknown types
       const pc = playerColors[b.ownerId % playerColors.length];
+
+      // Body fill
       ctx.fillStyle = b.built ? rgb(pc) : `rgba(${Math.round(pc[0]*200)},${Math.round(pc[1]*200)},${Math.round(pc[2]*200)},0.5)`;
       ctx.beginPath();
       ctx.roundRect(screen.sx, screen.sy, b.width, b.height, 2);
       ctx.fill();
+
+      // Border
+      ctx.strokeStyle = rgb([Math.min(1, pc[0]+0.2), Math.min(1, pc[1]+0.2), Math.min(1, pc[2]+0.2)]);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(screen.sx, screen.sy, b.width, b.height, 2);
+      ctx.stroke();
+
+      // Type-specific interior detail
+      ctx.fillStyle = b.built ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)';
+      if (b.type === 'hq') {
+        const poleX = screen.sx + b.width * 0.7, poleY = screen.sy + 2;
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.fillRect(poleX, poleY, 2, b.height * 0.5);
+        ctx.fillStyle = rgb(pc);
+        ctx.fillRect(poleX + 2, poleY, 8, 6);
+      } else if (b.type === 'turret') {
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.fillRect(screen.sx + b.width * 0.35, screen.sy + b.height * 0.3, b.width * 0.3, 6);
+      } else if (b.type === 'mine') {
+        const cx = screen.sx + b.width / 2, cy = screen.sy + b.height / 2;
+        ctx.fillStyle = 'rgba(255,200,0,0.7)';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - 8); ctx.lineTo(cx + 7, cy);
+        ctx.lineTo(cx, cy + 8); ctx.lineTo(cx - 7, cy);
+        ctx.closePath(); ctx.fill();
+      } else if (b.type === 'barracks' || b.type === 'workshop') {
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.beginPath();
+        ctx.arc(screen.sx + b.width / 2, screen.sy + b.height * 0.35, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(screen.sx + b.width / 2 - 3, screen.sy + b.height * 0.4, 6, 8);
+      }
     }
 
     // Under-construction overlay (hatched + progress bar)
@@ -1854,12 +1783,10 @@ drawUnit(u, camX, playerColors) {
     const cfg = BUILDING_TYPES[buildingType];
     const w = cfg.width_tiles * TILE_SIZE, h = cfg.height_tiles * TILE_SIZE;
     const { sx, sy } = this._worldToScreen(tx * TILE_SIZE, ty * TILE_SIZE);
-    ctx.fillStyle = valid ? 'rgba(0,255,100,0.3)' : 'rgba(255,50,50,0.3)';
-    ctx.strokeStyle = valid ? '#00FF66' : '#FF4D4D';
+    ctx.strokeStyle = valid ? 'rgba(0,255,100,0.6)' : 'rgba(255,50,50,0.6)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.roundRect(sx, sy, w, h, 3);
-    ctx.fill();
     ctx.stroke();
   }
 
