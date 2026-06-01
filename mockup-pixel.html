@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixel Art Sprite Mockup</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #141A38;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 32px;
+  font-family: 'Courier New', monospace;
+  color: #fff;
+}
+h2 { color: #3380FF; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; }
+.label { font-size: 11px; color: #666; text-align: center; }
+#c { display: block; }
+</style>
+</head>
+<body>
+
+<h2>Pixel Art Sprite Rendering Demo</h2>
+<canvas id="c" width="640" height="320"></canvas>
+<p class="label">Left: flat fallback (current) &nbsp;|&nbsp; Right: pixel art sprites</p>
+
+<script>
+// ------------------------------------------------------------------
+// Palette — NES-inspired 16-color RTS palette
+// ------------------------------------------------------------------
+const PAL = {
+  void:  '#101420',
+  ground:'#3A2A18',
+  dark:  '#1C2418',
+  black: '#000000',
+  white: '#ECECEC',
+  grey0: '#6C7A6C',
+  grey1: '#9CAA9C',
+  blue0: '#006880',
+  blue1: '#00B8BC',
+  blue2: '#64D8FC',
+  red0:  '#782020',
+  red1:  '#BC2828',
+  red2:  '#FC6060',
+  gold0: '#A07820',
+  gold1: '#E8BC34',
+  gold2: '#FCF878',
+  green0:'#205018',
+  green1:'#38A828',
+  green2:'#80F860',
+};
+
+// ------------------------------------------------------------------
+// Pixel art sprite definitions
+// Each sprite is a 2D array of PAL key strings.
+// Bottom row = ground contact. Left column = facing-left reference.
+// ------------------------------------------------------------------
+
+// HQ: 12×9 pixels → rendered at 3× scale = 36×27 per tile → 4×3 tiles
+const SPRITE_HQ = [
+  ['void','void','void','void','void','void','void','void','void','void','void','void'],
+  ['void','blue1','blue1','blue1','blue1','blue1','blue1','blue1','blue1','blue1','blue1','void'],
+  ['blue1','blue1','blue1','blue1','blue1','blue1','blue1','blue1','blue1','blue1','blue1','blue1'],
+  ['blue1','blue2','blue2','blue2','blue2','blue1','blue1','blue2','blue2','blue2','blue2','blue1'],
+  ['blue1','blue1','blue0','blue0','blue1','blue1','blue1','blue1','blue0','blue0','blue1','blue1'],
+  ['blue1','blue0','blue0','blue0','blue0','blue1','blue1','blue0','blue0','blue0','blue0','blue1'],
+  ['blue1','gold1','gold1','gold1','blue1','blue1','blue1','gold1','gold1','gold1','blue1','blue1'],
+  ['blue1','gold2','gold2','gold2','blue1','blue1','blue1','gold2','gold2','gold2','blue1','blue1'],
+  ['dark','dark','dark','dark','dark','dark','dark','dark','dark','dark','dark','dark'],
+];
+
+// Soldier: 6×8 pixels → rendered at 2× scale = 12×16 (matches collision 12×20ish)
+const SPRITE_SOLDIER = [
+  ['void','void','gold2','gold2','void','void'],
+  ['void','black','gold2','gold2','black','void'],
+  ['void','blue1','blue2','blue2','blue1','void'],
+  ['void','blue0','blue0','blue0','blue0','void'],
+  ['blue1','blue1','blue1','blue1','blue1','blue1'],
+  ['blue0','blue1','blue1','blue1','blue1','blue0'],
+  ['blue0','blue1','blue1','blue1','blue1','blue0'],
+  ['dark','dark','dark','dark','dark','dark'],
+];
+
+// Scout (slightly smaller): 5×7
+const SPRITE_SCOUT = [
+  ['void','gold2','gold2','void','void'],
+  ['void','black','gold2','black','void'],
+  ['void','blue1','blue2','blue1','void'],
+  ['blue0','blue0','blue0','blue0','blue0'],
+  ['blue1','blue1','blue1','blue1','blue1'],
+  ['blue0','blue1','blue1','blue1','blue0'],
+  ['dark','dark','dark','dark','dark'],
+];
+
+// Heavy: 8×9
+const SPRITE_HEAVY = [
+  ['void','void','gold2','gold2','gold2','gold2','void','void'],
+  ['void','black','gold2','gold2','gold2','gold2','black','void'],
+  ['void','blue1','blue2','blue2','blue2','blue2','blue1','void'],
+  ['void','blue0','blue0','blue0','blue0','blue0','blue0','void'],
+  ['blue1','blue1','blue1','blue1','blue1','blue1','blue1','blue1'],
+  ['blue0','blue1','blue1','blue1','blue1','blue1','blue1','blue0'],
+  ['blue0','blue1','blue1','blue1','blue1','blue1','blue1','blue0'],
+  ['dark','dark','dark','blue1','blue1','dark','dark','dark'],
+  ['dark','dark','dark','dark','dark','dark','dark','dark'],
+];
+
+// ------------------------------------------------------------------
+// Render a pixel sprite to an offscreen canvas
+// scale = pixel multiplier (2 = 2×, 3 = 3×)
+// Returns an HTMLCanvasElement
+// ------------------------------------------------------------------
+function createSpriteCanvas(pixelGrid, scale) {
+  const rows = pixelGrid.length;
+  const cols = pixelGrid[0].length;
+  const oc = document.createElement('canvas');
+  oc.width  = cols * scale;
+  oc.height = rows * scale;
+  const octx = oc.getContext('2d');
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const hex = PAL[pixelGrid[r][c]];
+      octx.fillStyle = hex;
+      octx.fillRect(c * scale, r * scale, scale, scale);
+    }
+  }
+  return oc;
+}
+
+// ------------------------------------------------------------------
+// Helpers
+// ------------------------------------------------------------------
+const TILE = 32;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+const PLAYER_COLORS = [
+  [0.2,  0.5,  0.9 ],
+  [0.85, 0.25, 0.25],
+  [0.2,  0.75, 0.4],
+  [0.85, 0.7,  0.2],
+];
+
+function rgb([r, g, b]) {
+  return `rgb(${[r,g,b].map(x => Math.round(x*255)).join(',')})`;
+}
+function rgba([r, g, b], a) {
+  return `rgba(${[r,g,b].map(x => Math.round(x*255)).join(',')},${a})`;
+}
+
+// ------------------------------------------------------------------
+// Player-tinted offscreen canvas
+// ------------------------------------------------------------------
+function tintSprite(oc, pc) {
+  const tmp = document.createElement('canvas');
+  tmp.width  = oc.width;
+  tmp.height = oc.height;
+  const tctx = tmp.getContext('2d');
+  tctx.drawImage(oc, 0, 0);
+  tctx.globalCompositeOperation = 'source-atop';
+  tctx.fillStyle = rgb(pc);
+  tctx.fillRect(0, 0, tmp.width, tmp.height);
+  const out = document.createElement('canvas');
+  out.width  = oc.width;
+  out.height = oc.height;
+  const octx = out.getContext('2d');
+  octx.drawImage(tmp, 0, 0);
+  octx.globalCompositeOperation = 'multiply';
+  octx.drawImage(oc, 0, 0);
+  return out;
+}
+
+// ------------------------------------------------------------------
+// Draw flat fallback (current)
+// ------------------------------------------------------------------
+function drawFlatBuilding(ctx, x, y, w, h, pc, built) {
+  ctx.fillStyle = built ? rgb(pc) : rgba(pc, 0.5);
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 2);
+  ctx.fill();
+  ctx.strokeStyle = rgb([Math.min(1,pc[0]+0.2), Math.min(1,pc[1]+0.2), Math.min(1,pc[2]+0.2)]);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 2);
+  ctx.stroke();
+}
+
+function drawFlatUnit(ctx, x, y, w, h, pc) {
+  ctx.fillStyle = rgb(pc);
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 3);
+  ctx.fill();
+}
+
+// ------------------------------------------------------------------
+// Draw pixel art sprite
+// ------------------------------------------------------------------
+function drawPixelBuilding(ctx, x, y, pc, built) {
+  const oc = createSpriteCanvas(SPRITE_HQ, 3); // 12px × 3 = 36px wide per tile
+  const tc = tintSprite(oc, pc);
+  const tw = 4 * TILE; // 4 tiles wide
+  const th = 3 * TILE; // 3 tiles tall
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(tc, x, y, tw, th);
+
+  if (!built) {
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#1a2a4a';
+    ctx.fillRect(x, y, tw, th);
+    ctx.strokeStyle = '#3380FF';
+    ctx.lineWidth = 1;
+    for (let i = -th; i < tw; i += 6) {
+      ctx.beginPath();
+      ctx.moveTo(x + i,     y);
+      ctx.lineTo(x + i + th, y + th);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function drawPixelUnit(ctx, x, y, pc, facing, type) {
+  let oc;
+  let sc = 2;
+  if (type === 'heavy') {
+    oc = createSpriteCanvas(SPRITE_HEAVY, sc); // 8×2=16w × 9×2=18h
+  } else if (type === 'scout') {
+    oc = createSpriteCanvas(SPRITE_SCOUT, sc); // 5×2=10w × 7×2=14h
+  } else {
+    oc = createSpriteCanvas(SPRITE_SOLDIER, sc); // 6×2=12w × 8×2=16h
+  }
+  const tc = tintSprite(oc, pc);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(tc, x, y);
+}
+
+// ------------------------------------------------------------------
+// Draw the demo
+// ------------------------------------------------------------------
+const CX = 40;
+const CY = 40;
+
+// ---- FLAT BUILDING ----
+const flatPC = PLAYER_COLORS[0];
+drawFlatBuilding(ctx, CX, CY, 4*TILE, 3*TILE, flatPC, true);
+ctx.fillStyle = '#666';
+ctx.font = '11px Courier New';
+ctx.fillText('CURRENT (flat)', CX, CY - 6);
+
+// ---- PIXEL ART BUILDING ----
+const realX = CX + 4*TILE + 40;
+const realPC = PLAYER_COLORS[0];
+drawPixelBuilding(ctx, realX, CY, realPC, true);
+ctx.fillStyle = '#3380FF';
+ctx.font = '11px Courier New';
+ctx.fillText('PIXEL ART', realX, CY - 6);
+
+// Construction variants
+const constrY = CY + 3*TILE + 30;
+drawPixelBuilding(ctx, realX, constrY, flatPC, false);
+drawFlatBuilding(ctx, CX, constrY, 4*TILE, 3*TILE, flatPC, false);
+ctx.fillStyle = '#666';
+ctx.font = '11px Courier New';
+ctx.fillText('CONSTRUCTION', realX, constrY - 6);
+
+// ---- FLAT UNITS ----
+const unitY = constrY + 3*TILE + 30;
+drawFlatUnit(ctx, CX, unitY, 12, 20, flatPC);
+ctx.fillStyle = '#666';
+ctx.font = '11px Courier New';
+ctx.fillText('SOLDIER', CX, unitY - 6);
+
+// ---- PIXEL ART UNITS ----
+const uTypes = ['soldier', 'scout', 'heavy'];
+const uNames = ['SOLDIER', 'SCOUT', 'HEAVY'];
+const uW = [12, 10, 16];
+for (let i = 0; i < 3; i++) {
+  const ux = realX + i * (uW[i] + 12);
+  drawPixelUnit(ctx, ux, unitY, flatPC, 1, uTypes[i]);
+  ctx.fillStyle = '#3380FF';
+  ctx.font = '11px Courier New';
+  ctx.fillText(uNames[i], ux, unitY - 6);
+}
+
+// Selected soldier
+const selX = realX;
+const selY = unitY + 30;
+drawPixelUnit(ctx, selX, selY, flatPC, -1, 'soldier');
+ctx.strokeStyle = '#FF0';
+ctx.lineWidth = 2;
+ctx.beginPath();
+ctx.roundRect(selX - 3, selY - 3, 14, 22, 4);
+ctx.stroke();
+ctx.fillStyle = '#666';
+ctx.font = '11px Courier New';
+ctx.fillText('SELECTED', selX, selY - 6);
+
+</script>
+</body>
+</html>

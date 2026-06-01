@@ -1932,28 +1932,255 @@ drawUnit(u, camX, playerColors) {
         ctx.arc(doorX + doorW - 5, doorY + doorH/2, 2, 0, Math.PI*2);
         ctx.fill();
 
+      } else if (b.type === 'wall') {
+        // Stone block texture: draw offset rows of stones
+        const stoneColors = [
+          'rgba(255,255,255,0.14)', 'rgba(200,200,200,0.10)',
+          'rgba(255,255,255,0.08)', 'rgba(180,180,180,0.12)',
+        ];
+        const rowH = 10, stoneW = w / 2;
+        for (let row = 0; row < Math.floor(h / rowH); row++) {
+          const offset = (row % 2) * (stoneW / 2);
+          const sy2 = sy + row * rowH;
+          for (let col = 0; col < 3; col++) {
+            const bx = sx + col * stoneW + offset - stoneW / 2;
+            ctx.strokeStyle = stoneColors[(row + col) % stoneColors.length];
+            ctx.lineWidth = 0.8;
+            ctx.strokeRect(bx + 1, sy2 + 1, stoneW - 2, rowH - 2);
+          }
+        }
+        // Crenellations at the top
+        const merlonW = w / 3, merlonH = 8;
+        for (let i = 0; i < 3; i++) {
+          const mx = sx + i * merlonW + merlonW * 0.1;
+          const mw = merlonW * 0.8;
+          ctx.fillStyle = rgb(this._lerpColor(pc, [0, 0, 0], 0.28));
+          ctx.fillRect(mx, sy - merlonH, mw, merlonH);
+          // merlon top highlight
+          ctx.fillStyle = rgb(this._lerpColor(pc, [1, 1, 1], 0.22));
+          ctx.fillRect(mx, sy - merlonH, mw, 2);
+        }
+
       } else if (b.type === 'turret') {
-        // Barrel
-        ctx.fillStyle = 'rgba(255,255,255,0.62)';
-        ctx.fillRect(sx + w * 0.34, sy + h * 0.3, w * 0.32, 7);
-      } else if (b.type === 'mine') {
-        // Diamond
-        const cx = sx + w/2, cy = sy + h/2;
-        ctx.fillStyle = 'rgba(255,200,0,0.72)';
+        // Concrete pillbox: circular dome + gun barrel
+        const cx = sx + w / 2, cy = sy + h * 0.44;
+        // Dome (half-ellipse)
+        const domeGrad = ctx.createRadialGradient(cx, cy, 2, cx, cy, w * 0.38);
+        domeGrad.addColorStop(0, rgb(this._lerpColor(pc, [1, 1, 1], 0.32)));
+        domeGrad.addColorStop(0.6, rgb(pc));
+        domeGrad.addColorStop(1, rgb(this._lerpColor(pc, [0, 0, 0], 0.3)));
+        ctx.fillStyle = domeGrad;
         ctx.beginPath();
-        ctx.moveTo(cx, cy - 9); ctx.lineTo(cx + 8, cy);
-        ctx.lineTo(cx, cy + 9); ctx.lineTo(cx - 8, cy);
-        ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-      } else if (b.type === 'barracks' || b.type === 'workshop') {
-        // Figure silhouette (head + body)
-        ctx.fillStyle = 'rgba(255,255,255,0.52)';
-        ctx.beginPath();
-        ctx.arc(sx + w/2, sy + h * 0.34, 4, 0, Math.PI*2);
+        ctx.ellipse(cx, cy, w * 0.38, h * 0.32, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillRect(sx + w/2 - 3, sy + h * 0.40, 6, 9);
+        // Concrete rim around dome
+        ctx.strokeStyle = rgb(this._lerpColor(pc, [0, 0, 0], 0.4));
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Gun barrel
+        const barrelX = cx + 4, barrelY = sy + h * 0.34;
+        ctx.fillStyle = rgb(this._lerpColor(pc, [1, 1, 1], 0.6));
+        ctx.fillRect(barrelX, barrelY, w * 0.52, 6);
+        // Barrel shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        ctx.fillRect(barrelX, barrelY + 5, w * 0.52, 2);
+        // Mount collar at barrel base
+        ctx.fillStyle = rgb(this._lerpColor(pc, [0, 0, 0], 0.22));
+        ctx.beginPath();
+        ctx.arc(cx + 4, sy + h * 0.37, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+      } else if (b.type === 'mine') {
+        // Headframe tower: vertical A-frame + winding wheel + ore bucket
+        const cx = sx + w / 2;
+        // Left leg
+        ctx.strokeStyle = rgb(this._lerpColor(pc, [1, 1, 1], 0.55));
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cx - 14, sy + h - 6);
+        ctx.lineTo(cx, sy + 8);
+        ctx.stroke();
+        // Right leg
+        ctx.beginPath();
+        ctx.moveTo(cx + 14, sy + h - 6);
+        ctx.lineTo(cx, sy + 8);
+        ctx.stroke();
+        // Cross brace
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx - 8, sy + h * 0.52);
+        ctx.lineTo(cx + 8, sy + h * 0.52);
+        ctx.stroke();
+        // Winding wheel at top
+        ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, sy + 8, 9, 0, Math.PI * 2);
+        ctx.stroke();
+        // Spokes
+        for (let a = 0; a < 4; a++) {
+          const angle = a * Math.PI / 2;
+          ctx.beginPath();
+          ctx.moveTo(cx, sy + 8);
+          ctx.lineTo(cx + Math.cos(angle) * 8, sy + 8 + Math.sin(angle) * 8);
+          ctx.stroke();
+        }
+        // Hoist cable
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx, sy + 8);
+        ctx.lineTo(cx, sy + h - 18);
+        ctx.stroke();
+        // Ore bucket
+        ctx.fillStyle = 'rgba(200,160,0,0.82)';
+        ctx.fillRect(cx - 6, sy + h - 18, 12, 10);
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillRect(cx - 6, sy + h - 18, 12, 3);
+        // Bucket highlight
+        ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(cx - 6, sy + h - 18, 12, 10);
+
+      } else if (b.type === 'barracks') {
+        // Sloped pitched roof + window row + central door
+        const roofH = 16;
+        // Pitched roof outline
+        ctx.fillStyle = rgb(this._lerpColor(pc, [0, 0, 0], 0.32));
+        ctx.beginPath();
+        ctx.moveTo(sx - 4, sy + roofH);
+        ctx.lineTo(sx + w / 2, sy);
+        ctx.lineTo(sx + w + 4, sy + roofH);
+        ctx.closePath();
+        ctx.fill();
+        // Roof shingles — diagonal lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 4; i++) {
+          const y0 = sy + i * 4;
+          ctx.beginPath();
+          ctx.moveTo(sx - 4 + i * 3, y0 + 4);
+          ctx.lineTo(sx + w + 4 - i * 3, y0 + 4);
+          ctx.stroke();
+        }
+        // Ridge highlight
+        ctx.strokeStyle = rgb(this._lerpColor(pc, [1, 1, 1], 0.28));
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(sx - 4, sy + roofH);
+        ctx.lineTo(sx + w / 2, sy);
+        ctx.lineTo(sx + w + 4, sy + roofH);
+        ctx.stroke();
+        // Window row (3 windows)
+        const winY = sy + roofH + 6, winH = 10, winW = 13, gap = 7;
+        const totalWinW = winW * 3 + gap * 2;
+        const winStartX = sx + (w - totalWinW) / 2;
+        for (let i = 0; i < 3; i++) {
+          const wx = winStartX + i * (winW + gap);
+          ctx.fillStyle = 'rgba(0,0,0,0.46)';
+          ctx.beginPath();
+          ctx.roundRect(wx + 1, winY + 1, winW, winH, 2);
+          ctx.fill();
+          const wg = ctx.createLinearGradient(wx, winY, wx, winY + winH);
+          wg.addColorStop(0, '#88BBEE');
+          wg.addColorStop(1, '#4477AA');
+          ctx.fillStyle = wg;
+          ctx.beginPath();
+          ctx.roundRect(wx, winY, winW, winH, 2);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.moveTo(wx + winW / 2, winY + 1);
+          ctx.lineTo(wx + winW / 2, winY + winH - 1);
+          ctx.moveTo(wx + 1, winY + winH / 2);
+          ctx.lineTo(wx + winW - 1, winY + winH / 2);
+          ctx.stroke();
+        }
+        // Door
+        const doorW = 16, doorH = 18;
+        const doorX = sx + (w - doorW) / 2;
+        const doorY = sy + h - doorH - 4;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath();
+        ctx.roundRect(doorX, doorY, doorW, doorH, [2, 2, 0, 0]);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(doorX, doorY, doorW, doorH, [2, 2, 0, 0]);
+        ctx.stroke();
+        // Door knob
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.arc(doorX + doorW - 4, doorY + doorH / 2, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+      } else if (b.type === 'workshop') {
+        // Sawtooth roof (monitor style) + large bay door + chimney
+        const roofH = 18;
+        const toothW = w / 3;
+        // Draw sawtooth roof outline
+        ctx.fillStyle = rgb(this._lerpColor(pc, [0, 0, 0], 0.36));
+        ctx.beginPath();
+        ctx.moveTo(sx, sy + roofH);
+        for (let i = 0; i < 3; i++) {
+          const tx = sx + i * toothW;
+          ctx.lineTo(tx + toothW / 2, sy);
+          ctx.lineTo(tx + toothW, sy + roofH);
+        }
+        ctx.closePath();
+        ctx.fill();
+        // Ridge line highlight
+        ctx.strokeStyle = rgb(this._lerpColor(pc, [1, 1, 1], 0.24));
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const tx = sx + i * toothW;
+          ctx.moveTo(tx + toothW / 2, sy);
+          ctx.lineTo(tx + toothW, sy + roofH);
+        }
+        ctx.stroke();
+        // Chimney
+        const chimX = sx + w * 0.78, chimW = 10, chimH = 20;
+        ctx.fillStyle = rgb(this._lerpColor(pc, [0, 0, 0], 0.38));
+        ctx.fillRect(chimX - chimW / 2, sy - chimH + 6, chimW, chimH);
+        // Chimney cap
+        ctx.fillStyle = rgb(this._lerpColor(pc, [1, 1, 1], 0.18));
+        ctx.fillRect(chimX - chimW / 2 - 2, sy - chimH + 4, chimW + 4, 4);
+        // Large bay door
+        const bayW = w * 0.44, bayH = 22;
+        const bayX = sx + (w - bayW) / 2, bayY = sy + h - bayH - 4;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath();
+        ctx.roundRect(bayX, bayY, bayW, bayH, 2);
+        ctx.fill();
+        // Bay door cross-bars (X pattern)
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(bayX + 3, bayY + 3);
+        ctx.lineTo(bayX + bayW - 3, bayY + bayH - 3);
+        ctx.moveTo(bayX + bayW - 3, bayY + 3);
+        ctx.lineTo(bayX + 3, bayY + bayH - 3);
+        ctx.stroke();
+        // Side windows (2 narrow vertical windows)
+        const swW = 8, swH = 14;
+        const swY = sy + roofH + 8;
+        for (let i = 0; i < 2; i++) {
+          const swX = sx + (w * 0.18) + i * (w * 0.62);
+          ctx.fillStyle = 'rgba(0,0,0,0.42)';
+          ctx.beginPath();
+          ctx.roundRect(swX, swY, swW, swH, 2);
+          ctx.fill();
+          const swg = ctx.createLinearGradient(swX, swY, swX, swY + swH);
+          swg.addColorStop(0, '#AABBCC');
+          swg.addColorStop(1, '#667788');
+          ctx.fillStyle = swg;
+          ctx.beginPath();
+          ctx.roundRect(swX, swY, swW, swH, 2);
+          ctx.fill();
+        }
       }
     }
   }

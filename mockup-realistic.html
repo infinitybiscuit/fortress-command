@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Realistic Canvas 2D Mockup</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #141A38;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 32px;
+  font-family: 'Courier New', monospace;
+  color: #fff;
+}
+h2 { color: #3380FF; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; }
+.label { font-size: 11px; color: #666; text-align: center; }
+#c { display: block; }
+</style>
+</head>
+<body>
+
+<h2>Canvas 2D Realistic Rendering Demo</h2>
+
+<!-- Building: HQ 4×3 tiles -->
+<canvas id="c" width="640" height="320"></canvas>
+<p class="label">Left: flat color fallback (current) &nbsp;|&nbsp; Right: layered realistic render</p>
+
+<script>
+// ------------------------------------------------------------------
+// Canvas setup
+// ------------------------------------------------------------------
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// ------------------------------------------------------------------
+// Palette
+// ------------------------------------------------------------------
+const PLAYER_COLORS = [
+  [0.2,  0.5,  0.9 ],   // blue
+  [0.85, 0.25, 0.25],   // red
+  [0.2,  0.75, 0.4 ],   // green
+  [0.85, 0.7,  0.2 ],   // gold
+];
+
+// Convert [0-1] rgb to CSS
+function rgb([r, g, b]) {
+  return `rgb(${[r,g,b].map(x => Math.round(x*255)).join(',')})`;
+}
+function rgba([r, g, b], a) {
+  return `rgba(${[r,g,b].map(x => Math.round(x*255)).join(',')},${a})`;
+}
+// Lerp two colors
+function lerp(a, b, t) {
+  return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+}
+
+// ------------------------------------------------------------------
+// Shadow helper — cast onto the ground plane
+// ------------------------------------------------------------------
+function drawGroundShadow(ctx, x, y, w, h, depth = 8) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0)';
+  const g = ctx.createLinearGradient(x, y + h, x, y + h + depth);
+  g.addColorStop(0, 'rgba(0,0,0,0.35)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(x + 4,           y + h);           // top-left of base
+  ctx.lineTo(x + w - 4,      y + h);           // top-right
+  ctx.lineTo(x + w,         y + h + depth);   // right shadow tip
+  ctx.lineTo(x - 2,          y + h + depth);  // left shadow tip
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// ------------------------------------------------------------------
+// Building: flat fallback
+// ------------------------------------------------------------------
+function drawFlat(ctx, x, y, w, h, pc, built) {
+  ctx.fillStyle = built ? rgb(pc) : rgba(pc, 0.5);
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 2);
+  ctx.fill();
+  ctx.strokeStyle = rgb(lerp(pc, [1,1,1], 0.2));
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 2);
+  ctx.stroke();
+}
+
+// ------------------------------------------------------------------
+// Building: realistic layered render
+// ------------------------------------------------------------------
+function drawRealisticHQ(ctx, x, y, w, h, pc, built) {
+  const r = 3; // corner radius
+
+  // --- Ground shadow (perspective cast to right) ---
+  drawGroundShadow(ctx, x, y, w, h, 10);
+
+  // ------------------------------------------------------------------
+  // 1. Base face — vertical gradient (top lighter, bottom darker)
+  // ------------------------------------------------------------------
+  const faceGrad = ctx.createLinearGradient(x, y, x, y + h);
+  if (built) {
+    faceGrad.addColorStop(0,    rgb(lerp(pc, [1,1,1], 0.25)));
+    faceGrad.addColorStop(0.3,  rgb(pc));
+    faceGrad.addColorStop(0.7,  rgb(lerp(pc, [0,0,0], 0.15)));
+    faceGrad.addColorStop(1,    rgb(lerp(pc, [0,0,0], 0.35)));
+  } else {
+    faceGrad.addColorStop(0, rgba(lerp(pc,[1,1,1],0.15), 0.6));
+    faceGrad.addColorStop(1, rgba(lerp(pc,[0,0,0],0.2),  0.6));
+  }
+  ctx.shadowColor = 'rgba(0,0,0,0.4)';
+  ctx.shadowBlur  = 12;
+  ctx.shadowOffsetX = 4;
+  ctx.shadowOffsetY = 6;
+  ctx.fillStyle = faceGrad;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  ctx.fill();
+
+  // Reset shadow
+  ctx.shadowColor = 'rgba(0,0,0,0)';
+  ctx.shadowBlur  = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+
+  // ------------------------------------------------------------------
+  // 2. Top rim highlight — simulates a flat top surface catching light
+  // ------------------------------------------------------------------
+  const topGrad = ctx.createLinearGradient(x, y, x, y + 8);
+  topGrad.addColorStop(0, rgb(lerp(pc, [1,1,1], 0.45)));
+  topGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = topGrad;
+  ctx.beginPath();
+  ctx.moveTo(x + r,  y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + 6);
+  ctx.lineTo(x,     y + 6);
+  ctx.lineTo(x,     y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  ctx.fill();
+
+  // ------------------------------------------------------------------
+  // 3. Left edge highlight — bright rim catching side light
+  // ------------------------------------------------------------------
+  const leftGrad = ctx.createLinearGradient(x, y, x + 7, y);
+  leftGrad.addColorStop(0, rgb(lerp(pc, [1,1,1], 0.4)));
+  leftGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = leftGrad;
+  ctx.beginPath();
+  ctx.moveTo(x,     y + r);
+  ctx.lineTo(x + 5, y + r);
+  ctx.lineTo(x + 5, y + h - r);
+  ctx.lineTo(x,     y + h - r);
+  ctx.quadraticCurveTo(x, y + h, x + r, y + h);
+  ctx.lineTo(x + r, y);
+  ctx.quadraticCurveTo(x, y, x, y + r);
+  ctx.closePath();
+  ctx.fill();
+
+  // ------------------------------------------------------------------
+  // 4. Bottom-right inner shadow — volume recession
+  // ------------------------------------------------------------------
+  const bottomGrad = ctx.createLinearGradient(x, y + h - 10, x, y + h);
+  bottomGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  bottomGrad.addColorStop(1, 'rgba(0,0,0,0.3)');
+  ctx.fillStyle = bottomGrad;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y + h);
+  ctx.lineTo(x + w - r, y + h);
+  ctx.quadraticCurveTo(x + w, y + h, x + w, y + h - r);
+  ctx.lineTo(x + w, y + h - 10);
+  ctx.lineTo(x,     y + h - 10);
+  ctx.lineTo(x,     y + h - r);
+  ctx.quadraticCurveTo(x, y + h, x + r, y + h);
+  ctx.closePath();
+  ctx.fill();
+
+  // ------------------------------------------------------------------
+  // 5. Right edge shadow — darkening side
+  // ------------------------------------------------------------------
+  const rightGrad = ctx.createLinearGradient(x + w - 8, y, x + w, y);
+  rightGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  rightGrad.addColorStop(1, 'rgba(0,0,0,0.25)');
+  ctx.fillStyle = rightGrad;
+  ctx.beginPath();
+  ctx.moveTo(x + w - 8, y + r);
+  ctx.lineTo(x + w,     y + r);
+  ctx.quadraticCurveTo(x + w, y, x + w - r, y);
+  ctx.lineTo(x + w - 8, y);
+  ctx.closePath();
+  ctx.fill();
+
+  // ------------------------------------------------------------------
+  // 6. Interior detail: Flag pole + pennant on HQ
+  // ------------------------------------------------------------------
+  if (built) {
+    // Pole
+    const poleX = x + w * 0.72;
+    const poleTop = y + 4;
+    const poleBot = y + h * 0.55;
+    ctx.strokeStyle = rgba([1,1,1], 0.7);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(poleX, poleTop);
+    ctx.lineTo(poleX, poleBot);
+    ctx.stroke();
+
+    // Pennant (pointing right)
+    ctx.fillStyle = rgb(pc);
+    ctx.beginPath();
+    ctx.moveTo(poleX, poleTop);
+    ctx.lineTo(poleX + 18, poleTop + 5);
+    ctx.lineTo(poleX, poleTop + 10);
+    ctx.closePath();
+    ctx.fill();
+
+    // Pennant outline
+    ctx.strokeStyle = rgba([1,1,1], 0.3);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Window row — three recessed rectangles
+    const winY  = y + h * 0.38;
+    const winH  = 10;
+    const winW  = 12;
+    const gap   = 6;
+    const totalW = winW * 3 + gap * 2;
+    const startX = x + (w - totalW) / 2;
+    for (let i = 0; i < 3; i++) {
+      const wx = startX + i * (winW + gap);
+      // Window recess shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.beginPath();
+      ctx.roundRect(wx + 1, winY + 1, winW, winH, 2);
+      ctx.fill();
+      // Window glass
+      const winGrad = ctx.createLinearGradient(wx, winY, wx, winY + winH);
+      winGrad.addColorStop(0, '#6699CC');
+      winGrad.addColorStop(0.5, '#88BBEE');
+      winGrad.addColorStop(1, '#4477AA');
+      ctx.fillStyle = winGrad;
+      ctx.beginPath();
+      ctx.roundRect(wx, winY, winW, winH, 2);
+      ctx.fill();
+      // Window cross (pane)
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(wx + winW/2, winY + 1);
+      ctx.lineTo(wx + winW/2, winY + winH - 1);
+      ctx.moveTo(wx + 1, winY + winH/2);
+      ctx.lineTo(wx + winW - 1, winY + winH/2);
+      ctx.stroke();
+    }
+
+    // Door at bottom-center
+    const doorW = 18;
+    const doorH = 22;
+    const doorX = x + (w - doorW) / 2;
+    const doorY = y + h - doorH - 4;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath();
+    ctx.roundRect(doorX, doorY, doorW, doorH, [2,2,0,0]);
+    ctx.fill();
+    // Door frame
+    ctx.strokeStyle = rgba([1,1,1], 0.3);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(doorX, doorY, doorW, doorH, [2,2,0,0]);
+    ctx.stroke();
+    // Door knob
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(doorX + doorW - 5, doorY + doorH/2, 2, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // ------------------------------------------------------------------
+  // 7. Under-construction: diagonal hatch overlay
+  // ------------------------------------------------------------------
+  if (!built) {
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = '#1a2a4a';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#3380FF';
+    ctx.lineWidth = 1;
+    for (let i = -h; i < w; i += 6) {
+      ctx.beginPath();
+      ctx.moveTo(x + i,     y);
+      ctx.lineTo(x + i + h, y + h);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+// ------------------------------------------------------------------
+// Unit: realistic soldier
+// ------------------------------------------------------------------
+function drawRealisticUnit(ctx, x, y, w, h, pc, facing, selected) {
+  const r = 3;
+
+  // Ground shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0)';
+  const g = ctx.createLinearGradient(x, y + h, x, y + h + 6);
+  g.addColorStop(0, 'rgba(0,0,0,0.3)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(x + w/2 + 3, y + h + 3, w/2 + 2, 4, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  // Body
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur  = 8;
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 3;
+  const bodyGrad = ctx.createLinearGradient(x, y, x, y + h);
+  bodyGrad.addColorStop(0, rgb(lerp(pc, [1,1,1], 0.3)));
+  bodyGrad.addColorStop(0.4, rgb(pc));
+  bodyGrad.addColorStop(1, rgb(lerp(pc, [0,0,0], 0.3)));
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  ctx.fill();
+
+  // Reset shadow
+  ctx.shadowColor = 'rgba(0,0,0,0)';
+  ctx.shadowBlur  = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+
+  // Top highlight
+  const topG = ctx.createLinearGradient(x, y, x, y + 6);
+  topG.addColorStop(0, rgba([1,1,1], 0.35));
+  topG.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = topG;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  ctx.fill();
+
+  // Helmet — dark rounded cap on top third
+  const helmW = w * 0.75;
+  const helmH = h * 0.38;
+  const helmX = x + (w - helmW) / 2;
+  const helmY = y + 2;
+  const helmGrad = ctx.createLinearGradient(helmX, helmY, helmX, helmY + helmH);
+  helmGrad.addColorStop(0, '#555');
+  helmGrad.addColorStop(1, '#222');
+  ctx.fillStyle = helmGrad;
+  ctx.beginPath();
+  ctx.roundRect(helmX, helmY, helmW, helmH, [r, r, 1, 1]);
+  ctx.fill();
+  // Helmet brim
+  ctx.fillStyle = '#333';
+  ctx.beginPath();
+  ctx.roundRect(helmX - 2, helmY + helmH - 3, helmW + 4, 4, 1);
+  ctx.fill();
+
+  // Facing indicator arrow
+  ctx.fillStyle = rgba([1,1,1], 0.8);
+  const fx = facing > 0 ? x + w - 5 : x + 2;
+  ctx.beginPath();
+  ctx.moveTo(fx, y + h * 0.32);
+  ctx.lineTo(fx + facing * 6, y + h * 0.5);
+  ctx.lineTo(fx, y + h * 0.68);
+  ctx.closePath();
+  ctx.fill();
+
+  // Selection ring
+  if (selected) {
+    ctx.strokeStyle = '#FF0';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(x - 3, y - 3, w + 6, h + 6, r + 2);
+    ctx.stroke();
+  }
+}
+
+// ------------------------------------------------------------------
+// Draw demo
+// ------------------------------------------------------------------
+const CX = 40; // left margin
+const CY = 40; // top margin
+const TILE = 32;
+
+// ---- FLAT ----
+const flatPC = PLAYER_COLORS[0];
+drawFlat(ctx, CX, CY, 4*TILE, 3*TILE, flatPC, true);
+
+// label
+ctx.fillStyle = '#666';
+ctx.font = '11px Courier New';
+ctx.fillText('CURRENT (flat)', CX, CY - 6);
+
+// ---- REALISTIC ----
+const realX = CX + 4*TILE + 40;
+const realPC = PLAYER_COLORS[0];
+drawRealisticHQ(ctx, realX, CY, 4*TILE, 3*TILE, realPC, true);
+ctx.fillStyle = '#3380FF';
+ctx.font = '11px Courier New';
+ctx.fillText('REALISTIC', realX, CY - 6);
+
+// ---- CONSTRUCTION ----
+const constrY = CY + 3*TILE + 30;
+drawRealisticHQ(ctx, realX, constrY, 4*TILE, 3*TILE, flatPC, false);
+drawFlat(ctx, CX, constrY, 4*TILE, 3*TILE, flatPC, false);
+ctx.fillStyle = '#666';
+ctx.font = '11px Courier New';
+ctx.fillText('CONSTRUCTION', realX, constrY - 6);
+
+// ---- UNITS ----
+const unitY = constrY + 3*TILE + 30;
+drawFlat(ctx, CX, unitY, 12, 20, flatPC, true);
+drawRealisticUnit(ctx, realX, unitY, 12, 20, flatPC, 1, false);
+ctx.fillStyle = '#666';
+ctx.font = '11px Courier New';
+ctx.fillText('UNIT', realX, unitY - 6);
+
+// Selected unit
+drawRealisticUnit(ctx, realX + 20, unitY + 30, 12, 20, flatPC, -1, true);
+ctx.fillStyle = '#666';
+ctx.font = '11px Courier New';
+ctx.fillText('SELECTED', realX + 20, unitY + 26);
+
+</script>
+</body>
+</html>
