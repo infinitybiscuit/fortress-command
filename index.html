@@ -171,6 +171,11 @@ const MINIMAP_W = 180;
 const MINIMAP_H = 40;
 const BUILD_MENU_W = 260;
 
+// Default max travel distance for projectiles (screen height — one screen is
+// a natural cap; snipers override this to half the map width)
+const DEFAULT_PROJECTILE_RANGE = typeof window !== 'undefined' ? (window.innerHeight || 800) : 800;
+const SNIPER_RANGE = MAP_WIDTH_TILES * TILE_SIZE / 2; // half-map, ~3200px
+
 // Unit types
 const UNIT_TYPES = {
   soldier: {
@@ -193,6 +198,12 @@ const UNIT_TYPES = {
     cost:60, train_time:4.0, width:12, height:20,
     can_build:true, can_repair:true, repair_rate:5,
   },
+  sniper: {
+    hp:60, speed:55, damage:30, attack_range:1500, attack_rate:10.0,
+    cost:200, train_time:8.0, width:14, height:22,
+    can_build:false, can_repair:false, repair_rate:0,
+    projectile_range: SNIPER_RANGE,
+  },
 };
 
 // Building types
@@ -204,7 +215,7 @@ const BUILDING_TYPES = {
   },
   barracks: {
     hp:200, width_tiles:3, height_tiles:2, cost:150, build_time:5.0,
-    can_train:['soldier','heavy','scout'],
+    can_train:['soldier','heavy','scout','sniper'],
   },
   turret: {
     hp:120, width_tiles:2, height_tiles:2, cost:100, build_time:4.0,
@@ -770,15 +781,20 @@ class Building {
 let _nextProjectileId = 0;
 
 class Projectile {
-  constructor(x, y, direction, damage, ownerId, targetX = null, targetY = null) {
+  constructor(x, y, direction, damage, ownerId, targetX = null, targetY = null, maxRange = null) {
     this.id = _nextProjectileId++;
     this.x = x;
     this.y = y;
+    this.startX = x;
+    this.startY = y;
     this.vx = direction * PROJECTILE_SPEED;
     this.damage = damage;
     this.ownerId = ownerId;
     this.alive = true;
     this.radius = PROJECTILE_RADIUS;
+    // maxRange: how far the projectile can travel before being killed.
+    // null = DEFAULT_PROJECTILE_RANGE (screen height).
+    this.maxRange = maxRange !== null ? maxRange : DEFAULT_PROJECTILE_RANGE;
     // Ballistic arc: use quadratic solution so targets at same height get
     // correct horizontal shots, not zero-vy shots that overshoot.
     // Solves: y + vy*t + 0.5*g*t² = targetY  with  vx*t = targetX - x
@@ -826,6 +842,12 @@ class Projectile {
       this.vy += GRAVITY * dt;
     }
     this._angle = Math.atan2(this.vy, this.vx);
+    // Kill if projectile has traveled beyond its max range
+    const dx = this.x - this.startX;
+    const dy = this.y - this.startY;
+    if (dx * dx + dy * dy > this.maxRange * this.maxRange) {
+      this.alive = false;
+    }
     if (this.x < -500 || this.x > MAP_WIDTH_TILES * TILE_SIZE + 500) {
       this.alive = false;
     }
@@ -1209,6 +1231,12 @@ class CombatSystem {
     this.projectiles = this.projectiles.filter(p => p.alive && !p.isOffscreen(worldW));
   }
 
+  _unitProjectileRange(u) {
+    // Returns the projectile_range from UNIT_TYPES config, or null for default
+    const cfg = UNIT_TYPES[u.type];
+    return cfg && cfg.projectile_range !== undefined ? cfg.projectile_range : null;
+  }
+
   _processMelee(allUnits) {
     for (const u of allUnits) {
       if (!u.alive || !u.canAttack()) continue;
@@ -1217,7 +1245,7 @@ class CombatSystem {
       if (u.target) {
         u.performAttack();
         const dir = u.target.x > u.x ? 1 : -1;
-        this.projectiles.push(new Projectile(u.x, u.centerY, dir, u.damage, u.ownerId, u.target.x, u.target.centerY));
+        this.projectiles.push(new Projectile(u.x, u.centerY, dir, u.damage, u.ownerId, u.target.x, u.target.centerY, this._unitProjectileRange(u)));
       } else {
         let nearest = null, nearestDist = u.attackRange + 1;
         for (const other of allUnits) {
@@ -1228,7 +1256,7 @@ class CombatSystem {
         if (nearest) {
           u.performAttack();
           const dir = nearest.x > u.x ? 1 : -1;
-          this.projectiles.push(new Projectile(u.x, u.centerY, dir, u.damage, u.ownerId, nearest.x, nearest.centerY));
+          this.projectiles.push(new Projectile(u.x, u.centerY, dir, u.damage, u.ownerId, nearest.x, nearest.centerY, this._unitProjectileRange(u)));
           u.target = nearest;
         }
       }
@@ -1248,7 +1276,7 @@ class CombatSystem {
       if (dx < t.width / 2 + u.attackRange && dy < t.height / 2 + 20) {
         u.performAttack();
         const dir = t.x > u.x ? 1 : -1;
-        this.projectiles.push(new Projectile(u.x, u.centerY, dir, u.damage, u.ownerId, t.centerX, t.centerY));
+        this.projectiles.push(new Projectile(u.x, u.centerY, dir, u.damage, u.ownerId, t.centerX, t.centerY, this._unitProjectileRange(u)));
       }
     }
   }
@@ -1585,7 +1613,7 @@ drawUnit(u, camX, playerColors) {
     }
 
     // Sprite
-    const typeMap = { soldier:'soldier', heavy:'heavy', scout:'scout', tank:'heavy' };
+    const typeMap = { soldier:'soldier', heavy:'heavy', scout:'scout', tank:'heavy', sniper:'soldier' };
     const spriteType = typeMap[u.type] || 'soldier';
     const sprite = this.sprites.getSprite(spriteType, u.ownerId, playerColors);
 
