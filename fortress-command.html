@@ -312,6 +312,15 @@ class TileMap {
     // Clear starting areas for HQs (just above ground surface)
     this._clearArea(2, groundTop, 6, 5);
     this._clearArea(this.width - 8, groundTop, 6, 5);
+
+    // ── GUARANTEED PLATFORMS ──────────────────────────────────────────
+    // Ensure both HQs have a platform beneath them at the TOP platform row.
+    // The top platform row is groundTop - PLATFORM_ROWS[0] - 1.
+    // HQ is 4 tiles wide — guarantee platform from x=0..7 (left) and x=11..18 (right).
+    const topRowDelta = [...PLATFORM_ROWS].sort((a, b) => b - a)[0];
+    const topPlatformY = groundTop - topRowDelta - 1;  // absolute tile row of top platform surface
+    for (let px = 0; px <= 7; px++) this.tiles[px][topPlatformY] = TILE_PLATFORM;
+    for (let px = this.width - 8; px < this.width; px++) this.tiles[px][topPlatformY] = TILE_PLATFORM;
   }
 
   _clearArea(x, y, w, h) {
