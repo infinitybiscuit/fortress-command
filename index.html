@@ -171,9 +171,10 @@ const MINIMAP_W = 180;
 const MINIMAP_H = 40;
 const BUILD_MENU_W = 260;
 
-// Default max travel distance for projectiles (screen height — one screen is
-// a natural cap; snipers override this to half the map width)
-const DEFAULT_PROJECTILE_RANGE = typeof window !== 'undefined' ? (window.innerHeight || 800) : 800;
+// Default max travel distance for projectiles.
+// Uses map-height in pixels so the cap is world-space consistent,
+// not viewport-dependent (window.innerHeight varies by browser/embedding).
+const DEFAULT_PROJECTILE_RANGE = MAP_HEIGHT_TILES * TILE_SIZE * 2.5; // ~1600px, ~50 tiles
 const SNIPER_RANGE = MAP_WIDTH_TILES * TILE_SIZE / 2; // half-map, ~3200px
 
 // Unit types
@@ -1363,9 +1364,10 @@ class InputHandler {
     this._EDGE_THRESHOLD = 30;
     this._SWIPE_THRESHOLD = 30;
     this._DRAG_THRESHOLD = 8;
+    this._keysDown = {};
+    this._lastArrowPanX = 0;
     this._lastX = 0;
     this._lastY = 0;
-    // Drag-selection tracking
     this._dragStartX = 0;
     this._dragStartY = 0;
     this._isDragging = false;
@@ -1382,6 +1384,26 @@ class InputHandler {
     canvas.addEventListener('pointercancel', e => this._onPointerUp(e), { passive: false });
     window.addEventListener('keydown', e => this._onKeyDown(e));
     window.addEventListener('keyup', e => this._onKeyUp(e));
+  }
+
+  // Called each game tick (dt in seconds) when arrow keys are held.
+  // Accumulates into _lastArrowPanX so a single onPan call handles the whole frame.
+  handleArrowKeys(dt) {
+    const PAN_SPEED = 320; // px/s
+    let dx = 0;
+    if (this._keysDown['ArrowLeft']  || this._keysDown['a'] || this._keysDown['A']) dx -= 1;
+    if (this._keysDown['ArrowRight'] || this._keysDown['d'] || this._keysDown['D']) dx += 1;
+    if (dx !== 0) {
+      this._lastArrowPanX += dx * PAN_SPEED * dt;
+    }
+  }
+
+  // Flush accumulated arrow pan (call once per frame, after handleArrowKeys)
+  flushArrowPan() {
+    if (this._lastArrowPanX !== 0) {
+      this.onPan && this.onPan(this._lastArrowPanX);
+      this._lastArrowPanX = 0;
+    }
   }
 
   _onPointerDown(e) {
@@ -1469,9 +1491,15 @@ class InputHandler {
     if (e.key === 'Escape') {
       if (window._fc_game) window._fc_game.cancelBuildMode && window._fc_game.cancelBuildMode();
     }
+    // Track arrow keys for camera panning
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'a' || e.key === 'A' || e.key === 'd' || e.key === 'D') {
+      this._keysDown[e.key] = true;
+    }
   }
 
-  _onKeyUp(e) {}
+  _onKeyUp(e) {
+    this._keysDown[e.key] = false;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2794,6 +2822,10 @@ _updateHUD() {
 
   _update(dt) {
     if (this.scene !== 'game' || this._gameOver) return;
+
+    // Keyboard camera pan (arrow keys / A / D)
+    this.input.handleArrowKeys(dt);
+    this.input.flushArrowPan();
 
     // Update players
     for (const p of this.players) {
