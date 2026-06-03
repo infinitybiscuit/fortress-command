@@ -334,6 +334,33 @@ class TileMap {
     return this.height - GROUND_LEVEL_TILE;
   }
 
+  // Returns the tile y of the platform SURFACE (top face of platform tiles)
+  // for a platform at the given rowDelta above ground.
+  _platformSurfaceY(rowDelta) {
+    // platform tiles are at: groundTop - rowDelta - 1
+    // the SURFACE (top face) is the same row (single-tile-thick platform)
+    const groundTop = this.height - GROUND_LEVEL_TILE;
+    return groundTop - rowDelta - 1;
+  }
+
+  // Find the highest platform surface that can fit a building of given dimensions
+  // starting at startTileX. Falls back to ground surface if no platform fits.
+  highestPlatformSurfaceTileY(startTileX, width) {
+    const groundTop = this.height - GROUND_LEVEL_TILE;
+    // Iterate highest to lowest rowDelta (most elevated first)
+    for (const rd of [...PLATFORM_ROWS].sort((a, b) => b - a)) {
+      const surfaceY = this._platformSurfaceY(rd);
+      // Check if there's a contiguous horizontal stretch of platform tiles at this surface
+      let ok = true;
+      for (let tx = startTileX; tx < startTileX + width; tx++) {
+        if (this.getTile(tx, surfaceY) !== TILE_PLATFORM) { ok = false; break; }
+      }
+      if (ok) return surfaceY;
+    }
+    // No platform found — fall back to ground surface
+    return groundTop;
+  }
+
   // Mark tiles as occupied by a building (so units can't fall through)
   markBuildingTiles(tileX, tileY, w, h, buildingId, buildingType) {
     for (let tx = tileX; tx < tileX + w; tx++) {
@@ -886,9 +913,11 @@ class Player {
 
   _placeHq(worldX) {
     const tileX = floor(worldX / TILE_SIZE);
-    const gsY = this.tilemap.groundSurfaceTileY();
-    const hqH = BUILDING_TYPES.hq.height_tiles;
-    const tileY = gsY - hqH;
+    const hqCfg = BUILDING_TYPES.hq;
+    // Place on highest platform that can fit the HQ; fall back to ground surface
+    const surfaceY = this.tilemap.highestPlatformSurfaceTileY(tileX, hqCfg.width_tiles);
+    // HQ sits with its bottom tile on the surface
+    const tileY = surfaceY - hqCfg.height_tiles + 1;
     const hq = new Building('hq', tileX, tileY, this.id, null, this.tilemap);
     this.buildings.push(hq);
     return hq;
