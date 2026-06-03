@@ -343,6 +343,14 @@ class TileMap {
     return groundTop - rowDelta - 1;
   }
 
+  // Always returns the tile y of the TOP platform surface (always elevated, ignores fit check)
+  topPlatformSurfaceTileY() {
+    // PLATFORM_ROWS[0] is the highest (first entry, after sort-descending this gives highest)
+    // Sort a copy highest-to-lowest and take the first
+    const topRowDelta = [...PLATFORM_ROWS].sort((a, b) => b - a)[0];
+    return this._platformSurfaceY(topRowDelta);
+  }
+
   // Find the highest platform surface that can fit a building of given dimensions
   // starting at startTileX. Falls back to ground surface if no platform fits.
   highestPlatformSurfaceTileY(startTileX, width) {
@@ -914,8 +922,8 @@ class Player {
   _placeHq(worldX) {
     const tileX = floor(worldX / TILE_SIZE);
     const hqCfg = BUILDING_TYPES.hq;
-    // Place on highest platform that can fit the HQ; fall back to ground surface
-    const surfaceY = this.tilemap.highestPlatformSurfaceTileY(tileX, hqCfg.width_tiles);
+    // Always place on the top platform surface (above ground)
+    const surfaceY = this.tilemap.topPlatformSurfaceTileY();
     // HQ sits with its bottom tile on the surface
     const tileY = surfaceY - hqCfg.height_tiles + 1;
     const hq = new Building('hq', tileX, tileY, this.id, null, this.tilemap);
