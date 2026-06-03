@@ -817,7 +817,14 @@ class Projectile {
   update(dt) {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    this.vy += GRAVITY * dt;  // gravity each frame for proper arc
+    // For targetless/visual projectiles (mines, etc.), apply gravity each frame.
+    // For aimed projectiles the constructor already solved the correct ballistic vy
+    // using the quadratic formula — adding frame gravity here would double the
+    // effective gravity and make straight-trajectory weapons (bullets/missiles)
+    // drop excessively.
+    if (this.vy === 0) {
+      this.vy += GRAVITY * dt;
+    }
     this._angle = Math.atan2(this.vy, this.vx);
     if (this.x < -500 || this.x > MAP_WIDTH_TILES * TILE_SIZE + 500) {
       this.alive = false;
