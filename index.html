@@ -584,45 +584,52 @@ class TileMap {
   // Returns { startTx, startTy, w, h, direction, height } or null if invalid.
   findRampSpanBetweenPoints(tx1, ty1, tx2, ty2) {
     const groundTop = this.height - GROUND_LEVEL_TILE;
-    // Height = absolute vertical drop (tiles from start surface down to end surface)
     const height = Math.abs(ty1 - ty2);
-    if (height < 2) return null;  // ramp needs at least 2 tiles of drop
+    if (height < 2) return null;
     const MAX_RAMP = 8;
-    if (height > MAX_RAMP) return null;  // too tall
+    if (height > MAX_RAMP) return null;
     const w = height + 1, h = height + 1;
-    // Direction: if endTx > tx1 → ramp goes down-right ('up-left'); else down-left ('up-right')
     const direction = tx2 > tx1 ? 'up-left' : 'up-right';
     let startTx, startTy;
     if (direction === 'up-right') {
-      // Anchor is top-right corner; startTx is the left edge
       startTx = tx1 - (w - 1);
       startTy = ty1;
     } else {
-      // 'up-left': anchor is top-left; startTx is left edge
       startTx = tx1;
       startTy = ty1;
     }
-    // Validate footprint tiles
     const anchorTx = direction === 'up-right' ? startTx + w - 1 : startTx;
     const anchorTy = startTy;
+    // Validate footprint: diagonal tiles must be empty; non-diagonal tiles
+    // below ground surface are always valid; no tile may be occupied otherwise.
     for (let ry = 0; ry < h; ry++) {
       for (let rx = 0; rx < w; rx++) {
         const cx = startTx + rx, cy = startTy + ry;
         if (cx < 0 || cx >= this.width || cy < 0 || cy >= this.height) return null;
-        if (cx === anchorTx && cy === anchorTy) continue;  // anchor on platform
-        if (cy >= groundTop) continue;  // below ground surface is always valid
-        const t = this.tiles[cx][cy];
-        if (t !== TILE_EMPTY) return null;
+        if (cx === anchorTx && cy === anchorTy) continue;  // anchor sits on platform
+        // Diagonal tile? (anchor corner to opposite bottom corner)
+        const isDiagonal = (direction === 'up-right')
+          ? (rx === w - 1 - ry)   // top-right → down-left diagonal
+          : (rx === ry);          // top-left → down-right diagonal
+        if (isDiagonal) {
+          // Diagonal tiles (except anchor) must be EMPTY
+          if (this.tiles[cx][cy] !== TILE_EMPTY) return null;
+        } else if (cy >= groundTop) {
+          continue;  // below ground: always valid
+        } else {
+          // Non-diagonal tiles above ground must be empty
+          if (this.tiles[cx][cy] !== TILE_EMPTY) return null;
+        }
       }
     }
     // Bottom corner must be at or below ground surface
     const bottomTy = startTy + h - 1;
     if (bottomTy < groundTop) return null;
-    const bottomTx = direction === 'up-right' ? startTx : startTx + w - 1;
-    for (let cx = bottomTx - 1; cx <= bottomTx + 1; cx++) {
-      const t = this.getTile(cx, bottomTy);
-      if (t !== TILE_GROUND && t !== TILE_BRIDGE) return null;
-    }
+    // Endpoint tile at bottom of diagonal must be on ground or bridge
+    const endTx = direction === 'up-right' ? startTx : startTx + w - 1;
+    const endTy = bottomTy;
+    const endTile = this.getTile(endTx, endTy);
+    if (endTile !== TILE_GROUND && endTile !== TILE_BRIDGE) return null;
     return { startTx, startTy, w, h, direction, height };
   }
 
