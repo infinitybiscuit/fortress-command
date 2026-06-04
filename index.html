@@ -135,6 +135,7 @@ const C = {
   GROUND:        [0.30, 0.25, 0.18],
   PLATFORM:      [0.35, 0.32, 0.25],
   BRIDGE:        [0.45, 0.30, 0.15],
+  RAMP:          [0.55, 0.35, 0.20],
   // UI
   HUD_BG:        'rgba(26,26,38,0.9)',
   ACCENT:        '#3380FF',
@@ -239,6 +240,10 @@ const BUILDING_TYPES = {
     hp:150, width_tiles:1, height_tiles:1,
     cost_per_tile:15, cost:15, build_time:3.0, is_bridge:true,
   },
+  ramp: {
+    hp:120, width_tiles:1, height_tiles:1,
+    cost_per_tile:20, cost:20, build_time:4.0, is_ramp:true,
+  },
 };
 
 // Projectile
@@ -255,6 +260,7 @@ const TILE_EMPTY = 0;
 const TILE_GROUND = 1;
 const TILE_PLATFORM = 2;
 const TILE_BRIDGE = 3;
+const TILE_RAMP   = 4;
 
 // ═══════════════════════════════════════════════════════════════
 // SECTION 3: UTILITY
@@ -284,6 +290,10 @@ class TileMap {
     this._buildingTiles = new Map();
     // Separate map for tiles that block unit movement (only walls/mines)
     this._unitBlockingTiles = new Map();
+    // Ramp footprint data: rampId -> {tileX, tileY, w, h, direction, topTileX, topTileY}
+    this._rampFootprints = new Map();
+    // Reverse lookup: "tx,ty" -> rampId for fast tile->ramp lookup
+    this._rampTileToRamp = new Map();
   }
 
   generate() {
@@ -402,12 +412,11 @@ class TileMap {
   }
 
   isSolid(x, y) {
-    // Out of bounds = solid (boundary wall)
     if (y < 0 || y >= this.height) return true;
     if (x < 0 || x >= this.width) return true;
-    // Only unit-blocking buildings (walls, mines) act as solid for unit physics
     if (this._unitBlockingTiles.has(`${x},${y}`)) return true;
-    return this.tiles[x][y] !== TILE_EMPTY;
+    const t = this.tiles[x][y];
+    return t !== TILE_EMPTY && t !== TILE_RAMP;
   }
 
   worldToTile(wx, wy) {
@@ -491,6 +500,138 @@ class TileMap {
       if (tx >= 0 && tx < this.width && tileY >= 0 && tileY < this.height) {
         if (this.tiles[tx][tileY] === TILE_BRIDGE) this.tiles[tx][tileY] = TILE_EMPTY;
       }
+    }
+  }
+
+  // ── RAMP METHODS ─────────────────────────────────────────────────────────
+  // directions: 'up-right' (top-right anchor steps down-left to ground),
+  //             'up-left'  (top-left anchor steps down-right to ground)
+
+  // Find the ramp footprint anchored at (tx, surfaceTy). The ramp extends
+  // diagonally downward in the given direction until it reaches ground.
+  // Returns { startTx, startTy, w, h, direction } or null if invalid.
+  findRampSpan(tx, surfaceTy, direction) {
+    const groundTop = this.height - GROUND_LEVEL_TILE;
+    // Height = number of tile rows from surface down to ground
+    const height = groundTop - surfaceTy;
+    if (height < 2) return null;  // ramp needs at least 2 tiles of drop
+    const MAX_RAMP = 8;
+    if (height > MAX_RAMP) return height;  // cap: caller clamps to MAX_RAMP
+
+    const w = height + 1, h = height + 1;
+    let startTx, startTy;  // top-left of footprint
+
+    if (direction === 'up-right') {
+      // Anchor corner is top-right; ramp steps down-left
+      // Anchor is at (tx + w - 1, surfaceTy) — top-right corner of footprint
+      startTx = tx;  // tx = anchor's x - (w-1)
+      startTy = surfaceTy;
+    } else {
+      // 'up-left': anchor corner is top-left; ramp steps down-right
+      startTx = tx;
+      startTy = surfaceTy;
+    }
+
+    // Validate all footprint tiles are empty or ground (except anchor corner which sits on platform)
+    const anchorTx = direction === 'up-right' ? startTx + w - 1 : startTx;
+    const anchorTy = startTy;
+    for (let ry = 0; ry < h; ry++) {
+      for (let rx = 0; rx < w; rx++) {
+        const cx = startTx + rx, cy = startTy + ry;
+        if (cx < 0 || cx >= this.width || cy < 0 || cy >= this.height) return null;
+        if (cx === anchorTx && cy === anchorTy) continue;  // anchor sits on platform (allowed)
+        if (cy >= groundTop) continue;  // tiles at/below ground surface are valid ramp tiles
+        const t = this.tiles[cx][cy];
+        if (t !== TILE_EMPTY) return null;
+      }
+    }
+
+    // Bottom corner must be at or below ground surface
+    const bottomTy = startTy + h - 1;
+    if (bottomTy < groundTop) return null;
+
+    // Bottom corner tiles must be on ground or bridge
+    const bottomTx = direction === 'up-right' ? startTx : startTx + w - 1;
+    for (let cx = bottomTx - 1; cx <= bottomTx + 1; cx++) {
+      const t = this.getTile(cx, bottomTy);
+      if (t !== TILE_GROUND && t !== TILE_BRIDGE) return null;
+    }
+
+    return { startTx, startTy, w, h, direction, height };
+  }
+
+  // Place ramp tiles into the tilemap and register in ramp footprint maps.
+  // rampData: { id, tileX, tileY, w, h, direction }
+  setRampTiles(rampData) {
+    const { id, startTx, startTy, w, h, direction } = rampData;
+    for (let ry = 0; ry < h; ry++) {
+      for (let rx = 0; rx < w; rx++) {
+        const cx = startTx + rx, cy = startTy + ry;
+        if (cx < 0 || cx >= this.width || cy < 0 || cy >= this.height) continue;
+        this.tiles[cx][cy] = TILE_RAMP;
+        this._rampTileToRamp.set(`${cx},${cy}`, id);
+      }
+    }
+    this._rampFootprints.set(id, {
+      ...rampData,
+      topTileX: direction === 'up-right' ? startTx + w - 1 : startTx,
+      topTileY: startTy,
+    });
+  }
+
+  // Remove ramp tiles from tilemap and unregister.
+  // rampData: { id, startTx, startTy, w, h }
+  clearRampTiles(rampData) {
+    const { id, startTx, startTy, w, h } = rampData;
+    for (let ry = 0; ry < h; ry++) {
+      for (let rx = 0; rx < w; rx++) {
+        const cx = startTx + rx, cy = startTy + ry;
+        if (cx < 0 || cx >= this.width || cy < 0 || cy >= this.height) continue;
+        if (this.tiles[cx][cy] === TILE_RAMP) this.tiles[cx][cy] = TILE_EMPTY;
+        this._rampTileToRamp.delete(`${cx},${cy}`);
+      }
+    }
+    this._rampFootprints.delete(id);
+  }
+
+  // Returns ramp footprint data for the ramp at tile (tx, ty), or null.
+  getRampInfoAt(tx, ty) {
+    const id = this._rampTileToRamp.get(`${tx},${ty}`);
+    if (id === undefined) return null;
+    return this._rampFootprints.get(id) || null;
+  }
+
+  // Returns the interpolated ramp surface Y (in pixels) for a unit at worldX
+  // standing on a ramp described by rampInfo. Returns null if not on ramp.
+  rampSurfaceY(rampInfo, worldX) {
+    if (!rampInfo) return null;
+    const { startTx, startTy, w, h, direction } = rampInfo;
+    const anchorTx = direction === 'up-right' ? startTx + w - 1 : startTx;
+    const anchorTy = startTy;  // surface tileY of anchor (platform surface)
+    const anchorWorldY = anchorTy * TILE_SIZE;  // top of anchor tile
+
+    // For 'up-right': surface rises from bottom-left (ground) to top-right (platform)
+    //   t=0 at bottom-left → surfaceY = anchorWorldY + (h-1)*TILE_SIZE
+    //   t=1 at top-right    → surfaceY = anchorWorldY
+    // For 'up-left': surface rises from bottom-right to top-left
+    //   t=0 at bottom-right → surfaceY = anchorWorldY + (h-1)*TILE_SIZE
+    //   t=1 at top-left     → surfaceY = anchorWorldY
+
+    // Clamp worldX to footprint bounds
+    const footLeft = startTx * TILE_SIZE;
+    const footRight = (startTx + w) * TILE_SIZE;
+    const t = clamp((worldX - footLeft) / (footRight - footLeft), 0, 1);
+
+    if (direction === 'up-right') {
+      // top-right corner = highest; bottom-left corner = lowest
+      const highY = anchorWorldY;           // top-right = anchor tile, elevated
+      const lowY = anchorWorldY + (h - 1) * TILE_SIZE;  // bottom-left = ground level
+      return lerp(lowY, highY, t);
+    } else {
+      // 'up-left': top-left corner = highest; bottom-right = lowest
+      const highY = anchorWorldY;
+      const lowY = anchorWorldY + (h - 1) * TILE_SIZE;
+      return lerp(lowY, highY, t);
     }
   }
 }
@@ -647,7 +788,15 @@ class Unit {
       outer:
       for (let ty = oldFeetTy; ty <= newFeetTy; ty++) {
         for (let tx = txL; tx <= txR; tx++) {
-          if (tilemap.isSolid(tx, ty)) {
+          const t = tilemap.getTile(tx, ty);
+          if (t === TILE_GROUND || t === TILE_PLATFORM || t === TILE_BRIDGE) {
+            newY = ty * TILE_SIZE - this.height;
+            this.vy = 0;
+            this.onGround = true;
+            break outer;
+          }
+          // TILE_RAMP: land but apply ramp surface height after sweep
+          if (t === TILE_RAMP) {
             newY = ty * TILE_SIZE - this.height;
             this.vy = 0;
             this.onGround = true;
@@ -664,6 +813,24 @@ class Unit {
         this.vy = 0;
       }
     }
+
+    // ── RAMP SURFACE ADJUSTMENT ──────────────────────────────────────────
+    // If the unit landed on a ramp tile, snap y to the interpolated ramp surface.
+    // This gives the stair-step slope effect as the unit walks across the ramp.
+    if (this.onGround) {
+      const footTy = floor((newY + this.height) / TILE_SIZE);
+      const rampInfo = tilemap.getRampInfoAt(txL, footTy);
+      if (rampInfo) {
+        const rampSurfaceY = tilemap.rampSurfaceY(rampInfo, this.x);
+        if (rampSurfaceY !== null) {
+          // Snap to ramp surface: unit feet rest on ramp, not tile top
+          newY = rampSurfaceY - this.height;
+          this.vy = 0;
+          this.onGround = true;
+        }
+      }
+    }
+
     this.y = newY;
   }
 
@@ -730,6 +897,10 @@ class Building {
 
     this.isBridge = cfg.is_bridge || false;
     this.bridgeTilesPlaced = false;
+
+    this.isRamp = cfg.is_ramp || false;
+    this.rampTilesPlaced = false;
+    this._rampData = null;  // { startTx, startTy, w, h, direction }
 
     this.providesIncome = cfg.provides_income || false;
     this.incomeAmount = cfg.income_amount || 0;
@@ -947,6 +1118,7 @@ class Player {
   build(buildingType, tileX, tileY) {
     const cfg = BUILDING_TYPES[buildingType];
     if (cfg.is_bridge) return this._buildBridge(tileX, tileY, cfg);
+    if (cfg.is_ramp)  return this._buildRamp(tileX, tileY, cfg);
     const cost = cfg.cost;
     if (!this.canAfford(cost)) return null;
     const w = cfg.width_tiles, h = cfg.height_tiles;
@@ -969,6 +1141,28 @@ class Player {
     if (!this.canAfford(cost)) return null;
     if (!this.spend(cost)) return null;
     const b = new Building('bridge', span.start, tileY, this.id, span.width, this.tilemap);
+    this.buildings.push(b);
+    return b;
+  }
+
+  // Currently selected ramp direction ('up-right' or 'up-left')
+  static RAMP_DIR_DEFAULT = 'up-right';
+
+  _buildRamp(tileX, surfaceTy, cfg) {
+    const dir = this._selectedRampDir || 'up-right';
+    const result = this.tilemap.findRampSpan(tileX, surfaceTy, dir);
+    if (!result) return null;
+    if (typeof result === 'number') return null;  // height > MAX_RAMP
+    const cost = (cfg.cost_per_tile || 20) * result.w;
+    if (!this.canAfford(cost)) return null;
+    if (!this.spend(cost)) return null;
+    // Store ramp data in a separate map keyed by building id
+    const rampData = { id: null, ...result };  // id filled in below
+    const b = new Building('ramp', tileX, surfaceTy, this.id, result.w, this.tilemap);
+    b._rampData = { ...result, id: b.id };
+    this._rampDataMap = this._rampDataMap || new Map();
+    this._rampDataMap.set(b.id, b._rampData);
+    rampData.id = b.id;
     this.buildings.push(b);
     return b;
   }
@@ -998,10 +1192,25 @@ class Player {
         this.tilemap.setBridgeTiles(b.tileX, b.tileY, b.wTiles);
         b.bridgeTilesPlaced = true;
       }
+      if (b.isRamp && b.built && !b.rampTilesPlaced) {
+        const rd = this._rampDataMap && this._rampDataMap.get(b.id);
+        if (rd) {
+          this.tilemap.setRampTiles(rd);
+          b.rampTilesPlaced = true;
+        }
+      }
       if (!b.alive) {
         if (b.isBridge && b.bridgeTilesPlaced) {
           this.tilemap.clearBridgeTiles(b.tileX, b.tileY, b.wTiles);
           b.bridgeTilesPlaced = false;
+        }
+        if (b.isRamp && b.rampTilesPlaced) {
+          const rd = this._rampDataMap && this._rampDataMap.get(b.id);
+          if (rd) {
+            this.tilemap.clearRampTiles(rd);
+            this._rampDataMap.delete(b.id);
+          }
+          b.rampTilesPlaced = false;
         }
         if (b.built) {
           this.tilemap.clearBuildingTiles(b.tileX, b.tileY, b.wTiles, b.hTiles);
@@ -2341,6 +2550,105 @@ drawUnit(u, camX, playerColors) {
           ctx.fillStyle = 'rgba(255,255,255,0.18)';
           ctx.fillRect(px, deckY, plankW, 1);
         }
+      } else if (b.type === 'ramp' && b._rampData) {
+        // Diagonal ramp drawn as a unified slope shape with step details.
+        // b._rampData: { startTx, startTy, w, h, direction }
+        const rd = b._rampData;
+        const stepPx = (rd.h - 1) * TILE_SIZE;  // total height difference in px
+        const rampLeft   = rd.startTx * TILE_SIZE - camX;
+        const rampTop    = rd.startTy * TILE_SIZE;
+        const rampBottom = (rd.startTy + rd.h) * TILE_SIZE;
+        const rampRight  = (rd.startTx + rd.w) * TILE_SIZE - camX;
+        const syRamp = rampTop;  // world y (no cam offset applied yet via _worldToScreen)
+
+        if (rd.direction === 'up-right') {
+          // Top-left = high corner (elevated), bottom-right = low corner (ground)
+          // Diagonal edges
+          ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+          ctx.lineWidth = 1.5;
+          // Bottom-left edge (rises going right)
+          ctx.beginPath();
+          ctx.moveTo(rampLeft, rampBottom);
+          ctx.lineTo(rampRight - w + 2, rampTop + stepPx);
+          ctx.stroke();
+          // Top-right edge (rises going left)
+          ctx.beginPath();
+          ctx.moveTo(rampRight - w + 2, rampTop + stepPx);
+          ctx.lineTo(rampRight, rampTop);
+          ctx.stroke();
+          // Slope fill — upper triangle (above diagonal)
+          ctx.fillStyle = 'rgba(0,0,0,0.22)';
+          ctx.beginPath();
+          ctx.moveTo(rampLeft, rampBottom);
+          ctx.lineTo(rampRight - w + 2, rampTop + stepPx);
+          ctx.lineTo(rampRight - w + 2, rampBottom);
+          ctx.closePath();
+          ctx.fill();
+          // Lower wedge (below diagonal, ground side)
+          ctx.fillStyle = 'rgba(0,0,0,0.14)';
+          ctx.beginPath();
+          ctx.moveTo(rampLeft, rampBottom);
+          ctx.lineTo(rampRight - w + 2, rampTop + stepPx);
+          ctx.lineTo(rampRight, rampTop);
+          ctx.closePath();
+          ctx.fill();
+          // Step lines (perpendicular to slope)
+          ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+          ctx.lineWidth = 1;
+          for (let s = 1; s < rd.h; s++) {
+            const t = s / rd.h;
+            const xOnTop = lerp(rampRight - w + 2, rampRight, t);
+            const yOnTop = lerp(rampTop + stepPx, rampTop, t);
+            const xOnBot = lerp(rampLeft, rampRight - w + 2, t);
+            ctx.beginPath();
+            ctx.moveTo(xOnBot, rampBottom);
+            ctx.lineTo(xOnTop, yOnTop);
+            ctx.stroke();
+          }
+        } else {
+          // 'up-left': top-right corner = high, bottom-left = low
+          ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+          ctx.lineWidth = 1.5;
+          // Bottom-right edge
+          ctx.beginPath();
+          ctx.moveTo(rampRight - w + 2, rampBottom);
+          ctx.lineTo(rampLeft, rampTop + stepPx);
+          ctx.stroke();
+          // Top-left edge
+          ctx.beginPath();
+          ctx.moveTo(rampLeft, rampTop + stepPx);
+          ctx.lineTo(rampLeft, rampTop);
+          ctx.stroke();
+          // Slope fill — upper triangle
+          ctx.fillStyle = 'rgba(0,0,0,0.22)';
+          ctx.beginPath();
+          ctx.moveTo(rampRight - w + 2, rampBottom);
+          ctx.lineTo(rampLeft, rampTop + stepPx);
+          ctx.lineTo(rampLeft, rampBottom);
+          ctx.closePath();
+          ctx.fill();
+          // Lower wedge
+          ctx.fillStyle = 'rgba(0,0,0,0.14)';
+          ctx.beginPath();
+          ctx.moveTo(rampRight - w + 2, rampBottom);
+          ctx.lineTo(rampLeft, rampTop + stepPx);
+          ctx.lineTo(rampRight - w + 2, rampTop);
+          ctx.closePath();
+          ctx.fill();
+          // Step lines
+          ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+          ctx.lineWidth = 1;
+          for (let s = 1; s < rd.h; s++) {
+            const t = s / rd.h;
+            const xOnTop = lerp(rampRight - w + 2, rampLeft, t);
+            const yOnTop = lerp(rampBottom, rampTop + stepPx, t);
+            const xOnBot = lerp(rampRight - w + 2, rampLeft, t);
+            ctx.beginPath();
+            ctx.moveTo(rampRight - w + 2, yOnTop);
+            ctx.lineTo(xOnBot, rampBottom);
+            ctx.stroke();
+          }
+        }
       }
     }
   }
@@ -2586,7 +2894,7 @@ class FortressCommand {
 
     const buildList = document.getElementById('build-list');
     buildList.innerHTML = '';
-    const order = ['barracks','turret','wall','mine','workshop','bridge'];
+    const order = ['barracks','turret','wall','mine','workshop','bridge','ramp'];
     for (const t of order) {
       const cfg = BUILDING_TYPES[t];
       const item = document.createElement('div');
@@ -2605,7 +2913,7 @@ class FortressCommand {
   }
 
   _buildingIcon(type) {
-    return { hq:'🏠', barracks:'⚔', turret:'🔫', wall:'🧱', mine:'💎', workshop:'⚙', bridge:'🌉' }[type] || '🏗';
+    return { hq:'🏠', barracks:'⚔', turret:'🔫', wall:'🧱', mine:'💎', workshop:'⚙', bridge:'🌉', ramp:'⬆' }[type] || '🏗';
   }
 
   _toggleBuildMenu() {
