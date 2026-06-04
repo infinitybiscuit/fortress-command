@@ -508,23 +508,28 @@ class TileMap {
   //             'up-left'  (top-left anchor steps down-right to ground)
 
   // Find the ramp footprint anchored at (tx, surfaceTy). The ramp extends
-  // diagonally downward in the given direction until it reaches ground.
-  // Returns { startTx, startTy, w, h, direction } or null if invalid.
-  findRampSpan(tx, surfaceTy, direction) {
+  // diagonally downward in the given direction.
+  // If endTy is provided: ramp runs from surfaceTy down to endTy (platform-to-platform).
+  // If endTy is omitted: ramp runs from surfaceTy all the way to ground level (backward compat).
+  // direction: 'up-right' (top-right anchor steps down-left),
+  //            'up-left'  (top-left anchor steps down-right).
+  // Returns { startTx, startTy, w, h, direction, height, endTy } or null if invalid.
+  findRampSpan(tx, surfaceTy, direction, endTy) {
     const groundTop = this.height - GROUND_LEVEL_TILE;
-    // Height = number of tile rows from surface down to ground
-    const height = groundTop - surfaceTy;
-    if (height < 2) return null;  // ramp needs at least 2 tiles of drop
+    // Height = vertical drop from start surface to end surface (or ground)
+    const height = endTy !== undefined
+      ? surfaceTy - endTy          // explicit end surface → platform-to-platform
+      : groundTop - surfaceTy;    // no endTy → default to ground (backward compat)
+    if (height < 2) return null;
     const MAX_RAMP = 8;
-    if (height > MAX_RAMP) return height;  // cap: caller clamps to MAX_RAMP
+    if (height > MAX_RAMP) return height;
 
     const w = height + 1, h = height + 1;
     let startTx, startTy;  // top-left of footprint
 
     if (direction === 'up-right') {
       // Anchor corner is top-right; ramp steps down-left
-      // Anchor is at (tx + w - 1, surfaceTy) — top-right corner of footprint
-      startTx = tx;  // tx = anchor's x - (w-1)
+      startTx = tx;
       startTy = surfaceTy;
     } else {
       // 'up-left': anchor corner is top-left; ramp steps down-right
@@ -532,32 +537,39 @@ class TileMap {
       startTy = surfaceTy;
     }
 
-    // Validate all footprint tiles are empty or ground (except anchor corner which sits on platform)
+    // Validate all footprint tiles are empty (except anchor corner on platform)
     const anchorTx = direction === 'up-right' ? startTx + w - 1 : startTx;
     const anchorTy = startTy;
+    const bottomTy = startTy + h - 1;  // last row of footprint
     for (let ry = 0; ry < h; ry++) {
       for (let rx = 0; rx < w; rx++) {
         const cx = startTx + rx, cy = startTy + ry;
         if (cx < 0 || cx >= this.width || cy < 0 || cy >= this.height) return null;
-        if (cx === anchorTx && cy === anchorTy) continue;  // anchor sits on platform (allowed)
-        if (cy >= groundTop) continue;  // tiles at/below ground surface are valid ramp tiles
-        const t = this.tiles[cx][cy];
-        if (t !== TILE_EMPTY) return null;
+        if (cx === anchorTx && cy === anchorTy) continue;  // anchor on platform: OK
+        if (cy >= groundTop) continue;  // at or below ground surface: always valid
+        if (this.tiles[cx][cy] !== TILE_EMPTY) return null;
       }
     }
 
-    // Bottom corner must be at or below ground surface
-    const bottomTy = startTy + h - 1;
-    if (bottomTy < groundTop) return null;
+    // Bottom must reach or pass ground level (for ground-target) or endTy surface (for platform-target)
+    if (endTy !== undefined && bottomTy < endTy) return null;
+    if (endTy === undefined && bottomTy < groundTop) return null;
 
-    // Bottom corner tiles must be on ground or bridge
+    // Bottom corner tiles must be ground/bridge (ground-target) OR platform (platform-target)
     const bottomTx = direction === 'up-right' ? startTx : startTx + w - 1;
+    const bottomCheckTy = endTy !== undefined ? endTy : bottomTy;
     for (let cx = bottomTx - 1; cx <= bottomTx + 1; cx++) {
-      const t = this.getTile(cx, bottomTy);
-      if (t !== TILE_GROUND && t !== TILE_BRIDGE) return null;
+      const t = this.getTile(cx, bottomCheckTy);
+      if (endTy !== undefined) {
+        // platform-to-platform: bottom landing must be on platform (or ground if no endTy)
+        if (t !== TILE_PLATFORM && t !== TILE_GROUND && t !== TILE_BRIDGE) return null;
+      } else {
+        // ground-target: bottom landing must be on ground or bridge
+        if (t !== TILE_GROUND && t !== TILE_BRIDGE) return null;
+      }
     }
 
-    return { startTx, startTy, w, h, direction, height };
+    return { startTx, startTy, w, h, direction, height, endTy };
   }
 
   // Place ramp tiles into the tilemap and register in ramp footprint maps.
@@ -1305,7 +1317,7 @@ class HumanPlayer extends Player {
       // Direction inferred from cursor x relative to start x
       const dir = tx < start.tx ? 'up-right' : 'up-left';
       const cfg = BUILDING_TYPES['ramp'];
-      const span = this.tilemap.findRampSpan(start.tx, start.ty, dir);
+      const span = this.tilemap.findRampSpan(start.tx, start.ty, dir, ty);
       if (!span || typeof span === 'number') { this.buildMode = null; this._pendingRampStart = null; return 'build_failed'; }
       const cost = (cfg.cost_per_tile || 20) * span.w;
       if (!this.canAfford(cost)) { this.buildMode = null; this._pendingRampStart = null; return 'build_failed'; }
@@ -2874,8 +2886,9 @@ drawUnit(u, camX, playerColors) {
     // Footprint preview box
     if (this.tilemap) {
       // Use findRampSpan with direction inferred from end x vs start x
+      // Pass endTy so footprint = actual ramp (platform-to-platform), not ground-level
       const dir = endTx < startTx ? 'up-right' : 'up-left';
-      const span = this.tilemap.findRampSpan(startTx, startTy, dir);
+      const span = this.tilemap.findRampSpan(startTx, startTy, dir, endTy);
       if (span && typeof span !== 'number') {
         const fx = span.startTx * TILE_SIZE - camX;
         const fy = span.startTy * TILE_SIZE;
@@ -3518,7 +3531,7 @@ _updateHUD() {
         const start = this.human._pendingRampStart;
         if (start) {
           const dir = tx < start.tx ? 'up-right' : 'up-left';
-          const span = this.tilemap.findRampSpan(start.tx, start.ty, dir);
+          const span = this.tilemap.findRampSpan(start.tx, start.ty, dir, ty);
           const valid = span && typeof span !== 'number';
           this.renderer.drawRampPreview(start.tx, start.ty, tx, ty, valid, this.camera.x);
         } else {
