@@ -579,6 +579,53 @@ class TileMap {
     });
   }
 
+  // Find ramp footprint between two explicit tile points (two-click ramp flow).
+  // startTx/startTy = top platform anchor; endTx/endTy = bottom platform/ground.
+  // Returns { startTx, startTy, w, h, direction, height } or null if invalid.
+  findRampSpanBetweenPoints(tx1, ty1, tx2, ty2) {
+    const groundTop = this.height - GROUND_LEVEL_TILE;
+    // Height is the vertical drop from start surface to end surface
+    const height = ty1 - ty2;
+    if (height < 2) return null;  // ramp needs at least 2 tiles of drop
+    const MAX_RAMP = 8;
+    if (height > MAX_RAMP) return null;  // too tall
+    const w = height + 1, h = height + 1;
+    // Direction: if endTx > tx1 → ramp goes down-right ('up-left'); else down-left ('up-right')
+    const direction = tx2 > tx1 ? 'up-left' : 'up-right';
+    let startTx, startTy;
+    if (direction === 'up-right') {
+      // Anchor is top-right corner; startTx is the left edge
+      startTx = tx1 - (w - 1);
+      startTy = ty1;
+    } else {
+      // 'up-left': anchor is top-left; startTx is left edge
+      startTx = tx1;
+      startTy = ty1;
+    }
+    // Validate footprint tiles
+    const anchorTx = direction === 'up-right' ? startTx + w - 1 : startTx;
+    const anchorTy = startTy;
+    for (let ry = 0; ry < h; ry++) {
+      for (let rx = 0; rx < w; rx++) {
+        const cx = startTx + rx, cy = startTy + ry;
+        if (cx < 0 || cx >= this.width || cy < 0 || cy >= this.height) return null;
+        if (cx === anchorTx && cy === anchorTy) continue;  // anchor on platform
+        if (cy >= groundTop) continue;  // below ground surface is always valid
+        const t = this.tiles[cx][cy];
+        if (t !== TILE_EMPTY) return null;
+      }
+    }
+    // Bottom corner must be at or below ground surface
+    const bottomTy = startTy + h - 1;
+    if (bottomTy < groundTop) return null;
+    const bottomTx = direction === 'up-right' ? startTx : startTx + w - 1;
+    for (let cx = bottomTx - 1; cx <= bottomTx + 1; cx++) {
+      const t = this.getTile(cx, bottomTy);
+      if (t !== TILE_GROUND && t !== TILE_BRIDGE) return null;
+    }
+    return { startTx, startTy, w, h, direction, height };
+  }
+
   // Remove ramp tiles from tilemap and unregister.
   // rampData: { id, startTx, startTy, w, h }
   clearRampTiles(rampData) {
@@ -1244,9 +1291,31 @@ class HumanPlayer extends Player {
     this.buildMode = null;
     this.buildPreviewTx = 0;
     this.buildPreviewTy = 0;
+    // Two-click ramp selection state
+    this.rampStage = null;         // null | 'select-start' | 'select-end'
+    this._pendingRampStart = null; // { tx, ty } from first click
   }
 
   handleTap(worldX, worldY, allUnits, allBuildings) {
+    if (this.buildMode === 'ramp-select-start') {
+      const tx = floor(worldX / TILE_SIZE);
+      const ty = floor(worldY / TILE_SIZE);
+      this._pendingRampStart = { tx, ty };
+      this.rampStage = 'select-end';
+      return 'ramp_start_set';
+    }
+    if (this.buildMode === 'ramp-select-end') {
+      const tx = floor(worldX / TILE_SIZE);
+      const ty = floor(worldY / TILE_SIZE);
+      const start = this._pendingRampStart;
+      if (!start) { this.rampStage = null; this.buildMode = null; return 'build_failed'; }
+      const cfg = BUILDING_TYPES['ramp'];
+      const result = this._buildRampBetweenPoints(start.tx, start.ty, tx, ty, cfg);
+      this.buildMode = null;
+      this.rampStage = null;
+      this._pendingRampStart = null;
+      return result ? 'built' : 'build_failed';
+    }
     if (this.buildMode) {
       const tx = floor(worldX / TILE_SIZE);
       const ty = floor(worldY / TILE_SIZE);
@@ -1302,7 +1371,14 @@ class HumanPlayer extends Player {
   }
 
   enterBuildMode(buildingType) {
-    this.buildMode = buildingType;
+    if (buildingType === 'ramp') {
+      this.buildMode = 'ramp-select-start';
+      this.rampStage = 'select-start';
+      this._pendingRampStart = null;
+    } else {
+      this.buildMode = buildingType;
+      this.rampStage = null;
+    }
     this._deselectAll();
   }
 
@@ -1311,12 +1387,33 @@ class HumanPlayer extends Player {
     this.buildPreviewTy = floor(worldY / TILE_SIZE);
   }
 
-  cancelBuildMode() { this.buildMode = null; }
+  cancelBuildMode() {
+    this.buildMode = null;
+    this.rampStage = null;
+    this._pendingRampStart = null;
+  }
 
   _deselectAll() {
     for (const u of this.selectedUnits) u.selected = false;
     this.selectedUnits = [];
     this.selectedBuilding = null;
+  }
+
+  // Build a ramp between two explicit tile points (two-click flow).
+  // startTx/startTy = top platform anchor; endTx/endTy = bottom platform/ground anchor.
+  _buildRampBetweenPoints(tx1, ty1, tx2, ty2, cfg) {
+    const span = this.tilemap.findRampSpanBetweenPoints(tx1, ty1, tx2, ty2);
+    if (!span) return null;
+    const cost = (cfg.cost_per_tile || 20) * span.w;
+    if (!this.canAfford(cost)) return null;
+    if (!this.spend(cost)) return null;
+    const b = new Building('ramp', tx1, ty1, this.id, span.w, this.tilemap);
+    b._rampData = { ...span, id: b.id };
+    this._rampDataMap = this._rampDataMap || new Map();
+    this._rampDataMap.set(b.id, b._rampData);
+    this.tilemap.setRampTiles(b._rampData);
+    this.buildings.push(b);
+    return b;
   }
 
   // Select all own units whose center falls within the given screen-space box
@@ -1840,12 +1937,15 @@ class SpriteLib {
 // RENDERER
 // ═══════════════════════════════════════════════════════════════
 class Renderer {
-  constructor(ctx, canvasW, canvasH) {
+  constructor(ctx, canvasW, canvasH, tilemap = null) {
     this.ctx = ctx;
     this.canvasW = canvasW;
     this.canvasH = canvasH;
+    this.tilemap = tilemap;
     this.sprites = new SpriteLib();
   }
+
+  setTilemap(tilemap) { this.tilemap = tilemap; }
 
   clear() {
     const ctx = this.ctx;
@@ -2739,6 +2839,56 @@ drawUnit(u, camX, playerColors) {
   _worldToScreen(wx, wy) {
     return { sx: wx - (window._fc_camX || 0), sy: wy };
   }
+
+  // Draw ramp selection preview: green circle at start point,
+  // blue diagonal line to current end, valid=green/red.
+  drawRampPreview(startTx, startTy, endTx, endTy, valid, camX) {
+    const ctx = this.ctx;
+    const sx1 = startTx * TILE_SIZE - camX;
+    const sy1 = startTy * TILE_SIZE;
+    const sx2 = endTx * TILE_SIZE - camX;
+    const sy2 = endTy * TILE_SIZE;
+    // Start point: filled green circle
+    ctx.fillStyle = 'rgba(0,255,100,0.9)';
+    ctx.beginPath();
+    ctx.arc(sx1 + TILE_SIZE / 2, sy1 + TILE_SIZE / 2, TILE_SIZE * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    // Diagonal line from start to end
+    ctx.strokeStyle = valid ? 'rgba(0,200,255,0.7)' : 'rgba(255,80,80,0.7)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(sx1 + TILE_SIZE / 2, sy1 + TILE_SIZE / 2);
+    ctx.lineTo(sx2 + TILE_SIZE / 2, sy2 + TILE_SIZE / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // End point circle
+    ctx.fillStyle = valid ? 'rgba(0,255,100,0.9)' : 'rgba(255,80,80,0.9)';
+    ctx.beginPath();
+    ctx.arc(sx2 + TILE_SIZE / 2, sy2 + TILE_SIZE / 2, TILE_SIZE * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    // Footprint preview box
+    if (this.tilemap) {
+      const span = this.tilemap.findRampSpanBetweenPoints(startTx, startTy, endTx, endTy);
+      if (span) {
+        const fx = span.startTx * TILE_SIZE - camX;
+        const fy = span.startTy * TILE_SIZE;
+        const fw = span.w * TILE_SIZE;
+        const fh = span.h * TILE_SIZE;
+        ctx.strokeStyle = valid ? 'rgba(0,255,100,0.5)' : 'rgba(255,80,80,0.5)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(fx, fy, fw, fh);
+        ctx.setLineDash([]);
+      }
+    }
+    // Instruction text
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(0, 0, 280, 28);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText('RAMP: Click END platform', 8, 19);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2981,6 +3131,7 @@ class FortressCommand {
 
     this.tilemap = new TileMap();
     this.tilemap.generate();
+    this.renderer.setTilemap(this.tilemap);
 
     this.camera = new Camera(this.viewW, this.viewH);
     this.camera.worldW = MAP_WIDTH_TILES * TILE_SIZE;
@@ -3342,9 +3493,37 @@ _updateHUD() {
     if (this.human && this.human.buildMode && this.camera) {
       const tx = this.human.buildPreviewTx;
       const ty = this.human.buildPreviewTy;
-      const cfg = BUILDING_TYPES[this.human.buildMode];
-      const valid = this.tilemap.canPlaceBuilding(tx, ty, cfg.width_tiles, cfg.height_tiles);
-      this.renderer.drawBuildPreview(tx, ty, valid, this.human.buildMode, this.camera.x);
+      if (this.human.buildMode === 'ramp-select-start') {
+        // Green circle + label: "Click START platform"
+        const ctx = this.ctx;
+        const sx = tx * TILE_SIZE - this.camera.x + TILE_SIZE / 2;
+        const sy = ty * TILE_SIZE + TILE_SIZE / 2;
+        ctx.fillStyle = 'rgba(0,255,100,0.85)';
+        ctx.beginPath();
+        ctx.arc(sx, sy, TILE_SIZE * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillRect(0, 0, 260, 28);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText('RAMP: Click START platform', 8, 19);
+      } else if (this.human.buildMode === 'ramp-select-end') {
+        // Show ramp footprint preview between pending start and current cursor
+        const start = this.human._pendingRampStart;
+        if (start) {
+          const span = this.tilemap.findRampSpanBetweenPoints(start.tx, start.ty, tx, ty);
+          const valid = span !== null;
+          this.renderer.drawRampPreview(start.tx, start.ty, tx, ty, valid, this.camera.x);
+        } else {
+          this.renderer.drawRampPreview(tx, ty, tx, ty, false, this.camera.x);
+        }
+      } else {
+        const cfg = BUILDING_TYPES[this.human.buildMode];
+        if (cfg) {
+          const valid = this.tilemap.canPlaceBuilding(tx, ty, cfg.width_tiles, cfg.height_tiles);
+          this.renderer.drawBuildPreview(tx, ty, valid, this.human.buildMode, this.camera.x);
+        }
+      }
     }
 
     // Buildings
