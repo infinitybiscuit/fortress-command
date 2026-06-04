@@ -584,8 +584,8 @@ class TileMap {
   // Returns { startTx, startTy, w, h, direction, height } or null if invalid.
   findRampSpanBetweenPoints(tx1, ty1, tx2, ty2) {
     const groundTop = this.height - GROUND_LEVEL_TILE;
-    // Height is the vertical drop from start surface to end surface
-    const height = ty1 - ty2;
+    // Height = absolute vertical drop (tiles from start surface down to end surface)
+    const height = Math.abs(ty1 - ty2);
     if (height < 2) return null;  // ramp needs at least 2 tiles of drop
     const MAX_RAMP = 8;
     if (height > MAX_RAMP) return null;  // too tall
