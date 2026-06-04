@@ -514,7 +514,7 @@ class TileMap {
   // direction: 'up-right' (top-right anchor steps down-left),
   //            'up-left'  (top-left anchor steps down-right).
   // Returns { startTx, startTy, w, h, direction, height, endTy } or null if invalid.
-  findRampSpan(tx, surfaceTy, direction, endTy) {
+  findRampSpanV2(tx, surfaceTy, direction, endTy) {
     const groundTop = this.height - GROUND_LEVEL_TILE;
     // Height = vertical drop from start surface to end surface (or ground)
     const height = endTy !== undefined
@@ -570,6 +570,12 @@ class TileMap {
     }
 
     return { startTx, startTy, w, h, direction, height, endTy };
+  }
+
+  // Backward-compat alias for old 1-click _buildRamp flow (no endTy → ground target).
+  // New code should use findRampSpanV2 directly.
+  findRampSpan(tx, surfaceTy, direction) {
+    return this.findRampSpanV2(tx, surfaceTy, direction, undefined);
   }
 
   // Place ramp tiles into the tilemap and register in ramp footprint maps.
@@ -1317,7 +1323,7 @@ class HumanPlayer extends Player {
       // Direction inferred from cursor x relative to start x
       const dir = tx < start.tx ? 'up-right' : 'up-left';
       const cfg = BUILDING_TYPES['ramp'];
-      const span = this.tilemap.findRampSpan(start.tx, start.ty, dir, ty);
+      const span = this.tilemap.findRampSpanV2(start.tx, start.ty, dir, ty);
       if (!span || typeof span === 'number') { this.buildMode = null; this._pendingRampStart = null; return 'build_failed'; }
       const cost = (cfg.cost_per_tile || 20) * span.w;
       if (!this.canAfford(cost)) { this.buildMode = null; this._pendingRampStart = null; return 'build_failed'; }
@@ -2888,7 +2894,7 @@ drawUnit(u, camX, playerColors) {
       // Use findRampSpan with direction inferred from end x vs start x
       // Pass endTy so footprint = actual ramp (platform-to-platform), not ground-level
       const dir = endTx < startTx ? 'up-right' : 'up-left';
-      const span = this.tilemap.findRampSpan(startTx, startTy, dir, endTy);
+      const span = this.tilemap.findRampSpanV2(startTx, startTy, dir, endTy);
       if (span && typeof span !== 'number') {
         const fx = span.startTx * TILE_SIZE - camX;
         const fy = span.startTy * TILE_SIZE;
@@ -3531,7 +3537,7 @@ _updateHUD() {
         const start = this.human._pendingRampStart;
         if (start) {
           const dir = tx < start.tx ? 'up-right' : 'up-left';
-          const span = this.tilemap.findRampSpan(start.tx, start.ty, dir, ty);
+          const span = this.tilemap.findRampSpanV2(start.tx, start.ty, dir, ty);
           const valid = span && typeof span !== 'number';
           this.renderer.drawRampPreview(start.tx, start.ty, tx, ty, valid, this.camera.x);
         } else {
