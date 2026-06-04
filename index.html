@@ -1311,6 +1311,7 @@ class HumanPlayer extends Player {
     if (this.buildMode === 'ramp-select-start') {
       const tx = floor(worldX / TILE_SIZE);
       const ty = floor(worldY / TILE_SIZE);
+      console.log('[DEBUG] handleTap ramp-select-start: tx=', tx, 'ty=', ty);
       this._pendingRampStart = { tx, ty };
       this.buildMode = 'ramp-select-end';
       return 'ramp_start_set';
@@ -1319,13 +1320,16 @@ class HumanPlayer extends Player {
       const tx = floor(worldX / TILE_SIZE);
       const ty = floor(worldY / TILE_SIZE);
       const start = this._pendingRampStart;
+      console.log('[DEBUG] handleTap ramp-select-end: tx=', tx, 'ty=', ty, 'start=', JSON.stringify(start));
       if (!start) { this.buildMode = null; return 'build_failed'; }
       // Direction inferred from cursor x relative to start x
       const dir = tx < start.tx ? 'up-right' : 'up-left';
       const cfg = BUILDING_TYPES['ramp'];
       const span = this.tilemap.findRampSpanV2(start.tx, start.ty, dir, ty);
+      console.log('[DEBUG] span=', JSON.stringify(span), 'span type=', typeof span);
       if (!span || typeof span === 'number') { this.buildMode = null; this._pendingRampStart = null; return 'build_failed'; }
       const cost = (cfg.cost_per_tile || 20) * span.w;
+      console.log('[DEBUG] cost=', cost, 'canAfford=', this.canAfford(cost));
       if (!this.canAfford(cost)) { this.buildMode = null; this._pendingRampStart = null; return 'build_failed'; }
       if (!this.spend(cost)) { this.buildMode = null; this._pendingRampStart = null; return 'build_failed'; }
       const b = new Building('ramp', start.tx, start.ty, this.id, span.w, this.tilemap);
@@ -1334,6 +1338,7 @@ class HumanPlayer extends Player {
       this._rampDataMap.set(b.id, b._rampData);
       this.tilemap.setRampTiles(b._rampData);
       this.buildings.push(b);
+      console.log('[DEBUG] RAMP CREATED! b.id=', b.id, 'span=', JSON.stringify(span));
       this.buildMode = null;
       this._pendingRampStart = null;
       return b;
@@ -3247,7 +3252,9 @@ class FortressCommand {
     const { wx, wy } = this.camera.screenToWorld(sx, sy);
     const allUnits = this.players.flatMap(p => p.units);
     const allBuildings = this.players.flatMap(p => p.buildings);
+    console.log('[DEBUG] _onTap wx=', wx, 'wy=', wy, 'buildMode=', this.human.buildMode, '_pendingRampStart=', JSON.stringify(this.human._pendingRampStart));
     const result = this.human.handleTap(wx, wy, allUnits, allBuildings);
+    console.log('[DEBUG] _onTap result=', result);
     if (result === 'select_building') this._updateBuildMenu();
     if (result === 'built') this._updateBuildMenu();
     this._updateHUD();
@@ -3257,10 +3264,11 @@ class FortressCommand {
   // gets a chance to process the release position (the normal selection-box
   // path does not call handleTap, which left ramp modes stuck on first click).
   _onDragEnd(sx, sy) {
-    if (this.scene !== 'game' || !this.camera) return;
-    if (sy <= HUD_HEIGHT) return;
+    if (this.scene !== 'game' || !this.camera) { console.log('[DEBUG] _onDragEnd early: scene=', this.scene, 'camera=', !!this.camera); return; }
+    if (sy <= HUD_HEIGHT) { console.log('[DEBUG] _onDragEnd early: sy=', sy, '<=', HUD_HEIGHT); return; }
     // Only intercept when buildMode is waiting for the ramp end-point
-    if (this.human.buildMode !== 'ramp-select-end') return;
+    console.log('[DEBUG] _onDragEnd mode=', this.human.buildMode, 'sx=', sx, 'sy=', sy);
+    if (this.human.buildMode !== 'ramp-select-end') { console.log('[DEBUG] _onDragEnd blocked: not ramp-select-end'); return; }
     this._onTap(sx, sy);
   }
 
