@@ -1301,13 +1301,24 @@ class HumanPlayer extends Player {
       const tx = floor(worldX / TILE_SIZE);
       const ty = floor(worldY / TILE_SIZE);
       const start = this._pendingRampStart;
-      if (!start) { this.rampStage = null; this.buildMode = null; return 'build_failed'; }
+      if (!start) { this.buildMode = null; return 'build_failed'; }
+      // Direction inferred from cursor x relative to start x
+      const dir = tx < start.tx ? 'up-right' : 'up-left';
       const cfg = BUILDING_TYPES['ramp'];
-      const result = this._buildRampBetweenPoints(start.tx, start.ty, tx, ty, cfg);
+      const span = this.tilemap.findRampSpan(start.tx, start.ty, dir);
+      if (!span || typeof span === 'number') { this.buildMode = null; this._pendingRampStart = null; return 'build_failed'; }
+      const cost = (cfg.cost_per_tile || 20) * span.w;
+      if (!this.canAfford(cost)) { this.buildMode = null; this._pendingRampStart = null; return 'build_failed'; }
+      if (!this.spend(cost)) { this.buildMode = null; this._pendingRampStart = null; return 'build_failed'; }
+      const b = new Building('ramp', start.tx, start.ty, this.id, span.w, this.tilemap);
+      b._rampData = { ...span, id: b.id };
+      this._rampDataMap = this._rampDataMap || new Map();
+      this._rampDataMap.set(b.id, b._rampData);
+      this.tilemap.setRampTiles(b._rampData);
+      this.buildings.push(b);
       this.buildMode = null;
-      this.rampStage = null;
       this._pendingRampStart = null;
-      return result ? 'built' : 'build_failed';
+      return b;
     }
     if (this.buildMode) {
       const tx = floor(worldX / TILE_SIZE);
@@ -2862,8 +2873,10 @@ drawUnit(u, camX, playerColors) {
     ctx.fill();
     // Footprint preview box
     if (this.tilemap) {
-      const span = this.tilemap.findRampSpanBetweenPoints(startTx, startTy, endTx, endTy);
-      if (span) {
+      // Use findRampSpan with direction inferred from end x vs start x
+      const dir = endTx < startTx ? 'up-right' : 'up-left';
+      const span = this.tilemap.findRampSpan(startTx, startTy, dir);
+      if (span && typeof span !== 'number') {
         const fx = span.startTx * TILE_SIZE - camX;
         const fy = span.startTy * TILE_SIZE;
         const fw = span.w * TILE_SIZE;
@@ -3501,11 +3514,12 @@ _updateHUD() {
         ctx.font = 'bold 14px monospace';
         ctx.fillText('RAMP: Click START platform', 8, 19);
       } else if (this.human.buildMode === 'ramp-select-end') {
-        // Show ramp footprint preview between pending start and current cursor
+        // Show ramp footprint preview based on pending start and cursor direction
         const start = this.human._pendingRampStart;
         if (start) {
-          const span = this.tilemap.findRampSpanBetweenPoints(start.tx, start.ty, tx, ty);
-          const valid = span !== null;
+          const dir = tx < start.tx ? 'up-right' : 'up-left';
+          const span = this.tilemap.findRampSpan(start.tx, start.ty, dir);
+          const valid = span && typeof span !== 'number';
           this.renderer.drawRampPreview(start.tx, start.ty, tx, ty, valid, this.camera.x);
         } else {
           this.renderer.drawRampPreview(tx, ty, tx, ty, false, this.camera.x);
