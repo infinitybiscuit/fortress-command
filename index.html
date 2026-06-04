@@ -1301,7 +1301,7 @@ class HumanPlayer extends Player {
       const tx = floor(worldX / TILE_SIZE);
       const ty = floor(worldY / TILE_SIZE);
       this._pendingRampStart = { tx, ty };
-      this.rampStage = 'select-end';
+      this.buildMode = 'ramp-select-end';
       return 'ramp_start_set';
     }
     if (this.buildMode === 'ramp-select-end') {
