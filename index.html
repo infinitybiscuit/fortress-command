@@ -1719,12 +1719,13 @@ class EconomySystem {
 // SECTION 14: INPUT HANDLER
 // ═══════════════════════════════════════════════════════════════
 class InputHandler {
-  constructor(onTap, onPan, onBuildHover, onSelectionBox, onDoubleTap) {
+  constructor(onTap, onPan, onBuildHover, onSelectionBox, onDoubleTap, onDragEnd) {
     this.onTap = onTap;
     this.onPan = onPan;
     this.onBuildHover = onBuildHover;
     this.onSelectionBox = onSelectionBox;
     this.onDoubleTap = onDoubleTap;
+    this.onDragEnd = onDragEnd;
     this._pointerDown = null;
     this._panStartCamX = 0;
     this._panStartX = 0;
@@ -1841,6 +1842,7 @@ class InputHandler {
       const sx2 = Math.max(this._dragStartX, this._lastX);
       const sy2 = Math.max(this._dragStartY, this._lastY);
       this.onSelectionBox && this.onSelectionBox(sx1, sy1, sx2, sy2);
+      this.onDragEnd && this.onDragEnd(e.clientX, e.clientY);
     } else if (!wasSwipe) {
       const now = performance.now();
       const dx = e.clientX - this._lastTapX, dy = e.clientY - this._lastTapY;
@@ -3223,7 +3225,8 @@ class FortressCommand {
       (sx, sy) => this._onBuildHover(sx, sy),
       (sx1, sy1, sx2, sy2) => this._onSelectionBox(sx1, sy1, sx2, sy2),
       (sx1, sy1, sx2, sy2) => this._onSelectionDrag(sx1, sy1, sx2, sy2),
-      (sx, sy) => this._onDoubleTap(sx, sy)
+      (sx, sy) => this._onDoubleTap(sx, sy),
+      (sx, sy) => this._onDragEnd(sx, sy)
     );
     this.input.attach(this.canvas);
 
@@ -3248,6 +3251,17 @@ class FortressCommand {
     if (result === 'select_building') this._updateBuildMenu();
     if (result === 'built') this._updateBuildMenu();
     this._updateHUD();
+  }
+
+  // Called after any drag ends — fires onTap for ramp modes so handleTap
+  // gets a chance to process the release position (the normal selection-box
+  // path does not call handleTap, which left ramp modes stuck on first click).
+  _onDragEnd(sx, sy) {
+    if (this.scene !== 'game' || !this.camera) return;
+    if (sy <= HUD_HEIGHT) return;
+    // Only intercept when buildMode is waiting for the ramp end-point
+    if (this.human.buildMode !== 'ramp-select-end') return;
+    this._onTap(sx, sy);
   }
 
   // Double-click on an enemy unit/building while units are selected → set attack target
