@@ -21,11 +21,9 @@ const WORLD_HEIGHT: float = 640.0
 var _target_position: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
-	var vp: Vector2 = get_viewport_rect().size
-	print("FortressCamera _ready — viewport: ", vp, " zoom: ", zoom)
-	# Blue HQ is at x=64 — center camera on blue HQ
-	# camera at x=128 means visible world x=[-512, 768], blue HQ [64,192] is on screen
-	position = Vector2(128.0, 320.0)
+	# Start near the player HQ (tile 2, ground_y≈14 → world x=64)
+	# Center horizontally on HQ region, vertically on world mid-height
+	position = Vector2(400.0, WORLD_HEIGHT / 2.0)
 	_target_position = position
 
 	limit_left = 0
@@ -36,8 +34,6 @@ func _ready() -> void:
 	make_current()
 
 func _process(delta: float) -> void:
-	if OS.is_debug_build():
-		print("FortressCamera pos: ", position, " viewport: ", get_viewport_rect().size)
 
 	var move: Vector2 = Vector2.ZERO
 

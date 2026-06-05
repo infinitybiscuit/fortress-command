@@ -52,7 +52,8 @@ static func _player_color(faction: int) -> Color:
 static func draw_unit(canvas: CanvasItem, unit: Unit, cam_offset: Vector2) -> void:
 	var faction: int = unit.faction as int
 	var pc: Color = _player_color(faction)
-	var screen_pos: Vector2 = unit.global_position - cam_offset
+	# Draw in unit's local space — Camera2D handles world→screen transform
+	var screen_pos: Vector2 = Vector2.ZERO
 
 	var stats: Dictionary = Unit.STATS.get(unit.unit_type, Unit.STATS.get("soldier"))
 	var w: float = 12.0
@@ -157,7 +158,8 @@ static func draw_ellipse(canvas: CanvasItem, rect: Rect2, color: Color) -> void:
 static func draw_building(canvas: CanvasItem, building: Building, cam_offset: Vector2) -> void:
 	var faction: int = building.faction as int
 	var pc: Color = _player_color(faction)
-	var screen_pos: Vector2 = building.global_position - cam_offset
+	# Draw in building's local space — Camera2D handles world→screen transform
+	var screen_pos: Vector2 = Vector2.ZERO
 
 	var world_w: float = building.world_width
 	var world_h: float = building.world_height
@@ -417,10 +419,15 @@ static func _draw_building_bridge(canvas: CanvasItem, rect: Rect2, pc: Color, fa
 ## ── Terrain Drawing ────────────────────────────────────────────────────────────
 
 static func draw_terrain(canvas: CanvasItem, tilemap, cam_offset: Vector2, screen_size: Vector2) -> void:
-	var left_tile: int = max(0, int(floor(cam_offset.x / TILE_SIZE)))
-	var right_tile: int = min(tilemap.MAP_WIDTH if "MAP_WIDTH" in tilemap else MAP_WIDTH_TILES, int(floor((cam_offset.x + screen_size.x) / TILE_SIZE)) + 1)
-	var top_tile: int = 0
-	var bottom_tile: int = tilemap.MAP_HEIGHT if "MAP_HEIGHT" in tilemap else MAP_HEIGHT_TILES
+	# cam_offset is the camera CENTER — compute visible tile range from half-extents
+	var half_w: float = screen_size.x / 2.0
+	var half_h: float = screen_size.y / 2.0
+	var map_w: int = tilemap.MAP_WIDTH if "MAP_WIDTH" in tilemap else MAP_WIDTH_TILES
+	var map_h: int = tilemap.MAP_HEIGHT if "MAP_HEIGHT" in tilemap else MAP_HEIGHT_TILES
+	var left_tile: int = max(0, int(floor((cam_offset.x - half_w) / TILE_SIZE)))
+	var right_tile: int = min(map_w, int(floor((cam_offset.x + half_w) / TILE_SIZE)) + 2)
+	var top_tile: int = max(0, int(floor((cam_offset.y - half_h) / TILE_SIZE)))
+	var bottom_tile: int = min(map_h, int(floor((cam_offset.y + half_h) / TILE_SIZE)) + 2)
 
 	var tile_size_f: float = float(TILE_SIZE)
 
@@ -431,7 +438,9 @@ static func draw_terrain(canvas: CanvasItem, tilemap, cam_offset: Vector2, scree
 				continue
 			var world_x: float = tx * tile_size_f
 			var world_y: float = ty * tile_size_f
-			var screen_pos: Vector2 = Vector2(world_x, world_y) - cam_offset
+			# Draw at world coordinates — tilemap node is at (0,0) so local=world
+			# Camera2D handles the world→screen transform automatically
+			var screen_pos: Vector2 = Vector2(world_x, world_y)
 			var tile_color: Color
 			match tile:
 				TILE_GROUND:
