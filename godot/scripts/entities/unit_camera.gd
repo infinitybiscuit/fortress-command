@@ -27,9 +27,6 @@ func _ready() -> void:
 	limit_right = WORLD_RIGHT
 	limit_bottom = WORLD_BOTTOM
 	
-	# Enable smooth limit clamping
-	limit_smoothing_enabled = true
-	
 	# Set camera offset (Unit in lower-center)
 	offset = CAMERA_OFFSET
 	
