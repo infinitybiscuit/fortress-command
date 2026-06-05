@@ -127,7 +127,7 @@ func _start_credits_flash() -> void:
 	__do_flash_step()
 
 
-func _$do_flash_step() -> void:
+func __do_flash_step() -> void:
 	if not _credits_flash_active:
 		_credits_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
 		return

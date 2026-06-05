@@ -19,7 +19,7 @@ const MAX_DELTA: float = 0.25
 enum GameMode { NONE, ONE_V_ONE_CPU, TWO_V_TWO, ONE_V_ONE, SKIRMISH }
 
 var current_game_mode: GameMode = GameMode.NONE
-var game_started: bool = false
+var game_is_started: bool = false
 var game_paused: bool = false
 
 ## Players
@@ -57,7 +57,7 @@ func _process(delta: float) -> void:
 	# Clamp delta to prevent large jumps on lag spikes
 	delta = min(delta, MAX_DELTA)
 	
-	if not game_started or game_paused:
+	if not game_is_started or game_paused:
 		return
 	
 	# Economy tick every 1 second
@@ -159,8 +159,8 @@ func set_game_mode(mode_name: String) -> void:
 	
 	current_game_mode = mode
 	_setup_players()
-	game_started = true
-	game_started.emit(mode)
+	game_is_started = true
+game_started.emit(mode)
 
 func _setup_players() -> void:
 	# Clear existing players and entities

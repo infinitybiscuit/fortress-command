@@ -27,9 +27,9 @@ func _ready() -> void:
 	limit_right = WORLD_RIGHT
 	limit_bottom = WORLD_BOTTOM
 	
-	# Enable smooth limit clamping
-	limit_smooth_enabled = true
-	limit_smoothing_smoothed = Vector2(50, 50)
+	# Enable smooth limit clamping (Godot 4.3 renamed these)
+	limit_position_smoothing_enabled = true
+	limit_position_smoothing_steepness = 50.0
 	
 	# Set camera offset (Unit in lower-center)
 	offset = CAMERA_OFFSET
