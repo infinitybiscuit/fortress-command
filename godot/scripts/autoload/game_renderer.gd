@@ -67,10 +67,10 @@ static func draw_unit(canvas: CanvasItem, unit: Unit, cam_offset: Vector2) -> vo
 	var rect: Rect2 = Rect2(screen_pos - Vector2(w / 2, h), Vector2(w, h))
 	var sel_rect: Rect2 = rect.grow(2.0)
 
-	# Ground shadow (ellipse via 4-arc approximation)
+	# Ground shadow (ellipse via polygon approximation)
 	var shadow_col: Color = Color(0, 0, 0, 0.28)
 	var shadow_rect: Rect2 = Rect2(rect.position.x - 2, rect.end.y - 2, w + 4, 8)
-	canvas.draw_ellipse(shadow_rect, shadow_col)
+	draw_ellipse(canvas, shadow_rect, shadow_col)
 
 	# Body gradient fill
 	var body_top: Color = _lerp_color(PLAYER_COLORS[faction % 4], [1.0, 1.0, 1.0], 0.28)
