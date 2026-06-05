@@ -171,7 +171,7 @@ func _setup_players() -> void:
 	
 	var ground_y: int = tilemap.ground_surface_tile_y()
 	
-match current_game_mode:
+	match current_game_mode:
 		GameMode.ONE_V_ONE_CPU:
 			# Player 1 (human) on left, Player 2 (AI) on right
 			players.append({
@@ -189,9 +189,9 @@ match current_game_mode:
 				"hq": null
 			})
 			# Place HQs at ground level
-			_spawn_hq_for_player(0, 2, ground_y - 3)
-			_spawn_hq_for_player(1, 193, ground_y - 3)
-
+		_spawn_hq_for_player(0, 2, ground_y - 3)
+		_spawn_hq_for_player(1, 193, ground_y - 3)
+		
 		GameMode.ONE_V_ONE:
 			# Two human players
 			players.append({
@@ -208,9 +208,9 @@ match current_game_mode:
 				"is_ai": false,
 				"hq": null
 			})
-			_spawn_hq_for_player(0, 2, ground_y - 3)
-			_spawn_hq_for_player(1, 193, ground_y - 3)
-
+		_spawn_hq_for_player(0, 2, ground_y - 3)
+		_spawn_hq_for_player(1, 193, ground_y - 3)
+		
 		GameMode.TWO_V_TWO:
 			# 4 players total
 			players.append({"faction": 0, "income": 0, "money": 500, "is_ai": false, "hq": null})
