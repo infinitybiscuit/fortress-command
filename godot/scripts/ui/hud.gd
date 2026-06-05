@@ -95,8 +95,7 @@ func _set_build_menu_open(open: bool) -> void:
 	var current_x: float = panel_pos.x if _build_menu_open != open else 0.0
 	
 	# Animate menu slide
-	tween.tween_property(_build_menu_panel, "position:x", target_x, 0.15)\
-		.set_trans(Tween.TWEEN_TRANSITION_EASE_OUT).set_ease(Tween.TWEEN_EASE_OUT)
+tween.tween_property(_build_menu_panel, "position:x", target_x, 0.15).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	
 	# Animate HUD padding shift (mimics CSS .menu-open padding)
 	# Offset is handled by anchoring to right side instead
@@ -181,7 +180,7 @@ func populate_build_list(building_entries: Array) -> void:
 		child.queue_free()
 	
 	for entry in building_entries:
-		var item: HBoxContainer = _create_build_item(
+		var item: PanelContainer = _create_build_item(
 			entry.get("name", ""),
 			entry.get("cost", 0),
 			entry.get("icon", "■"),
@@ -237,7 +236,7 @@ func populate_train_list(unit_entries: Array) -> void:
 		child.queue_free()
 	
 	for entry in unit_entries:
-		var item: HBoxContainer = _create_train_item(
+		var item: PanelContainer = _create_train_item(
 			entry.get("name", ""),
 			entry.get("cost", 0),
 			entry.get("time", 0.0),
