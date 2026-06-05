@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://building_scene"]
+
+[ext_resource type="Script" path="res://scripts/entities/building.gd" id="1_building"]
+
+[node name="Building" type="StaticBody2D"]
+script = ExtResource("1_building")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
