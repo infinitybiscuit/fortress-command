@@ -160,7 +160,7 @@ func set_game_mode(mode_name: String) -> void:
 	current_game_mode = mode
 	_setup_players()
 	game_is_started = true
-game_started.emit(mode)
+	game_started.emit(mode)
 
 func _setup_players() -> void:
 	# Clear existing players and entities

@@ -113,7 +113,7 @@ func draw_unit(unit: Unit, cam_offset: Vector2) -> void:
 	# Top highlight band
 	draw_rect(Rect2(rect.position, Vector2(w, h * 0.35)), body_top)
 	# Middle band
-draw_rect(Rect2(rect.position + Vector2(0, h * 0.35), Vector2(w, h * 0.35)), body_mid)
+	draw_rect(Rect2(rect.position + Vector2(0, h * 0.35), Vector2(w, h * 0.35)), body_mid)
 	# Bottom shadow band
 	draw_rect(Rect2(rect.position + Vector2(0, h * 0.7), Vector2(w, h * 0.3)), body_bot)
 

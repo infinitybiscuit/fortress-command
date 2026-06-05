@@ -96,7 +96,7 @@ func _set_build_menu_open(open: bool) -> void:
 	
 	# Animate menu slide
 	tween.tween_property(_build_menu_panel, "position:x", target_x, 0.15)\
-		.set_trans(Tween.TRANS_EASE_OUT).set_ease(Tween.EASE_OUT)
+		.set_trans(Tween.TWEEN_TRANSITION_EASE_OUT).set_ease(Tween.TWEEN_EASE_OUT)
 	
 	# Animate HUD padding shift (mimics CSS .menu-open padding)
 	# Offset is handled by anchoring to right side instead
@@ -191,7 +191,7 @@ func populate_build_list(building_entries: Array) -> void:
 		_build_list.add_child(item)
 
 
-func _create_build_item(name: String, cost: int, icon: String, btype: String, disabled: bool = false) -> HBoxContainer:
+func _create_build_item(name: String, cost: int, icon: String, btype: String, disabled: bool = false) -> PanelContainer:
 	var container := HBoxContainer.new()
 	container.add_theme_constant_override("separation", 10)
 	
@@ -248,7 +248,7 @@ func populate_train_list(unit_entries: Array) -> void:
 		_train_list.add_child(item)
 
 
-func _create_train_item(name: String, cost: int, train_time: float, utype: String, queued: bool = false, disabled: bool = false) -> HBoxContainer:
+func _create_train_item(name: String, cost: int, train_time: float, utype: String, queued: bool = false, disabled: bool = false) -> PanelContainer:
 	var container := HBoxContainer.new()
 	container.add_theme_constant_override("separation", 8)
 	
