@@ -124,7 +124,7 @@ signal income_generated(amount: int)
 ## ── Initialization ─────────────────────────────────────────────────────────────
 func _ready() -> void:
 	_load_stats()
-	# If build_time is 0, building is instantly complete
+	add_to_group("buildings")
 	if build_time <= 0.0:
 		is_constructing = false
 		construction_progress = 1.0
@@ -159,7 +159,6 @@ func _load_stats() -> void:
 
 ## ── Rendering ─────────────────────────────────────────────────────────────────────
 func _draw() -> void:
-	print("BUILDING_DRAW: ", building_type, " at ", global_position, " faction=", faction)
 	var cam: Camera2D = get_viewport().get_camera_2d()
 	var cam_offset: Vector2 = Vector2.ZERO
 	if cam != null:
@@ -189,6 +188,10 @@ func _process(delta: float) -> void:
 		else:
 			_scan_and_attack()
 
+	# Training queue processing
+	if not is_constructing and can_train.size() > 0:
+		_process_training(delta)
+
 ## ── Auto-Attack Turret Logic ───────────────────────────────────────────────────
 func _scan_and_attack() -> void:
 	# Scan for enemy units within attack_range
@@ -199,7 +202,10 @@ func _scan_and_attack() -> void:
 	for target in targets:
 		if target == self:
 			continue
-		# Check if target is an enemy (would need faction comparison)
+		# Only attack enemy factions
+		if target.has_method("take_damage") and target.get("faction") != null:
+			if target.faction == faction:
+				continue
 		var distance: float = global_position.distance_to(target.global_position)
 		if distance < nearest_distance:
 			nearest_distance = distance
