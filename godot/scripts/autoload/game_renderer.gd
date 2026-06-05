@@ -149,7 +149,7 @@ func draw_unit(unit: Unit, cam_offset: Vector2) -> void:
 	var facing_dir: float = 1.0  # default right
 	if unit.has_method("get_facing"):
 		facing_dir = unit.get_facing()
-	var fx: float = rect.position.x + (facing_dir > 0 ? w - 4 : 2)
+	var fx: float = rect.position.x + (w - 4 if facing_dir > 0 else 2)
 	var fy1: float = rect.position.y + h * 0.3
 	var fy2: float = rect.position.y + h * 0.5
 	var fy3: float = rect.position.y + h * 0.7
@@ -168,7 +168,13 @@ func draw_unit(unit: Unit, cam_offset: Vector2) -> void:
 		var bar_y: float = rect.position.y - 6
 		draw_rect(Rect2(bar_x, bar_y, bar_w, bar_h), Color(0.2, 0.2, 0.2))
 		var hp_ratio: float = unit.health / unit.max_health
-		var hp_color: Color = hp_ratio > 0.5 ? Color(0, 1, 0.4) : hp_ratio > 0.25 ? Color(1, 0.67, 0) : Color(1, 0.3, 0.3)
+		var hp_color: Color
+	if hp_ratio > 0.5:
+		hp_color = Color(0, 1, 0.4)
+	elif hp_ratio > 0.25:
+		hp_color = Color(1, 0.67, 0)
+	else:
+		hp_color = Color(1, 0.3, 0.3)
 		draw_rect(Rect2(bar_x, bar_y, bar_w * hp_ratio, bar_h), hp_color)
 
 ## Draw an ellipse approximated by a polygon
@@ -283,7 +289,13 @@ func draw_building(building: Building, cam_offset: Vector2) -> void:
 		var bar_y: float = rect.position.y - 6
 		draw_rect(Rect2(bar_x, bar_y, bar_w, bar_h), Color(0.2, 0.2, 0.2))
 		var hp_ratio: float = building.hp / building.max_hp
-		var hp_color: Color = hp_ratio > 0.5 ? Color(0, 1, 0.4) : hp_ratio > 0.25 ? Color(1, 0.67, 0) : Color(1, 0.3, 0.3)
+		var hp_color: Color
+	if hp_ratio > 0.5:
+		hp_color = Color(0, 1, 0.4)
+	elif hp_ratio > 0.25:
+		hp_color = Color(1, 0.67, 0)
+	else:
+		hp_color = Color(1, 0.3, 0.3)
 		draw_rect(Rect2(bar_x, bar_y, bar_w * hp_ratio, bar_h), hp_color)
 
 ## ── Building-type detail drawers ──────────────────────────────────────────────
