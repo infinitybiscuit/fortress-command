@@ -104,11 +104,20 @@ signal state_changed(new_state: State)
 ## ── Node References ────────────────────────────────────────────────────────────
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
+@onready var camera: Camera2D = $Camera2D
 
-## ── Initialization ─────────────────────────────────────────────────────────────
+## ── Initialization ──────────────────────────────────────────────────────────────
 func _ready() -> void:
 	_load_stats()
 	current_state = State.IDLE
+	_setup_camera()
+
+## Set up the UnitCamera with world bounds clamping
+func _setup_camera() -> void:
+	var cam: UnitCamera = UnitCamera.new()
+	cam.follow_target = self
+	cam.make_current()
+	camera = cam
 
 ## Load stats from the hardcoded STATS dictionary based on unit_type
 func _load_stats() -> void:
