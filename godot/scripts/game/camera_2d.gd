@@ -23,9 +23,9 @@ var _target_position: Vector2 = Vector2.ZERO
 func _ready() -> void:
 	var vp: Vector2 = get_viewport_rect().size
 	print("FortressCamera _ready — viewport: ", vp, " zoom: ", zoom)
-	# Blue HQ is at x=64 — center camera on blue HQ (world x=704 = 64 + 640)
-	# so it is immediately visible when the game starts
-	position = Vector2(704.0, 320.0)
+	# Blue HQ is at x=64 — center camera on blue HQ
+	# camera at x=128 means visible world x=[-512, 768], blue HQ [64,192] is on screen
+	position = Vector2(128.0, 320.0)
 	_target_position = position
 
 	limit_left = 0
