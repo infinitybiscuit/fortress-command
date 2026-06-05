@@ -189,8 +189,8 @@ func _setup_players() -> void:
 				"hq": null
 			})
 			# Place HQs at ground level
-		_spawn_hq_for_player(0, 2, ground_y - 3)
-		_spawn_hq_for_player(1, 193, ground_y - 3)
+			_spawn_hq_for_player(0, 2, ground_y - 3)
+			_spawn_hq_for_player(1, 193, ground_y - 3)
 		
 		GameMode.ONE_V_ONE:
 			# Two human players
@@ -208,8 +208,8 @@ func _setup_players() -> void:
 				"is_ai": false,
 				"hq": null
 			})
-		_spawn_hq_for_player(0, 2, ground_y - 3)
-		_spawn_hq_for_player(1, 193, ground_y - 3)
+			_spawn_hq_for_player(0, 2, ground_y - 3)
+			_spawn_hq_for_player(1, 193, ground_y - 3)
 		
 		GameMode.TWO_V_TWO:
 			# 4 players total
