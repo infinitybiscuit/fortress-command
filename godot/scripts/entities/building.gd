@@ -159,6 +159,7 @@ func _load_stats() -> void:
 
 ## ── Rendering ─────────────────────────────────────────────────────────────────────
 func _draw() -> void:
+	print("BUILDING_DRAW: ", building_type, " at ", global_position, " faction=", faction)
 	var cam: Camera2D = get_viewport().get_camera_2d()
 	var cam_offset: Vector2 = Vector2.ZERO
 	if cam != null:

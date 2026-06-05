@@ -238,9 +238,11 @@ func _setup_players() -> void:
 		players[i]["income"] = _calculate_player_income(i)
 
 func _spawn_hq_for_player(player_idx: int, tile_x: int, tile_y: int) -> void:
+	print("SPAWN_HQ: player=", player_idx, " tile=(", tile_x, ",", tile_y, ") ground_y=", tilemap.ground_surface_tile_y())
 	var hq: Node = spawn_building("hq", Vector2i(tile_x, tile_y), players[player_idx]["faction"])
 	if hq != null:
 		players[player_idx]["hq"] = hq
+		print("  -> HQ spawned at world pos=", hq.global_position)
 
 func _clear_all_entities() -> void:
 	# Remove all existing units
