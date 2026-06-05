@@ -77,6 +77,10 @@ var hp: float = 500.0
 var max_hp: float = 500.0
 var alive: bool = true
 
+## Selection & Faction
+var is_selected: bool = false
+var faction: int = 0  # 0=blue, 1=red, 2=green, 3=yellow
+
 ## Construction
 var is_constructing: bool = true
 var construction_progress: float = 0.0
@@ -153,7 +157,15 @@ func _load_stats() -> void:
 		is_constructing = build_time > 0.0
 		construction_progress = 0.0
 
-## ── Process ────────────────────────────────────────────────────────────────────
+## ── Rendering ─────────────────────────────────────────────────────────────────────
+func _draw() -> void:
+	var cam: Camera2D = get_viewport().get_camera_2d()
+	var cam_offset: Vector2 = Vector2.ZERO
+	if cam != null:
+		cam_offset = cam.global_position
+	GameRenderer.draw_building(self, cam_offset)
+
+## ── Process ───────────────────────────────────────────────────────────────────
 func _process(delta: float) -> void:
 	if not alive:
 		return

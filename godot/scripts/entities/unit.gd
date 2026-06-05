@@ -119,6 +119,14 @@ func _setup_camera() -> void:
 	cam.make_current()
 	camera = cam
 
+## ── Rendering ─────────────────────────────────────────────────────────────────
+func _draw() -> void:
+	var cam: Camera2D = get_viewport().get_camera_2d()
+	var cam_offset: Vector2 = Vector2.ZERO
+	if cam != null:
+		cam_offset = cam.global_position
+	GameRenderer.draw_unit(self, cam_offset)
+
 ## Load stats from the hardcoded STATS dictionary based on unit_type
 func _load_stats() -> void:
 	if STATS.has(unit_type):
