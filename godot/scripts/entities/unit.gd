@@ -85,6 +85,7 @@ var attack_range: float = 100.0
 var attack_damage: float = 15.0
 var attack_cooldown: float = 0.5
 var repair_rate: float = 0.0
+var jump_velocity: float = JUMP_VELOCITY
 
 ## Target references
 var move_target: Vector2 = Vector2.ZERO
@@ -138,7 +139,7 @@ func _load_stats() -> void:
 		attack_damage = stats.get("attack_damage", 15.0)
 		attack_cooldown = stats.get("attack_cooldown", 0.5)
 		repair_rate = stats.get("repair_rate", 0.0)
-		jump_velocity = stats.get("jump_velocity", JUMP_VELOCITY)
+		self.jump_velocity = stats.get("jump_velocity", JUMP_VELOCITY)
 
 ## ── Physics Process ───────────────────────────────────────────────────────────
 func _physics_process(delta: float) -> void:
@@ -159,7 +160,7 @@ func _physics_process(delta: float) -> void:
 		State.ATTACKING:
 			_velocity_attack()
 		State.REPAIRING:
-			_velocity_repair()
+			_velocity_repair(delta)
 		State.DEAD:
 			velocity = Vector2.ZERO
 	
@@ -191,7 +192,7 @@ func _velocity_attack() -> void:
 		attack_target_ref = null
 		_set_state(State.IDLE)
 
-func _velocity_repair() -> void:
+func _velocity_repair(delta: float) -> void:
 	velocity.x = 0.0
 	# Check if repair target is still valid
 	if repair_target_ref != null and is_instance_valid(repair_target_ref):
