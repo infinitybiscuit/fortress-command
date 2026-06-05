@@ -163,9 +163,6 @@ static func draw_building(canvas: CanvasItem, building: Building, cam_offset: Ve
 	var world_h: float = building.world_height
 	var rect: Rect2 = Rect2(screen_pos, Vector2(world_w, world_h))
 
-	# DEBUG
-	print("  DRAW_BLDG_RECT: world_pos=", building.global_position, " cam_offset=", cam_offset, " screen_pos=", screen_pos, " rect=", rect)
-
 	# Selection ring
 	if building.is_selected:
 		var sel_color: Color = Color(0, 1, 0.4)
