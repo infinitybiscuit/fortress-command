@@ -146,6 +146,9 @@ func _physics_process(delta: float) -> void:
 	# Clamp delta to prevent large jumps on lag spikes
 	delta = min(delta, 0.25)
 	
+	# Trigger redraw every frame — _draw() only fires when queue_redraw() is called
+	queue_redraw()
+	
 	# Apply gravity
 	if not is_on_floor():
 		velocity.y += GRAVITY * delta

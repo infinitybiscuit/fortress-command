@@ -203,3 +203,16 @@ func get_building_tile_key(tx: int, ty: int) -> Variant:
 
 func has_building_at(tx: int, ty: int) -> bool:
 	return _building_tiles.has(str(tx) + "," + str(ty))
+
+## ── Rendering ───────────────────────────────────────────────────────────────────
+func _process(_delta: float) -> void:
+	# Redraw every frame so terrain updates as camera pans
+	queue_redraw()
+
+func _draw() -> void:
+	var cam: Camera2D = get_viewport().get_camera_2d()
+	var cam_offset: Vector2 = Vector2.ZERO
+	if cam != null:
+		cam_offset = cam.global_position
+	var screen_size: Vector2 = get_viewport().get_visible_rect().size
+	GameRenderer.draw_terrain(self, self, cam_offset, screen_size)

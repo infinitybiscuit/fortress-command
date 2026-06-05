@@ -170,6 +170,9 @@ func _process(delta: float) -> void:
 	if not alive:
 		return
 	
+	# Trigger redraw every frame — _draw() only fires when queue_redraw() is called
+	queue_redraw()
+	
 	# Handle construction progress
 	if is_constructing:
 		construction_progress += delta / build_time
