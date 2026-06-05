@@ -62,3 +62,22 @@ ui_cancel={
 [autoload]
 
 game_manager="*res://scripts/autoload/game_manager.gd"
+[preset.0]
+name="HTML5"
+platform="Web"
+export_path="export/html5/index.html"
+
+[preset.1]
+name="Windows"
+platform="Windows"
+export_path="export/windows/fortress_command.exe"
+
+[preset.2]
+name="Linux"
+platform="Linux/X11"
+export_path="export/linux/fortress_command"
+
+[preset.3]
+name="macOS"
+platform="macOS"
+export_path="export/macos/fortress_command.zip"
