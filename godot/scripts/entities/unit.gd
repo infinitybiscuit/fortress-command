@@ -125,7 +125,7 @@ func _draw() -> void:
 	var cam_offset: Vector2 = Vector2.ZERO
 	if cam != null:
 		cam_offset = cam.global_position
-	GameRenderer.draw_unit(self, cam_offset)
+	GameRenderer.draw_unit(self, self, cam_offset)
 
 ## Load stats from the hardcoded STATS dictionary based on unit_type
 func _load_stats() -> void:

@@ -163,7 +163,7 @@ func _draw() -> void:
 	var cam_offset: Vector2 = Vector2.ZERO
 	if cam != null:
 		cam_offset = cam.global_position
-	GameRenderer.draw_building(self, cam_offset)
+	GameRenderer.draw_building(self, self, cam_offset)
 
 ## ── Process ───────────────────────────────────────────────────────────────────
 func _process(delta: float) -> void:
