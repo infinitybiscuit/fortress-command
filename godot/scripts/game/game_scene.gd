@@ -189,8 +189,8 @@ func _setup_players() -> void:
 				"hq": null
 			})
 			# Place HQs at ground level
-			_spawn_hq_for_player(0, 2, ground_y - 1)
-			_spawn_hq_for_player(1, 193, ground_y - 1)
+		_spawn_hq_for_player(0, 2, ground_y - 3)
+		_spawn_hq_for_player(1, 193, ground_y - 3)
 		
 		GameMode.ONE_V_ONE:
 			# Two human players
@@ -208,8 +208,8 @@ func _setup_players() -> void:
 				"is_ai": false,
 				"hq": null
 			})
-			_spawn_hq_for_player(0, 2, ground_y - 1)
-			_spawn_hq_for_player(1, 193, ground_y - 1)
+		_spawn_hq_for_player(0, 2, ground_y - 3)
+		_spawn_hq_for_player(1, 193, ground_y - 3)
 		
 		GameMode.TWO_V_TWO:
 			# 4 players total
@@ -217,10 +217,10 @@ func _setup_players() -> void:
 			players.append({"faction": 1, "income": 0, "money": 500, "is_ai": true, "hq": null})
 			players.append({"faction": 2, "income": 0, "money": 500, "is_ai": true, "hq": null})
 			players.append({"faction": 3, "income": 0, "money": 500, "is_ai": false, "hq": null})
-			_spawn_hq_for_player(0, 2, ground_y - 1)
-			_spawn_hq_for_player(1, 60, ground_y - 1)
-			_spawn_hq_for_player(2, 140, ground_y - 1)
-			_spawn_hq_for_player(3, 193, ground_y - 1)
+			_spawn_hq_for_player(0, 2, ground_y - 3)
+			_spawn_hq_for_player(1, 60, ground_y - 3)
+			_spawn_hq_for_player(2, 140, ground_y - 3)
+			_spawn_hq_for_player(3, 193, ground_y - 3)
 		
 		GameMode.SKIRMISH:
 			# Single player vs multiple AI
@@ -228,10 +228,10 @@ func _setup_players() -> void:
 			players.append({"faction": 1, "income": 0, "money": 500, "is_ai": true, "hq": null})
 			players.append({"faction": 2, "income": 0, "money": 500, "is_ai": true, "hq": null})
 			players.append({"faction": 3, "income": 0, "money": 500, "is_ai": true, "hq": null})
-			_spawn_hq_for_player(0, 2, ground_y - 1)
-			_spawn_hq_for_player(1, 50, ground_y - 1)
-			_spawn_hq_for_player(2, 100, ground_y - 1)
-			_spawn_hq_for_player(3, 193, ground_y - 1)
+			_spawn_hq_for_player(0, 2, ground_y - 3)
+			_spawn_hq_for_player(1, 50, ground_y - 3)
+			_spawn_hq_for_player(2, 100, ground_y - 3)
+			_spawn_hq_for_player(3, 193, ground_y - 3)
 	
 	# Initialize income rates after setup
 	for i in range(players.size()):
