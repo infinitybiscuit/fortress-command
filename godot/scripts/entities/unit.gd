@@ -105,20 +105,12 @@ signal state_changed(new_state: State)
 ## ── Node References ────────────────────────────────────────────────────────────
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
-@onready var camera: Camera2D = $Camera2D
 
 ## ── Initialization ──────────────────────────────────────────────────────────────
 func _ready() -> void:
 	_load_stats()
+	add_to_group("units")
 	current_state = State.IDLE
-	_setup_camera()
-
-## Set up the UnitCamera with world bounds clamping
-func _setup_camera() -> void:
-	var cam: UnitCamera = UnitCamera.new()
-	cam.follow_target = self
-	cam.make_current()
-	camera = cam
 
 ## ── Rendering ─────────────────────────────────────────────────────────────────
 func _draw() -> void:
@@ -184,13 +176,13 @@ func _velocity_move_to_target() -> void:
 
 func _velocity_attack() -> void:
 	velocity.x = 0.0
-	# Check if target is still valid and in range
 	if attack_target_ref != null and is_instance_valid(attack_target_ref):
 		var distance: float = global_position.distance_to(attack_target_ref.global_position)
 		if distance > attack_range:
-			# Target out of range, stop attacking
 			attack_target_ref = null
 			_set_state(State.IDLE)
+		else:
+			fire_at_target()
 	else:
 		attack_target_ref = null
 		_set_state(State.IDLE)
@@ -293,6 +285,10 @@ func deselect() -> void:
 	# Remove visual feedback
 	if sprite:
 		sprite.modulate = Color(1.0, 1.0, 1.0)  # Normal color
+
+## ── Utility ───────────────────────────────────────────────────────────────────
+func get_facing() -> int:
+	return 1 if velocity.x >= 0.0 else -1
 
 ## ── Cooldown Timer Update ──────────────────────────────────────────────────────
 func _process(delta: float) -> void:

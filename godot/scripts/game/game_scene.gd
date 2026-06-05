@@ -81,15 +81,11 @@ func _process(delta: float) -> void:
 	_process_buildings(delta)
 
 ## ── Per-Frame Unit/Building Processing ──────────────────────────────────────────
-func _process_units(delta: float) -> void:
-	for unit in all_units:
-		if is_instance_valid(unit) and unit.has_method("_physics_process"):
-			unit._physics_process(delta)
+func _process_units(_delta: float) -> void:
+	pass  # Godot calls _physics_process on each CharacterBody2D automatically
 
-func _process_buildings(delta: float) -> void:
-	for building in all_buildings:
-		if is_instance_valid(building) and building.has_method("_process"):
-			building._process(delta)
+func _process_buildings(_delta: float) -> void:
+	pass  # Godot calls _process on each Node automatically
 
 ## ── Economy ────────────────────────────────────────────────────────────────────────
 func _process_economy() -> void:
@@ -271,7 +267,8 @@ func spawn_unit(unit_type: String, position: Vector2, faction: int) -> Node:
 	# Add to scene and tracking arrays
 	units_node.add_child(unit)
 	all_units.append(unit)
-	
+	unit.add_to_group("units")
+
 	# Connect unit death signal
 	if unit.has_signal("unit_died"):
 		unit.unit_died.connect(_on_unit_died.bind(unit))
@@ -302,21 +299,90 @@ func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> 
 	# Add to scene and tracking arrays
 	buildings_node.add_child(building)
 	all_buildings.append(building)
-	
+	building.add_to_group("buildings")
+
 	# Connect building destruction signal
 	if building.has_signal("building_destroyed"):
 		building.building_destroyed.connect(_on_building_destroyed.bind(building))
+
+	# Wire unit_trained signal so trained units actually spawn
+	if building.has_signal("unit_trained"):
+		building.unit_trained.connect(_on_unit_trained.bind(building))
 	
 	building_spawned.emit(building)
 	return building
 
 func _on_building_destroyed(building: Node) -> void:
-	# Remove from tracking arrays
 	all_buildings.erase(building)
-	
-	# Clear building tiles on tilemap
-	if building.has_method("get_width_tiles") and building.has_method("get_height_tiles"):
-		tilemap.clear_building_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
+	tilemap.clear_building_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
+
+	# Check if destroyed building is a player's HQ — trigger game over
+	for i in range(players.size()):
+		if players[i].get("hq") == building:
+			players[i]["hq"] = null
+			_check_game_over()
+			break
+
+
+func _on_unit_trained(unit_type: String, source_building: Node) -> void:
+	# Spawn the trained unit near the building's exit
+	var spawn_pos: Vector2 = source_building.global_position + Vector2(source_building.world_width + 8, 0)
+	spawn_unit(unit_type, spawn_pos, source_building.faction)
+
+
+func _check_game_over() -> void:
+	# A player loses when their HQ is destroyed
+	for i in range(players.size()):
+		if players[i].get("hq") == null:
+			# Find any surviving enemy player as the winner
+			for j in range(players.size()):
+				if j != i and players[j].get("hq") != null:
+					game_over.emit(j)
+					game_is_started = false
+					return
+
+## ── Input Handling ──────────────────────────────────────────────────────────
+func _unhandled_input(event: InputEvent) -> void:
+	if not game_is_started or game_paused:
+		return
+
+	if event is InputEventMouseButton and event.pressed:
+		var world_pos: Vector2 = get_global_mouse_position()
+
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			# Try to select a unit (player faction 0) near click position
+			var nearby: Array = get_units_at_position(world_pos, 24.0)
+			var player_unit: Node = null
+			for u in nearby:
+				if is_instance_valid(u) and u.faction == 0:
+					player_unit = u
+					break
+			if player_unit != null:
+				select_unit(player_unit)
+			else:
+				deselect_all()
+
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			# Right-click: move or attack at target position
+			if selected_units.size() == 0:
+				return
+
+			# Check if there's an enemy unit at target
+			var nearby: Array = get_units_at_position(world_pos, 24.0)
+			var enemy: Node = null
+			for u in nearby:
+				if is_instance_valid(u) and u.faction != 0:
+					enemy = u
+					break
+
+			for unit in selected_units:
+				if not is_instance_valid(unit):
+					continue
+				if enemy != null:
+					unit.attack_target(enemy)
+				else:
+					unit.move_to(world_pos)
+
 
 ## ── Selection ───────────────────────────────────────────────────────────────────
 func select_unit(unit: Node) -> void:
