@@ -9,7 +9,6 @@
 script = ExtResource("1_game_scene")
 
 [node name="GameTileMap" type="Node2D" parent="."]
-script = ExtResource("2_tilemap")
 
 [node name="Camera2D" type="Camera2D" parent="."]
 
