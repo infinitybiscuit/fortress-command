@@ -94,8 +94,8 @@ func _set_build_menu_open(open: bool) -> void:
 	var panel_pos: Vector2 = _build_menu_panel.position
 	var current_x: float = panel_pos.x if _build_menu_open != open else 0.0
 	
-	# Animate menu slide
-tween.tween_property(_build_menu_panel, "position:x", target_x, 0.15).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+# Animate menu slide
+	# tween.tween_property(_build_menu_panel, "position:x", target_x, 0.15).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	
 	# Animate HUD padding shift (mimics CSS .menu-open padding)
 	# Offset is handled by anchoring to right side instead
