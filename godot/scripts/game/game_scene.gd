@@ -51,6 +51,8 @@ signal income_updated(player_idx: int, new_rate: int)
 func _ready() -> void:
 	# Initialize empty player array
 	players = []
+	# Auto-start for testing — spawns HQs and begins game loop
+	set_game_mode("1v1_cpu")
 
 ## ── Main Game Loop ────────────────────────────────────────────────────────────────
 func _process(delta: float) -> void:
