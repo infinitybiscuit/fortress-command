@@ -51,69 +51,69 @@ const AI_AGGRESSION_RAMP: float = 0.01
 
 # ===== Unit Types =====
 const UNIT_TYPES: Dictionary = {
-	soldier: {
-		hp: 30, speed: 80, damage: 8, attack_range: 40, attack_rate: 0.8,
-		cost: 50, train_time: 3.0, width: 12, height: 20,
-		can_build: false, can_repair: false, repair_rate: 0,
+	"soldier": {
+		"hp": 30, "speed": 80, "damage": 8, "attack_range": 40, "attack_rate": 0.8,
+		"cost": 50, "train_time": 3.0, "width": 12, "height": 20,
+		"can_build": false, "can_repair": false, "repair_rate": 0,
 	},
-	heavy: {
-		hp: 80, speed: 45, damage: 20, attack_range: 35, attack_rate: 1.5,
-		cost: 120, train_time: 6.0, width: 16, height: 22,
-		can_build: false, can_repair: false, repair_rate: 0,
+	"heavy": {
+		"hp": 80, "speed": 45, "damage": 20, "attack_range": 35, "attack_rate": 1.5,
+		"cost": 120, "train_time": 6.0, "width": 16, "height": 22,
+		"can_build": false, "can_repair": false, "repair_rate": 0,
 	},
-	scout: {
-		hp: 15, speed: 140, damage: 5, attack_range: 30, attack_rate: 0.4,
-		cost: 30, train_time: 1.5, width: 10, height: 18,
-		can_build: false, can_repair: false, repair_rate: 0,
+	"scout": {
+		"hp": 15, "speed": 140, "damage": 5, "attack_range": 30, "attack_rate": 0.4,
+		"cost": 30, "train_time": 1.5, "width": 10, "height": 18,
+		"can_build": false, "can_repair": false, "repair_rate": 0,
 	},
-	engineer: {
-		hp: 20, speed: 70, damage: 3, attack_range: 25, attack_rate: 1.0,
-		cost: 60, train_time: 4.0, width: 12, height: 20,
-		can_build: true, can_repair: true, repair_rate: 5,
+	"engineer": {
+		"hp": 20, "speed": 70, "damage": 3, "attack_range": 25, "attack_rate": 1.0,
+		"cost": 60, "train_time": 4.0, "width": 12, "height": 20,
+		"can_build": true, "can_repair": true, "repair_rate": 5,
 	},
-	sniper: {
-		hp: 60, speed: 55, damage: 30, attack_range: 1500, attack_rate: 10.0,
-		cost: 200, train_time: 8.0, width: 14, height: 22,
-		can_build: false, can_repair: false, repair_rate: 0,
-		projectile_range: SNIPER_RANGE,
+	"sniper": {
+		"hp": 60, "speed": 55, "damage": 30, "attack_range": 1500, "attack_rate": 10.0,
+		"cost": 200, "train_time": 8.0, "width": 14, "height": 22,
+		"can_build": false, "can_repair": false, "repair_rate": 0,
+		"projectile_range": SNIPER_RANGE,
 	},
 }
 
 # ===== Building Types =====
 const BUILDING_TYPES: Dictionary = {
-	hq: {
-		hp: 500, width_tiles: 4, height_tiles: 3, cost: 0, build_time: 0,
-		provides_income: true, income_amount: 5,
-		blocks_units: false,
+	"hq": {
+		"hp": 500, "width_tiles": 4, "height_tiles": 3, "cost": 0, "build_time": 0,
+		"provides_income": true, "income_amount": 5,
+		"blocks_units": false,
 	},
-	barracks: {
-		hp: 200, width_tiles: 3, height_tiles: 2, cost: 150, build_time: 5.0,
-		can_train: ["soldier", "heavy", "scout", "sniper"],
+	"barracks": {
+		"hp": 200, "width_tiles": 3, "height_tiles": 2, "cost": 150, "build_time": 5.0,
+		"can_train": ["soldier", "heavy", "scout", "sniper"],
 	},
-	turret: {
-		hp: 120, width_tiles: 2, height_tiles: 2, cost: 100, build_time: 4.0,
-		auto_attack: true, attack_damage: 12, attack_range: 150, attack_rate: 1.2,
+	"turret": {
+		"hp": 120, "width_tiles": 2, "height_tiles": 2, "cost": 100, "build_time": 4.0,
+		"auto_attack": true, "attack_damage": 12, "attack_range": 150, "attack_rate": 1.2,
 	},
-	wall: {
-		hp: 300, width_tiles: 1, height_tiles: 2, cost: 40, build_time: 2.0,
-		blocks_units: true,
+	"wall": {
+		"hp": 300, "width_tiles": 1, "height_tiles": 2, "cost": 40, "build_time": 2.0,
+		"blocks_units": true,
 	},
-	mine: {
-		hp: 100, width_tiles: 2, height_tiles: 2, cost: 200, build_time: 8.0,
-		blocks_units: false,
-		provides_income: true, income_amount: 15,
+	"mine": {
+		"hp": 100, "width_tiles": 2, "height_tiles": 2, "cost": 200, "build_time": 8.0,
+		"blocks_units": false,
+		"provides_income": true, "income_amount": 15,
 	},
-	workshop: {
-		hp: 180, width_tiles: 3, height_tiles: 2, cost: 200, build_time: 6.0,
-		can_train: ["engineer"],
+	"workshop": {
+		"hp": 180, "width_tiles": 3, "height_tiles": 2, "cost": 200, "build_time": 6.0,
+		"can_train": ["engineer"],
 	},
-	bridge: {
-		hp: 150, width_tiles: 1, height_tiles: 1,
-		cost_per_tile: 15, cost: 15, build_time: 3.0, is_bridge: true,
+	"bridge": {
+		"hp": 150, "width_tiles": 1, "height_tiles": 1,
+		"cost_per_tile": 15, "cost": 15, "build_time": 3.0, "is_bridge": true,
 	},
-	ramp: {
-		hp: 120, width_tiles: 1, height_tiles: 1,
-		cost_per_tile: 20, cost: 20, build_time: 4.0, is_ramp: true,
+	"ramp": {
+		"hp": 120, "width_tiles": 1, "height_tiles": 1,
+		"cost_per_tile": 20, "cost": 20, "build_time": 4.0, "is_ramp": true,
 	},
 }
 
