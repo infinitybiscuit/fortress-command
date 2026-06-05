@@ -175,12 +175,11 @@ func update_mode_label(text: String) -> void:
 # ═══════════════════════════════════════════════════════════════════
 
 func populate_build_list(building_entries: Array) -> void:
-	# Clear existing items
 	for child in _build_list.get_children():
 		child.queue_free()
-	
+
 	for entry in building_entries:
-		var item: PanelContainer = _create_build_item(
+		var item: Button = _create_build_item(
 			entry.get("name", ""),
 			entry.get("cost", 0),
 			entry.get("icon", "■"),
@@ -190,36 +189,15 @@ func populate_build_list(building_entries: Array) -> void:
 		_build_list.add_child(item)
 
 
-func _create_build_item(name: String, cost: int, icon: String, btype: String, disabled: bool = false) -> PanelContainer:
-	var container := HBoxContainer.new()
-	container.add_theme_constant_override("separation", 10)
-	
-	var icon_label := Label.new()
-	icon_label.text = icon
-	icon_label.size_flags_stretch_ratio = 0.0
-	icon_label.custom_minimum_size = Vector2(28, 28)
-	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	
-	var name_label := Label.new()
-	name_label.text = name
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	
-	var cost_label := Label.new()
-	cost_label.text = "%d" % cost
-	cost_label.theme_type_variation = ""
-	
-	var item_panel := PanelContainer.new()
-	item_panel.add_child(container)
-	container.add_child(icon_label)
-	container.add_child(name_label)
-	container.add_child(cost_label)
-	
-	if disabled:
-		item_panel.modulate = Color(1.0, 1.0, 1.0, 0.35)
-		container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	
-	return item_panel
+func _create_build_item(display_name: String, cost: int, icon: String, btype: String, disabled: bool = false) -> Button:
+	var btn := Button.new()
+	btn.text = "%s  %s   %d💰" % [icon, display_name, cost]
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.disabled = disabled
+	if not disabled:
+		btn.pressed.connect(func(): build_item_selected.emit(btype))
+	return btn
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -231,12 +209,11 @@ func show_train_section(show: bool) -> void:
 
 
 func populate_train_list(unit_entries: Array) -> void:
-	# Clear existing items
 	for child in _train_list.get_children():
 		child.queue_free()
-	
+
 	for entry in unit_entries:
-		var item: PanelContainer = _create_train_item(
+		var item: Button = _create_train_item(
 			entry.get("name", ""),
 			entry.get("cost", 0),
 			entry.get("time", 0.0),
@@ -247,34 +224,17 @@ func populate_train_list(unit_entries: Array) -> void:
 		_train_list.add_child(item)
 
 
-func _create_train_item(name: String, cost: int, train_time: float, utype: String, queued: bool = false, disabled: bool = false) -> PanelContainer:
-	var container := HBoxContainer.new()
-	container.add_theme_constant_override("separation", 8)
-	
-	var name_label := Label.new()
-	name_label.text = name
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	
-	var cost_label := Label.new()
-	cost_label.text = "%d" % cost
-	
-	var time_label := Label.new()
-	time_label.text = "%.1fs" % train_time
-	time_label.theme_type_variation = ""
-	
-	var item_panel := PanelContainer.new()
-	item_panel.add_child(container)
-	container.add_child(name_label)
-	container.add_child(cost_label)
-	container.add_child(time_label)
-	
+func _create_train_item(display_name: String, cost: int, train_time: float, utype: String, queued: bool = false, disabled: bool = false) -> Button:
+	var btn := Button.new()
+	btn.text = "%s   %d💰   %.1fs" % [display_name, cost, train_time]
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.disabled = disabled
 	if queued:
-		item_panel.modulate = Color(0.0, 1.0, 0.4, 0.25)
-	elif disabled:
-		item_panel.modulate = Color(1.0, 1.0, 1.0, 0.35)
-		container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	
-	return item_panel
+		btn.modulate = Color(0.0, 1.0, 0.4, 0.8)
+	if not disabled:
+		btn.pressed.connect(func(): train_item_selected.emit(utype))
+	return btn
 
 
 # ═══════════════════════════════════════════════════════════════════

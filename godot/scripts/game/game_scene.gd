@@ -14,6 +14,7 @@ const MAX_DELTA: float = 0.25
 @onready var tilemap: GameTileMap = $GameTileMap
 @onready var units_node: Node2D = $Units
 @onready var buildings_node: Node2D = $Buildings
+@onready var hud: HUD = $CanvasLayer/HUD
 
 ## ── Game State ────────────────────────────────────────────────────────────────────
 enum GameMode { NONE, ONE_V_ONE_CPU, TWO_V_TWO, ONE_V_ONE, SKIRMISH }
@@ -32,6 +33,10 @@ var all_buildings: Array = []
 
 ## Selection state
 var selected_units: Array = []
+var _selected_building: Node = null
+
+## Build placement state
+var _pending_build_type: String = ""
 
 ## Tick timers
 var economy_tick_timer: float = 0.0
@@ -49,10 +54,9 @@ signal income_updated(player_idx: int, new_rate: int)
 
 ## ── Initialization ───────────────────────────────────────────────────────────────
 func _ready() -> void:
-	# Initialize empty player array
 	players = []
-	# Auto-start for testing — spawns HQs and begins game loop
 	set_game_mode("1v1_cpu")
+	_setup_hud()
 
 ## ── Main Game Loop ────────────────────────────────────────────────────────────────
 func _process(delta: float) -> void:
@@ -89,13 +93,15 @@ func _process_buildings(_delta: float) -> void:
 
 ## ── Economy ────────────────────────────────────────────────────────────────────────
 func _process_economy() -> void:
-	# Calculate income from all buildings for each player
 	for i in range(players.size()):
 		var player: Dictionary = players[i]
 		var income: int = _calculate_player_income(i)
 		player["income"] = income
 		player["money"] += income
 		income_updated.emit(i, income)
+		if i == 0:
+			hud.update_credits(player["money"])
+			hud.update_income(income)
 
 func _calculate_player_income(player_idx: int) -> int:
 	var total_income: int = 0
@@ -184,9 +190,14 @@ func _setup_players() -> void:
 				"is_ai": true,
 				"hq": null
 			})
-			# Place HQs at ground level
 			_spawn_hq_for_player(0, 2, ground_y - 3)
 			_spawn_hq_for_player(1, 193, ground_y - 3)
+			# Starting soldiers — spawn just above ground so physics settles them
+			var spawn_y: float = (ground_y - 1) * GameConfig.TILE_SIZE
+			spawn_unit("soldier", Vector2(250, spawn_y), 0)
+			spawn_unit("soldier", Vector2(290, spawn_y), 0)
+			spawn_unit("soldier", Vector2(6140, spawn_y), 1)
+			spawn_unit("soldier", Vector2(6100, spawn_y), 1)
 		
 		GameMode.ONE_V_ONE:
 			# Two human players
@@ -341,6 +352,103 @@ func _check_game_over() -> void:
 					game_is_started = false
 					return
 
+## ── HUD Setup ───────────────────────────────────────────────────────────────
+func _setup_hud() -> void:
+	# Populate build list (player can't build HQs)
+	var icons: Dictionary = {
+		"barracks": "⚔", "turret": "🗼", "wall": "🧱",
+		"mine": "⛏", "workshop": "🔧"
+	}
+	var build_entries: Array = []
+	for btype in ["barracks", "turret", "wall", "mine", "workshop"]:
+		var data: Dictionary = GameConfig.BUILDING_TYPES.get(btype, {})
+		build_entries.append({
+			"name": btype.capitalize(),
+			"cost": data.get("cost", 0),
+			"icon": icons.get(btype, "■"),
+			"type": btype,
+			"disabled": false
+		})
+	hud.populate_build_list(build_entries)
+
+	# Connect HUD signals
+	hud.build_item_selected.connect(_on_hud_build_item_selected)
+	hud.train_item_selected.connect(_on_hud_train_item_selected)
+
+	# Seed initial values
+	if players.size() > 0:
+		hud.update_credits(players[0].get("money", 0))
+		hud.update_income(players[0].get("income", 0))
+	hud.update_mode_label("1v1 CPU")
+
+
+func _on_hud_build_item_selected(btype: String) -> void:
+	_pending_build_type = btype
+	hud.update_selection_info("Click to place: " + btype.capitalize())
+
+
+func _on_hud_train_item_selected(utype: String) -> void:
+	if _selected_building == null or not is_instance_valid(_selected_building):
+		return
+	if _selected_building.faction != 0:
+		return
+	var cost: int = GameConfig.UNIT_TYPES.get(utype, {}).get("cost", 0)
+	if players[0].get("money", 0) < cost:
+		return
+	if _selected_building.queue_train(utype):
+		players[0]["money"] -= cost
+		hud.update_credits(players[0]["money"])
+		# Refresh train list to reflect new affordability
+		_select_building(_selected_building)
+
+
+func _select_building(building: Node) -> void:
+	# Deselect previous building
+	if _selected_building != null and is_instance_valid(_selected_building):
+		_selected_building.is_selected = false
+	_selected_building = building
+	building.is_selected = true
+	deselect_all()
+
+	hud.update_selection_info(building.building_type.capitalize())
+
+	if building.can_train.size() > 0:
+		var train_entries: Array = []
+		for utype in building.can_train:
+			var data: Dictionary = GameConfig.UNIT_TYPES.get(utype, {})
+			train_entries.append({
+				"name": utype.capitalize(),
+				"cost": data.get("cost", 0),
+				"time": data.get("train_time", 3.0),
+				"type": utype,
+				"disabled": players[0].get("money", 0) < data.get("cost", 0)
+			})
+		hud.populate_train_list(train_entries)
+		hud.show_train_section(true)
+	else:
+		hud.show_train_section(false)
+
+
+func _try_place_building(btype: String, world_pos: Vector2) -> void:
+	var data: Dictionary = GameConfig.BUILDING_TYPES.get(btype, {})
+	var cost: int = data.get("cost", 0)
+	if players.size() == 0 or players[0].get("money", 0) < cost:
+		hud.update_selection_info("Not enough credits!")
+		return
+	var tile_pos: Vector2i = tilemap.world_to_tile(world_pos.x, world_pos.y)
+	var w: int = data.get("width_tiles", 1)
+	var h: int = data.get("height_tiles", 1)
+	# Place so the bottom of the building sits on the clicked tile row
+	var place_tile_y: int = tile_pos.y - h + 1
+	if not tilemap.can_place_building(tile_pos.x, place_tile_y, w, h):
+		hud.update_selection_info("Can't place here!")
+		return
+	players[0]["money"] -= cost
+	spawn_building(btype, Vector2i(tile_pos.x, place_tile_y), 0)
+	hud.update_credits(players[0]["money"])
+	hud.update_selection_info("Placed " + btype.capitalize())
+
+
 ## ── Input Handling ──────────────────────────────────────────────────────────
 func _unhandled_input(event: InputEvent) -> void:
 	if not game_is_started or game_paused:
@@ -350,6 +458,21 @@ func _unhandled_input(event: InputEvent) -> void:
 		var world_pos: Vector2 = get_global_mouse_position()
 
 		if event.button_index == MOUSE_BUTTON_LEFT:
+			# Build placement mode takes priority
+			if _pending_build_type != "":
+				_try_place_building(_pending_build_type, world_pos)
+				_pending_build_type = ""
+				return
+
+			# Check for building click first
+			for building in all_buildings:
+				if not is_instance_valid(building) or building.faction != 0:
+					continue
+				var brect := Rect2(building.global_position, Vector2(building.world_width, building.world_height))
+				if brect.has_point(world_pos):
+					_select_building(building)
+					return
+
 			# Try to select a unit (player faction 0) near click position
 			var nearby: Array = get_units_at_position(world_pos, 24.0)
 			var player_unit: Node = null
@@ -358,9 +481,19 @@ func _unhandled_input(event: InputEvent) -> void:
 					player_unit = u
 					break
 			if player_unit != null:
+				if _selected_building != null and is_instance_valid(_selected_building):
+					_selected_building.is_selected = false
+					_selected_building = null
+					hud.show_train_section(false)
 				select_unit(player_unit)
+				hud.update_selection_info(player_unit.unit_type.capitalize())
 			else:
+				if _selected_building != null and is_instance_valid(_selected_building):
+					_selected_building.is_selected = false
+					_selected_building = null
+					hud.show_train_section(false)
 				deselect_all()
+				hud.update_selection_info("")
 
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			# Right-click: move or attack at target position
