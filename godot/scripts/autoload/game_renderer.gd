@@ -162,7 +162,10 @@ static func draw_building(canvas: CanvasItem, building: Building, cam_offset: Ve
 	var world_w: float = building.world_width
 	var world_h: float = building.world_height
 	var rect: Rect2 = Rect2(screen_pos, Vector2(world_w, world_h))
-
+	
+	# DEBUG: yellow outline showing exact rect screen position
+	canvas.draw_rect(rect, Color(1, 1, 0, 0.8), false, 2.0)
+	
 	# Selection ring
 	if building.is_selected:
 		var sel_color: Color = Color(0, 1, 0.4)
