@@ -307,7 +307,7 @@ func fire_at_target() -> void:
 
 	# Check range
 	var distance: float = global_position.distance_to(attack_target_ref.global_position)
-	print("FIRE: ", unit_type, " -> ", attack_target_ref.get("unit_type") ?? "??", " range=", distance, " attack_range=", attack_range, " cooldown=", attack_cooldown_timer)
+	print("FIRE: ", unit_type, " -> ", attack_target_ref.get("unit_type") if attack_target_ref.has("unit_type") else "??", " range=", distance, " attack_range=", attack_range, " cooldown=", attack_cooldown_timer)
 	if distance <= attack_range:
 		# Damage is applied by the spawned projectile on impact
 		attack_fired.emit(attack_target_ref, attack_damage)
