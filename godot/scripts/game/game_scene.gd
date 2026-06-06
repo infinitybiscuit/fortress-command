@@ -453,6 +453,9 @@ func _try_place_building(btype: String, world_pos: Vector2) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not game_is_started or game_paused:
 		return
+	# Ignore world clicks when the mouse is over any GUI element
+	if get_viewport().gui_is_mouse_over_gui():
+		return
 
 	if event is InputEventMouseButton and event.pressed:
 		var world_pos: Vector2 = get_global_mouse_position()
