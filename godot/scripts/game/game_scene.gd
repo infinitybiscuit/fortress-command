@@ -454,7 +454,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not game_is_started or game_paused:
 		return
 	# Ignore world clicks when the mouse is over any GUI element
-	if get_viewport().gui_is_mouse_over_gui():
+	if get_viewport().gui_get_hovered_control() != null:
 		return
 
 	if event is InputEventMouseButton and event.pressed:

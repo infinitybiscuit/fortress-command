@@ -88,18 +88,13 @@ func toggle_build_menu() -> void:
 
 func _set_build_menu_open(open: bool) -> void:
 	_build_menu_open = open
-	
+
+	# Slide the menu in from / out to the left edge
+	var target_x: float = 0.0 if open else float(-_BUILD_MENU_W)
 	var tween: Tween = create_tween()
-	var target_x: float = -_BUILD_MENU_W if not open else 0.0
-	var panel_pos: Vector2 = _build_menu_panel.position
-	var current_x: float = panel_pos.x if _build_menu_open != open else 0.0
-	
-# Animate menu slide
-	# tween.tween_property(_build_menu_panel, "position:x", target_x, 0.15).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	
-	# Animate HUD padding shift (mimics CSS .menu-open padding)
-	# Offset is handled by anchoring to right side instead
-	
+	tween.tween_property(_build_menu_panel, "position:x", target_x, 0.15) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
 	_build_tab.button_pressed = open
 	build_menu_toggled.emit(open)
 
