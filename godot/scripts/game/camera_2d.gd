@@ -57,8 +57,8 @@ func _process(delta: float) -> void:
 
 	# ── Edge-scrolling: auto-pan when mouse is near viewport edge ──────────────
 	var vp_size: Vector2 = get_viewport_rect().size
-	var mouse_pos: Vector2 = get_global_mouse_position()
-	# Convert mouse to viewport-relative coordinates
+	# Use viewport-relative coords so edge detection works at any camera position
+	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
 	var rel_x: float = mouse_pos.x
 	var rel_y: float = mouse_pos.y
 

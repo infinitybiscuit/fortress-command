@@ -35,6 +35,11 @@ var all_buildings: Array = []
 var selected_units: Array = []
 var _selected_building: Node = null
 
+## Drag-selection state
+var _drag_start: Vector2 = Vector2.ZERO
+var _is_dragging: bool = false
+var _drag_rect: Rect2 = Rect2.ZERO
+
 ## Build placement state
 var _pending_build_type: String = ""
 
@@ -142,9 +147,41 @@ func _process_ai() -> void:
 			_process_ai_player(i)
 
 func _process_ai_player(player_idx: int) -> void:
-	# Placeholder for AI logic - can be extended
-	# This will be implemented with AI-specific scripts later
-	pass
+	var player_faction: int = players[player_idx]["faction"]
+	var ai_units: Array = get_units_for_faction(player_faction)
+	if ai_units.size() == 0:
+		return
+
+	# Collect all enemy units and buildings
+	var enemies: Array = []
+	for unit in all_units:
+		if is_instance_valid(unit) and unit.faction != player_faction:
+			enemies.append(unit)
+	for building in all_buildings:
+		if is_instance_valid(building) and building.faction != player_faction:
+			enemies.append(building)
+
+	if enemies.size() == 0:
+		return
+
+	# Find the closest enemy across all units and buildings
+	var best_target: Node = null
+	var best_dist: float = INF
+	for enemy in enemies:
+		for ai_unit in ai_units:
+			if not is_instance_valid(ai_unit):
+				continue
+			var d: float = ai_unit.global_position.distance_to(enemy.global_position)
+			if d < best_dist:
+				best_dist = d
+				best_target = enemy
+
+	if best_target != null and best_dist < 800.0:
+		for ai_unit in ai_units:
+			if not is_instance_valid(ai_unit):
+				continue
+			if ai_unit.current_state != ai_unit.State.DEAD:
+				ai_unit.attack_target(best_target)
 
 ## ── Game Mode Setup ──────────────────────────────────────────────────────────────
 func set_game_mode(mode_name: String) -> void:
@@ -296,6 +333,9 @@ func _on_unit_died(unit: Node) -> void:
 	# Remove from tracking arrays
 	all_units.erase(unit)
 	selected_units.erase(unit)
+	# Actually remove the unit from the scene tree
+	if is_instance_valid(unit):
+		unit.queue_free()
 
 ## ── Projectiles ──────────────────────────────────────────────────────────────────
 const _PROJECTILE_SCRIPT: GDScript = preload("res://scripts/entities/projectile.gd")
@@ -486,6 +526,39 @@ var _last_click_time: float = 0.0
 var _last_click_pos: Vector2 = Vector2.ZERO
 const _DOUBLE_CLICK_SEC: float = 0.35
 const _DOUBLE_CLICK_PX: float = 20.0
+const _DRAG_MIN_DISTANCE: float = 10.0
+
+## Tracks mouse motion to build a drag-selection rectangle while the left button is held.
+func _input(event: InputEvent) -> void:
+	if not _is_dragging:
+		return
+	if not (event is InputEventMouseMotion):
+		return
+	var world_pos: Vector2 = get_global_mouse_position()
+	var dist: float = world_pos.distance_to(_drag_start)
+	if dist >= _DRAG_MIN_DISTANCE:
+		_is_dragging = true
+		var top_left: Vector2 = Vector2(
+			minf(_drag_start.x, world_pos.x),
+			minf(_drag_start.y, world_pos.y)
+		)
+		var size: Vector2 = Vector2(
+			absf(world_pos.x - _drag_start.x),
+			absf(world_pos.y - _drag_start.y)
+		)
+		_drag_rect = Rect2(top_left, size)
+		queue_redraw()
+
+## ── Drag-selection rectangle rendering ───────────────────────────────────
+func _draw() -> void:
+	if not _is_dragging:
+		return
+	if _drag_rect == Rect2.ZERO:
+		return
+	# Draw a semi-transparent blue fill
+	draw_rect(_drag_rect, Color(0.3, 0.5, 1.0, 0.25), filled=true)
+	# Draw a solid blue border
+	draw_rect(_drag_rect, Color(0.3, 0.5, 1.0, 0.8), filled=false, width=1)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not game_is_started or game_paused:
@@ -493,10 +566,29 @@ func _unhandled_input(event: InputEvent) -> void:
 	if get_viewport().gui_get_hovered_control() != null:
 		return
 
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var world_pos: Vector2 = get_global_mouse_position()
 
-		if event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			# Begin drag selection
+			_drag_start = world_pos
+			_is_dragging = false
+		else:
+			# Mouse button released — check for drag-to-select
+			if _is_dragging:
+				var own_unit: Node = _unit_at_point(world_pos, 0)
+				if own_unit == null:
+					# Dragged on empty ground — select all player units in rect
+					_clear_selection()
+					for unit in all_units:
+						if is_instance_valid(unit) and unit.faction == 0:
+							if _drag_rect.encloses(unit.get_bounds()):
+								select_unit(unit)
+				_is_dragging = false
+				queue_redraw()
+			return
+
+		if event.pressed:
 			# Build placement mode takes priority
 			if _pending_build_type != "":
 				_try_place_building(_pending_build_type, world_pos)
