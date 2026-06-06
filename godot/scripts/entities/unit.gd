@@ -239,8 +239,16 @@ func _apply_physics(delta: float) -> void:
 	position.y = new_y
 
 ## ── State Velocity Handlers ────────────────────────────────────────────────────
+var _auto_attack_timer: float = 0.0
+const _AUTO_ATTACK_INTERVAL: float = 0.5
+
 func _velocity_idle() -> void:
 	velocity.x = 0.0
+	# Scan for nearby enemies every half-second
+	_auto_attack_timer -= get_physics_process_delta_time()
+	if _auto_attack_timer <= 0.0:
+		_auto_attack_timer = _AUTO_ATTACK_INTERVAL
+		_scan_for_enemy()
 
 func _velocity_move_to_target() -> void:
 	# Horizontal-only steering — gravity owns the vertical axis
@@ -362,6 +370,23 @@ func deselect() -> void:
 	# Remove visual feedback
 	if sprite:
 		sprite.modulate = Color(1.0, 1.0, 1.0)  # Normal color
+
+func _scan_for_enemy() -> void:
+	var closest: Node = null
+	var closest_dist: float = attack_range
+	for enemy in get_tree().get_nodes_in_group("units"):
+		if not is_instance_valid(enemy) or enemy == self:
+			continue
+		if enemy.get("faction") == faction:
+			continue
+		if enemy.get("current_state") == State.DEAD:
+			continue
+		var d: float = global_position.distance_to(enemy.global_position)
+		if d < closest_dist:
+			closest_dist = d
+			closest = enemy
+	if closest != null:
+		attack_target(closest)
 
 ## ── Utility ───────────────────────────────────────────────────────────────────
 func get_facing() -> int:

@@ -454,10 +454,14 @@ func _try_place_building(btype: String, world_pos: Vector2) -> void:
 
 
 ## ── Input Handling ──────────────────────────────────────────────────────────
+var _last_click_time: float = 0.0
+var _last_click_pos: Vector2 = Vector2.ZERO
+const _DOUBLE_CLICK_SEC: float = 0.35
+const _DOUBLE_CLICK_PX: float = 20.0
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not game_is_started or game_paused:
 		return
-	# Ignore world clicks when the mouse is over any GUI element
 	if get_viewport().gui_get_hovered_control() != null:
 		return
 
@@ -471,47 +475,74 @@ func _unhandled_input(event: InputEvent) -> void:
 				_pending_build_type = ""
 				return
 
-			# Check for building click first
+			# Detect double-click
+			var now: float = Time.get_ticks_msec() / 1000.0
+			var is_double: bool = (now - _last_click_time < _DOUBLE_CLICK_SEC and
+				world_pos.distance_to(_last_click_pos) < _DOUBLE_CLICK_PX)
+			_last_click_time = now
+			_last_click_pos = world_pos
+
+			# Double-click on an enemy → attack order for selected units
+			if is_double and selected_units.size() > 0:
+				var enemy: Node = _unit_at_point(world_pos, -1)
+				if enemy != null:
+					for unit in selected_units:
+						if is_instance_valid(unit):
+							unit.attack_target(enemy)
+					return
+
+			# If units are already selected, left-click issues orders first
+			if selected_units.size() > 0:
+				var enemy: Node = _unit_at_point(world_pos, -1)
+				if enemy != null:
+					# Clicked directly on an enemy — attack order
+					for unit in selected_units:
+						if is_instance_valid(unit):
+							unit.attack_target(enemy)
+					return
+
+				# Not clicking on own unit — move order (or re-select if clicking own unit)
+				var own_unit: Node = _unit_at_point(world_pos, 0)
+				if own_unit == null:
+					# Empty ground or building → issue move command
+					for unit in selected_units:
+						if is_instance_valid(unit):
+							unit.move_to(world_pos)
+					return
+				# else fall through to re-select the clicked own unit
+
+			# Click on a player building
 			for building in all_buildings:
 				if not is_instance_valid(building) or building.faction != 0:
 					continue
 				var brect := Rect2(building.global_position, Vector2(building.world_width, building.world_height))
 				if brect.has_point(world_pos):
+					_clear_selection()
 					_select_building(building)
 					return
 
-			# Try to select a player unit (faction 0) whose body contains the click
+			# Click on a player unit → select it
 			var player_unit: Node = _unit_at_point(world_pos, 0)
 			if player_unit != null:
-				if _selected_building != null and is_instance_valid(_selected_building):
-					_selected_building.is_selected = false
-					_selected_building = null
-					hud.show_train_section(false)
+				_clear_building_selection()
 				select_unit(player_unit)
 				hud.update_selection_info(player_unit.unit_type.capitalize())
 			else:
-				if _selected_building != null and is_instance_valid(_selected_building):
-					_selected_building.is_selected = false
-					_selected_building = null
-					hud.show_train_section(false)
-				deselect_all()
-				hud.update_selection_info("")
+				# Clicked nothing — clear all selections
+				_clear_selection()
 
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			# Right-click: move or attack at target position
-			if selected_units.size() == 0:
-				return
 
-			# Check if there's an enemy unit at the target position
-			var enemy: Node = _unit_at_point(world_pos, -1)
+func _clear_building_selection() -> void:
+	if _selected_building != null and is_instance_valid(_selected_building):
+		_selected_building.is_selected = false
+		_selected_building = null
+		hud.show_train_section(false)
 
-			for unit in selected_units:
-				if not is_instance_valid(unit):
-					continue
-				if enemy != null:
-					unit.attack_target(enemy)
-				else:
-					unit.move_to(world_pos)
+
+func _clear_selection() -> void:
+	_clear_building_selection()
+	deselect_all()
+	hud.update_selection_info("")
 
 
 ## ── Selection ───────────────────────────────────────────────────────────────────
