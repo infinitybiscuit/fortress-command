@@ -253,9 +253,9 @@ godot --headless --export-release "Android" build/app.apk
 
 ---
 
-## 7. Original to Godot Reference (Pythonista 3 → Godot 4)
+## 7. Original to Godot Reference
 
-| Pythonista 3 Original | Godot 4 Equivalent |
+| Original | Godot 4 Equivalent |
 |---|---|
 | `scene` module | Godot's scene system (`Node2D`, `CharacterBody2D`, etc.) |
 | `scene.Scene` base class | `_process()` / `_physics_process()` loop |

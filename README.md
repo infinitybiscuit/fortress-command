@@ -80,4 +80,4 @@ Open `godot/project.godot` in Godot 4. The project uses GDScript with Godot's bu
 
 ## Credits
 
-Original Fortress Command for Pythonista 3 — Rick Dangerous / Lemmings / Command & Conquer inspired.
+Original Fortress Command — Rick Dangerous / Lemmings / Command & Conquer inspired.
