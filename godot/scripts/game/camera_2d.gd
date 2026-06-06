@@ -1,5 +1,5 @@
 ## Camera2D — Fortress Command RTS Camera Controller
-## Handles WASD/arrow pan, mouse-wheel zoom, and camera limits.
+## Handles smooth lerp pan, edge-scrolling, WASD/arrow pan, and camera limits.
 ## Attach to the Camera2D node in game_scene.tscn.
 
 class_name FortressCamera
@@ -7,6 +7,11 @@ extends Camera2D
 
 ## ── Movement ──────────────────────────────────────────────────────────────────
 const PAN_SPEED: float = 800.0  # pixels per second
+const LERP_FACTOR: float = 0.08  # smooth follow factor (0.08 = spec value)
+
+## ── Edge-scrolling ─────────────────────────────────────────────────────────────
+const EDGE_ZONE_PX: float = 40.0  # pixels from viewport edge to trigger auto-pan
+const EDGE_SCROLL_SPEED: float = 600.0  # pixels per second at viewport edge
 
 ## ── Zoom ───────────────────────────────────────────────────────────────────────
 const MIN_ZOOM: float = 0.25
@@ -34,7 +39,6 @@ func _ready() -> void:
 	make_current()
 
 func _process(delta: float) -> void:
-
 	var move: Vector2 = Vector2.ZERO
 
 	# WASD / Arrow keys
@@ -51,6 +55,27 @@ func _process(delta: float) -> void:
 		move = move.normalized() * PAN_SPEED * delta
 		_target_position += move
 
+	# ── Edge-scrolling: auto-pan when mouse is near viewport edge ──────────────
+	var vp_size: Vector2 = get_viewport_rect().size
+	var mouse_pos: Vector2 = get_global_mouse_position()
+	# Convert mouse to viewport-relative coordinates
+	var rel_x: float = mouse_pos.x
+	var rel_y: float = mouse_pos.y
+
+	var edge_move: Vector2 = Vector2.ZERO
+	if rel_x < EDGE_ZONE_PX:
+		edge_move.x -= 1.0
+	elif rel_x > vp_size.x - EDGE_ZONE_PX:
+		edge_move.x += 1.0
+	if rel_y < EDGE_ZONE_PX:
+		edge_move.y -= 1.0
+	elif rel_y > vp_size.y - EDGE_ZONE_PX:
+		edge_move.y += 1.0
+
+	if edge_move.length() > 0.0:
+		edge_move = edge_move.normalized() * EDGE_SCROLL_SPEED * delta
+		_target_position += edge_move
+
 	# Mouse wheel zoom
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_WHEEL_UP):
 		var new_zoom: Vector2 = Vector2(zoom.x - ZOOM_STEP, zoom.y - ZOOM_STEP)
@@ -59,10 +84,11 @@ func _process(delta: float) -> void:
 		var new_zoom: Vector2 = Vector2(zoom.x + ZOOM_STEP, zoom.y + ZOOM_STEP)
 		zoom = new_zoom.clamp(Vector2(MIN_ZOOM, MIN_ZOOM), Vector2(MAX_ZOOM, MAX_ZOOM))
 
-	# Apply clamped to world bounds
+	# ── Smooth lerp toward target ──────────────────────────────────────────────
 	if _target_position != position:
 		var half_extent: Vector2 = (get_viewport_rect().size / 2.0) / zoom
 		var new_pos: Vector2 = _target_position
 		new_pos.x = clamp(new_pos.x, half_extent.x, WORLD_WIDTH - half_extent.x)
 		new_pos.y = clamp(new_pos.y, half_extent.y, WORLD_HEIGHT - half_extent.y)
-		position = new_pos
+		# Smooth lerp — the key fix for smooth camera movement
+		position = position.lerp(new_pos, LERP_FACTOR)
