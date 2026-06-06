@@ -38,7 +38,7 @@ var _selected_building: Node = null
 ## Drag-selection state
 var _drag_start: Vector2 = Vector2.ZERO
 var _is_dragging: bool = false
-var _drag_rect: Rect2 = Rect2.ZERO
+var _drag_rect: Rect2 = Rect2()  # Default Rect2: pos=(0,0), size=(0,0)
 
 ## Build placement state
 var _pending_build_type: String = ""
@@ -553,7 +553,7 @@ func _input(event: InputEvent) -> void:
 func _draw() -> void:
 	if not _is_dragging:
 		return
-	if _drag_rect == Rect2.ZERO:
+	if _drag_rect.size == Vector2.ZERO:
 		return
 	# Draw a semi-transparent blue fill
 	draw_rect(_drag_rect, Color(0.3, 0.5, 1.0, 0.25), true)
