@@ -299,14 +299,15 @@ func attack_target(target: Node) -> void:
 func fire_at_target() -> void:
 	if attack_target_ref == null or not is_instance_valid(attack_target_ref):
 		return
-	
+
 	# Update cooldown
 	if attack_cooldown_timer > 0.0:
 		return
 	attack_cooldown_timer = attack_cooldown
-	
+
 	# Check range
 	var distance: float = global_position.distance_to(attack_target_ref.global_position)
+	print("FIRE: ", unit_type, " -> ", attack_target_ref.get("unit_type", "??"), " range=", distance, " attack_range=", attack_range, " cooldown=", attack_cooldown_timer)
 	if distance <= attack_range:
 		# Damage is applied by the spawned projectile on impact
 		attack_fired.emit(attack_target_ref, attack_damage)
@@ -314,12 +315,14 @@ func fire_at_target() -> void:
 func take_damage(amount: float) -> void:
 	if current_state == State.DEAD:
 		return
-	
+
 	health -= amount
 	health_changed.emit(health, max_health)
-	
+	print("TAKE_DAMAGE: ", unit_type, " faction=", faction, " health=", health, " dmg=", amount)
+
 	if health <= 0.0:
 		health = 0.0
+		print("DIE: ", unit_type, " faction=", faction)
 		die()
 
 func die() -> void:

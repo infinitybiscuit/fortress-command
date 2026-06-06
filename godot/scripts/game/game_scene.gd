@@ -176,11 +176,13 @@ func _process_ai_player(player_idx: int) -> void:
 				best_dist = d
 				best_target = enemy
 
+	print("AI(", player_idx, "): ai_units=", ai_units.size(), " enemies=", enemies.size(), " best_target=", best_target.get("unit_type", best_target.get("building_type", "??")) if best_target != null else "null", " dist=", best_dist)
 	if best_target != null and best_dist < 800.0:
 		for ai_unit in ai_units:
 			if not is_instance_valid(ai_unit):
 				continue
 			if ai_unit.current_state != ai_unit.State.DEAD:
+				print("AI(", player_idx, "): ordering attack from ", ai_unit.unit_type, " -> ", best_target.get("unit_type", best_target.get("building_type", "??")))
 				ai_unit.attack_target(best_target)
 
 ## ── Game Mode Setup ──────────────────────────────────────────────────────────────
@@ -345,6 +347,7 @@ const _PROJECTILE_SCRIPT: GDScript = preload("res://scripts/entities/projectile.
 func _on_attacker_fired(target: Node, damage: float, shooter: Node) -> void:
 	if not is_instance_valid(shooter) or not is_instance_valid(target):
 		return
+	print("SPAWN_PROJECTILE: from=", shooter.get("unit_type", "???"), " -> target=", target.get("unit_type", target.get("building_type", "???")), " dmg=", damage)
 	var from_pos: Vector2 = shooter.global_position
 	# Units originate at their feet; lift the muzzle toward the body centre
 	if shooter is CharacterBody2D:
@@ -529,9 +532,8 @@ const _DOUBLE_CLICK_PX: float = 20.0
 const _DRAG_MIN_DISTANCE: float = 10.0
 
 ## Tracks mouse motion to build a drag-selection rectangle while the left button is held.
+## _is_dragging is set to false on mouse-press and becomes true once real drag is detected.
 func _input(event: InputEvent) -> void:
-	if not _is_dragging:
-		return
 	if not (event is InputEventMouseMotion):
 		return
 	var world_pos: Vector2 = get_global_mouse_position()
