@@ -367,6 +367,14 @@ func deselect() -> void:
 func get_facing() -> int:
 	return 1 if velocity.x >= 0.0 else -1
 
+## Drawn bounding box in world space (global_position is the unit's feet)
+func get_bounds() -> Rect2:
+	return Rect2(global_position - Vector2(_body_w / 2.0, _body_h), Vector2(_body_w, _body_h))
+
+## True if a world point falls within the unit's body (with a little click padding)
+func contains_point(world_point: Vector2) -> bool:
+	return get_bounds().grow(6.0).has_point(world_point)
+
 ## ── Cooldown Timer Update ──────────────────────────────────────────────────────
 func _process(delta: float) -> void:
 	if attack_cooldown_timer > 0.0:

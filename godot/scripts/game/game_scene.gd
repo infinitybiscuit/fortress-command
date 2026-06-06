@@ -480,13 +480,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					_select_building(building)
 					return
 
-			# Try to select a unit (player faction 0) near click position
-			var nearby: Array = get_units_at_position(world_pos, 24.0)
-			var player_unit: Node = null
-			for u in nearby:
-				if is_instance_valid(u) and u.faction == 0:
-					player_unit = u
-					break
+			# Try to select a player unit (faction 0) whose body contains the click
+			var player_unit: Node = _unit_at_point(world_pos, 0)
 			if player_unit != null:
 				if _selected_building != null and is_instance_valid(_selected_building):
 					_selected_building.is_selected = false
@@ -507,13 +502,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			if selected_units.size() == 0:
 				return
 
-			# Check if there's an enemy unit at target
-			var nearby: Array = get_units_at_position(world_pos, 24.0)
-			var enemy: Node = null
-			for u in nearby:
-				if is_instance_valid(u) and u.faction != 0:
-					enemy = u
-					break
+			# Check if there's an enemy unit at the target position
+			var enemy: Node = _unit_at_point(world_pos, -1)
 
 			for unit in selected_units:
 				if not is_instance_valid(unit):
@@ -551,6 +541,21 @@ func get_units_at_position(position: Vector2, radius: float = 32.0) -> Array:
 		if is_instance_valid(unit) and unit.global_position.distance_to(position) <= radius:
 			result.append(unit)
 	return result
+
+## Returns the first unit whose body contains the point.
+## faction_filter: 0+ to require that faction, -1 to require any NON-zero (enemy) faction.
+func _unit_at_point(world_point: Vector2, faction_filter: int) -> Node:
+	for unit in all_units:
+		if not is_instance_valid(unit):
+			continue
+		if faction_filter == -1:
+			if unit.faction == 0:
+				continue
+		elif unit.faction != faction_filter:
+			continue
+		if unit.contains_point(world_point):
+			return unit
+	return null
 
 func get_buildings_for_faction(faction: int) -> Array:
 	var result: Array = []
