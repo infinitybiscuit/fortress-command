@@ -427,6 +427,8 @@ func _select_building(building: Node) -> void:
 			})
 		hud.populate_train_list(train_entries)
 		hud.show_train_section(true)
+		# Auto-open the menu so the train options are actually visible
+		hud.open_build_menu()
 	else:
 		hud.show_train_section(false)
 

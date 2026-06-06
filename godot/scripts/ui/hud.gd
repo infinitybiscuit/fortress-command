@@ -86,6 +86,15 @@ func toggle_build_menu() -> void:
 	_set_build_menu_open(!_build_menu_open)
 
 
+func open_build_menu() -> void:
+	if not _build_menu_open:
+		_set_build_menu_open(true)
+
+
+func is_build_menu_open() -> bool:
+	return _build_menu_open
+
+
 func _set_build_menu_open(open: bool) -> void:
 	_build_menu_open = open
 
