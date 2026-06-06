@@ -556,9 +556,9 @@ func _draw() -> void:
 	if _drag_rect == Rect2.ZERO:
 		return
 	# Draw a semi-transparent blue fill
-	draw_rect(_drag_rect, Color(0.3, 0.5, 1.0, 0.25), filled=true)
+	draw_rect(_drag_rect, Color(0.3, 0.5, 1.0, 0.25), true)
 	# Draw a solid blue border
-	draw_rect(_drag_rect, Color(0.3, 0.5, 1.0, 0.8), filled=false, width=1)
+	draw_rect(_drag_rect, Color(0.3, 0.5, 1.0, 0.8), false, 1)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not game_is_started or game_paused:
