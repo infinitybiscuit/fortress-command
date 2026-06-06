@@ -106,11 +106,23 @@ signal state_changed(new_state: State)
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 
+## Reference to the tilemap for manual tile collision (set on spawn; falls back to group)
+var tilemap_ref: Node = null
+var on_ground: bool = false
+var _body_w: float = 16.0
+var _body_h: float = 24.0
+
 ## ── Initialization ──────────────────────────────────────────────────────────────
 func _ready() -> void:
 	_load_stats()
 	add_to_group("units")
 	current_state = State.IDLE
+	# Cache body dimensions from the collision shape for tile collision
+	if collision_shape and collision_shape.shape is RectangleShape2D:
+		_body_w = collision_shape.shape.size.x
+		_body_h = collision_shape.shape.size.y
+	if tilemap_ref == null:
+		tilemap_ref = get_tree().get_first_node_in_group("tilemap")
 
 ## ── Rendering ─────────────────────────────────────────────────────────────────
 func _draw() -> void:
@@ -137,16 +149,11 @@ func _load_stats() -> void:
 func _physics_process(delta: float) -> void:
 	# Clamp delta to prevent large jumps on lag spikes
 	delta = min(delta, 0.25)
-	
+
 	# Trigger redraw every frame — _draw() only fires when queue_redraw() is called
 	queue_redraw()
-	
-	# Apply gravity
-	if not is_on_floor():
-		velocity.y += GRAVITY * delta
-		velocity.y = min(velocity.y, TERMINAL_VELOCITY)
-	
-	# Handle state-based behavior
+
+	# Handle state-based behavior (sets velocity.x)
 	match current_state:
 		State.IDLE:
 			_velocity_idle()
@@ -158,21 +165,91 @@ func _physics_process(delta: float) -> void:
 			_velocity_repair(delta)
 		State.DEAD:
 			velocity = Vector2.ZERO
-	
-	# Apply movement
-	move_and_slide()
+
+	# Manual tile-based physics (the tilemap has no Godot collision bodies)
+	_apply_physics(delta)
+
+## Manual AABB tile collision against the tilemap, ported from the JS version.
+## Treats global_position as the unit's bottom-centre (feet).
+func _apply_physics(delta: float) -> void:
+	if tilemap_ref == null:
+		tilemap_ref = get_tree().get_first_node_in_group("tilemap")
+	if tilemap_ref == null:
+		return
+
+	var ts: int = 32
+	var half_w: float = _body_w / 2.0
+	var h: float = _body_h
+
+	# Gravity
+	velocity.y += GRAVITY * delta
+	if velocity.y > TERMINAL_VELOCITY:
+		velocity.y = TERMINAL_VELOCITY
+
+	# ── Horizontal movement with collision ──
+	var new_x: float = position.x + velocity.x * delta
+	if velocity.x != 0.0:
+		var dir: int = 1 if velocity.x > 0.0 else -1
+		var probe_x: float = new_x + dir * half_w
+		var tx: int = int(floor(probe_x / ts))
+		var ty_top: int = int(floor((position.y - h + 2.0) / ts))
+		var ty_bot: int = int(floor((position.y - 2.0) / ts))
+		var blocked: bool = false
+		for ty in range(ty_top, ty_bot + 1):
+			if tilemap_ref.is_solid(tx, ty):
+				blocked = true
+				break
+		if blocked:
+			if dir > 0:
+				new_x = tx * ts - half_w
+			else:
+				new_x = (tx + 1) * ts + half_w
+			velocity.x = 0.0
+	position.x = new_x
+
+	# ── Vertical movement with sweep collision ──
+	var new_y: float = position.y + velocity.y * delta
+	var tx_l: int = int(floor((position.x - half_w + 2.0) / ts))
+	var tx_r: int = int(floor((position.x + half_w - 2.0) / ts))
+	on_ground = false
+
+	if velocity.y >= 0.0:
+		# Moving down — sweep every row from old feet to new feet
+		var old_feet: int = int(floor(position.y / ts))
+		var new_feet: int = int(floor(new_y / ts))
+		var landed: bool = false
+		for ty in range(old_feet, new_feet + 1):
+			for tx2 in range(tx_l, tx_r + 1):
+				if tilemap_ref.is_solid(tx2, ty):
+					new_y = ty * ts
+					velocity.y = 0.0
+					on_ground = true
+					landed = true
+					break
+			if landed:
+				break
+	else:
+		# Moving up — check the head row
+		var head_ty: int = int(floor((new_y - h) / ts))
+		for tx2 in range(tx_l, tx_r + 1):
+			if tilemap_ref.is_solid(tx2, head_ty):
+				new_y = (head_ty + 1) * ts + h
+				velocity.y = 0.0
+				break
+	position.y = new_y
 
 ## ── State Velocity Handlers ────────────────────────────────────────────────────
 func _velocity_idle() -> void:
 	velocity.x = 0.0
 
 func _velocity_move_to_target() -> void:
-	var direction: Vector2 = (move_target - global_position).normalized()
-	velocity.x = direction.x * speed
-	# Stop when close to target
-	if global_position.distance_to(move_target) < 5.0:
-		_set_state(State.IDLE)
+	# Horizontal-only steering — gravity owns the vertical axis
+	var dx: float = move_target.x - global_position.x
+	if abs(dx) < 6.0:
 		velocity.x = 0.0
+		_set_state(State.IDLE)
+	else:
+		velocity.x = sign(dx) * speed
 
 func _velocity_attack() -> void:
 	velocity.x = 0.0

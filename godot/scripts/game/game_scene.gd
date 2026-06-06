@@ -274,7 +274,8 @@ func spawn_unit(unit_type: String, position: Vector2, faction: int) -> Node:
 	unit.unit_type = unit_type
 	unit.faction = faction
 	unit.global_position = position
-	
+	unit.tilemap_ref = tilemap
+
 	# Add to scene and tracking arrays
 	units_node.add_child(unit)
 	all_units.append(unit)
@@ -336,9 +337,10 @@ func _on_building_destroyed(building: Node) -> void:
 
 
 func _on_unit_trained(unit_type: String, source_building: Node) -> void:
-	# Spawn the trained unit near the building's exit
-	var spawn_pos: Vector2 = source_building.global_position + Vector2(source_building.world_width + 8, 0)
-	spawn_unit(unit_type, spawn_pos, source_building.faction)
+	# Spawn at the building's bottom edge (feet on the ground next to it)
+	var spawn_x: float = source_building.global_position.x + source_building.world_width + 8.0
+	var spawn_y: float = source_building.global_position.y + source_building.world_height
+	spawn_unit(unit_type, Vector2(spawn_x, spawn_y), source_building.faction)
 
 
 func _check_game_over() -> void:

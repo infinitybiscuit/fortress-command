@@ -32,10 +32,11 @@ var _unit_blocking_tiles: Dictionary = {}
 
 ## ── Initialisation ───────────────────────────────────────────────────────────
 func _init() -> void:
-	print("GameTileMap _init — MAP_WIDTH=", MAP_WIDTH, " MAP_HEIGHT=", MAP_HEIGHT)
-	print("  ground_surface_tile_y()=", ground_surface_tile_y())
 	_clear_tiles()
 	generate()
+
+func _ready() -> void:
+	add_to_group("tilemap")
 
 func _clear_tiles() -> void:
 	tiles = []
