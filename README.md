@@ -1,12 +1,12 @@
 # Fortress Command
 
-A side-scrolling platformer / RTS crossover game that runs in any modern browser — desktop and mobile.
+A side-scrolling platformer / RTS crossover built in Godot 4.
 
 Build bases, train armies, construct defences, and conquer the opposing forces across a procedurally generated battlefield.
 
 ## How to Play
 
-Open `index.html` in any browser. No server required.
+Open the project in Godot 4 (editior or exported binary). Select a scene under `godot/scenes/game/` and press F5 to run.
 
 ### Controls
 
@@ -50,42 +50,33 @@ Open the build menu (`▸` tab) to place structures:
 
 Units are trained by selecting a barracks or workshop, then tapping a unit type in the build menu.
 
-## Architecture
-
-Single HTML file (~1900 lines) with vanilla JavaScript + HTML5 Canvas. No build step, no npm, no external runtime dependencies.
+## Project Structure
 
 ```
-index.html
- ├── HTML skeleton + CSS (UI overlays, HUD, menus)
- ├── CONFIG          — all game constants
- ├── TileMap         — procedural terrain
- ├── Camera          — scrolling camera with lerp
- ├── Unit            — unit entity with platformer physics
- ├── Building        — building entity with construction/training
- ├── Projectile      — flying projectiles
- ├── Player          — base player class
- ├── HumanPlayer     — touch/mouse input handling
- ├── CpuPlayer       — AI decision-making
- ├── CombatSystem    — attack resolution, projectiles
- ├── EconomySystem   — per-tick credit generation
- ├── InputHandler    — unified pointer + keyboard input
- ├── Renderer        — all canvas draw calls
- ├── MinimapRenderer — minimap draw pass
- └── FortressCommand — main game loop + scene management
-```
-
-## Deploy
-
-```bash
-git push origin main
-# Then enable GitHub Pages:
-# Repository Settings → Pages → Source: main branch, / (root)
-# Game lives at: https://infinitybiscuit.github.io/fortress-command/
+fortress-command/
+├── godot/
+│   ├── project.godot          ← Godot 4 project file
+│   ├── scenes/
+│   │   ├── root.tscn          ← root scene
+│   │   ├── game/              ← game scenes
+│   │   ├── entities/          ← unit & building scenes
+│   │   └── ui/                ← HUD, menus, build menu
+│   └── scripts/
+│       ├── root.gd            ← project entry point
+│       ├── autoload/          ← singleton systems
+│       ├── entities/          ← unit & building scripts
+│       ├── game/              ← game logic scripts
+│       └── ui/                ← UI scripts
+├── entities.txt               ← unit definitions
+├── foundation.txt             ← building/terrain definitions
+├── SPEC.md                    ← design specification
+├── README.md                  ← this file
+└── LICENSE                    ← MIT
 ```
 
 ## Development
 
-All game logic lives in `index.html`. Edit in any text editor — refresh the browser to see changes.
+Open `godot/project.godot` in Godot 4. The project uses GDScript with Godot's built-in scene system.
 
 ## Credits
 

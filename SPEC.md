@@ -1,17 +1,17 @@
-# Fortress Command — Web Port Spec
+# Fortress Command — Godot Spec
 
 ## 1. Concept & Vision
 
-**Fortress Command** is a side-scrolling platformer/RTS crossover that runs in any modern browser — desktop and mobile. Players build bases on procedurally generated terrain, train armies, and crush the opposition. The feel is nostalgic Command & Conquer meets Lemmings: chunky pixel-adjacent art drawn procedurally, satisfying micro-management, and frantic platformer traversal.
+**Fortress Command** is a side-scrolling platformer/RTS crossover built in Godot 4. Players build bases on procedurally generated terrain, train armies, and crush the opposition. The feel is nostalgic Command & Conquer meets Lemmings: chunky pixel-adjacent art drawn procedurally, satisfying micro-management, and frantic platformer traversal.
 
-**Target:** Single HTML file (no build step) using vanilla JS + HTML5 Canvas. Deployable to GitHub Pages or any static host. Touch-first mobile design with desktop keyboard/mouse support.
+**Target:** Godot 4 project using GDScript and Godot's built-in scene system. Export to desktop and mobile platforms. Touch-first mobile design with desktop keyboard/mouse support.
 
 ---
 
 ## 2. Design Language
 
 ### Aesthetic Direction
-Retro pixel-art-adjacent but drawn procedurally with Canvas primitives — bold flat colors, clean geometric shapes, no external sprites.
+Retro pixel-art-adjacent but drawn procedurally with Godot's `ColorRect`, `Sprite2D`, and Shape2D primitives — bold flat colors, clean geometric shapes, no external sprite dependencies required.
 
 ### Color Palette
 ```
@@ -30,9 +30,9 @@ Damage flash:      #FFFFFF
 ```
 
 ### Typography
-- Primary: `'Courier New', monospace` for terminal feel
+- Primary: Godot's built-in font (system default)
 - HUD: bold, 14–20px, high contrast
-- No external font dependencies (inline everything)
+- No external font dependencies
 
 ### Spatial System
 - Tile size: 32px (same as original)
@@ -48,11 +48,11 @@ Damage flash:      #FFFFFF
 - Building placement: green/red tile preview for valid/invalid placement
 
 ### Visual Assets
-- All drawn procedurally with Canvas 2D API — no external images or sprites
-- Units: colored rounded rectangles with facing triangle
+- All drawn procedurally with Godot 2D primitives — no external images or sprites required
+- Units: colored rounded rectangles with facing triangle (via `Polygon2D` or `ColorRect`)
 - Buildings: outlined rectangles with type-specific interior marks
 - Terrain: solid color rectangles per tile type
-- Projectiles: yellow filled circles
+- Projectiles: yellow filled circles (`CircleShape2D` + `ColorRect`)
 
 ---
 
@@ -72,13 +72,13 @@ Damage flash:      #FFFFFF
 ├────────┬────────────────────────┬───────┤
 │ Build  │                        │Minimap│
 │ Menu   │   Scrolling Game World  │(180×40│
-│(260px) │      (main canvas)      │       │
+│(260px) │      (main viewport)    │       │
 │        │                        │       │
 └────────┴────────────────────────┴───────┘
 ```
 
 ### Responsive Strategy
-- Canvas fills entire viewport at device pixel ratio
+- Viewport fills entire window at device pixel ratio
 - Build menu: fixed 260px on desktop; full-width bottom sheet on mobile (< 600px wide)
 - All touch targets minimum 44px for mobile accessibility
 - HUD font scales with viewport width (clamp between 12–20px)
@@ -126,20 +126,20 @@ Damage flash:      #FFFFFF
 5. Units walk forward from building exit
 
 ### Edge Cases
-- Can't afford building/unit: button disabled (opacity 0.4, no response)
+- Can't afford building/unit: button disabled (modulate alpha 0.4, no response)
 - Building placement on solid ground only: red preview if invalid
 - Overlapping buildings: prohibited, red preview
 - Game over: all input blocked until Restart/Menu tapped
-- Window resize: canvas scales, game continues
-- Tab hidden: `requestAnimationFrame` pauses naturally (browser throttles)
+- Window resize: viewport scales, game continues
+- Tab hidden: `process` loop pauses naturally (Godot throttles)
 
 ---
 
 ## 5. Component Inventory
 
 ### HUD Bar
-- Left: `💰 340  (+5/s)` — credits + income rate
-- Center: selected unit/building info — `SOLDIER  HP: 23/30`
+- Left: credits + income rate
+- Center: selected unit/building info
 - Right: current game mode label
 - States: normal; low-credit warning (red text when credits < 50)
 
@@ -173,12 +173,12 @@ Damage flash:      #FFFFFF
 - Selected: green ring (2px, full unit height)
 - Damaged: white overlay flash for 150ms
 - HP bar: only shown when damaged or selected (small bar above unit)
-- Dead: removed from render
+- Dead: removed from scene
 
 ### Building Visual States
 - Under construction: outlined rectangle + progress bar fill
 - Operational: filled rectangle + type-specific interior detail (HQ flag, turret barrel, etc.)
-- Destroyed: removed from render
+- Destroyed: removed from scene
 - Selected: green ring around building footprint
 
 ---
@@ -186,124 +186,87 @@ Damage flash:      #FFFFFF
 ## 6. Technical Approach
 
 ### Stack
-- Single self-contained `index.html` — HTML + CSS + JavaScript in one file
-- Vanilla JavaScript ES6+ (no TypeScript, no build step)
-- HTML5 Canvas 2D API for all game rendering
-- HTML/CSS overlay for HUD, menus (cleaner than pure canvas text)
-- No runtime dependencies — works offline after first load
-- Google Fonts CDN for typography (optional, falls back to system monospace)
+- Godot 4.x with GDScript
+- Godot's built-in 2D scene system (no external engines)
+- `Node2D`-based scenes for all game entities
+- `CharacterBody2D` for units (platformer physics)
+- `Area2D` / `StaticBody2D` for buildings and terrain
+- `Camera2D` for viewport scrolling
 
 ### Architecture
 
-```javascript
-// All code lives in a single <script> block
-
-// === CONFIG (ported from Python config.py) ===
-const CONFIG = { TILE_SIZE: 32, MAP_WIDTH_TILES: 200, ... }
-
-// === MATH / UTILITY ===
-class Vec2 { add, sub, scale, length, normalize, ... }
-
-// === WORLD ===
-class TileMap { generate(), isSolid(), canPlaceBuilding(), ... }
-class Camera { x, targetX, focusOn(), update(), worldToScreen(), screenToWorld() }
-
-// === ENTITIES ===
-class Unit { update(), takeDamage(), performAttack(), ... }
-class Building { update(), queueTrain(), ... }
-class Projectile { update(), ... }
-
-// === INPUT ===
-class InputHandler { handlePointerDown/Move/Up(), handleKeyDown/Up() }
-
-// === SYSTEMS ===
-class CombatSystem { resolveAttacks(), ... }
-class EconomySystem { tick(), ... }
-
-// === PLAYERS ===
-class CpuPlayer { update(), ... }
-class HumanPlayer { issueOrder(), ... }
-
-// === SCENES ===
-class SceneManager { currentScene, transition(), ... }
-
-// === RENDERING ===
-class Renderer { drawUnit(), drawBuilding(), drawTerrain(), ... }
-
-// === MINIMAP ===
-class MinimapRenderer { render(), ... }
-
-// === BOOT ===
-function main() { ... }
 ```
-
-### Input
-- Pointer Events API (`pointerdown`, `pointermove`, `pointerup`) for unified mouse + touch
-- `touch-action: none` on canvas to prevent browser gestures
-- `Keyboard` events for desktop shortcuts (Q=menu, Esc=deselect, 1-4 not mapped in v1)
-- Touch: left-edge swipe (30px threshold) opens build menu
-- `event.preventDefault()` blocks scroll/zoom on mobile
+godot/
+├── project.godot          ← project manifest + settings
+├── scenes/
+│   ├── root.tscn         ← main entry scene (boot)
+│   ├── game/
+│   │   ├── game.tscn      ← main game scene
+│   │   └── ...            ← game-specific scenes
+│   ├── entities/
+│   │   ├── unit.tscn      ← base unit scene
+│   │   ├── building.tscn   ← base building scene
+│   │   ├── projectile.tscn ← projectile scene
+│   │   └── ...            ← entity variants
+│   └── ui/
+│       ├── hud.tscn       ← heads-up display
+│       ├── build_menu.tscn ← structure placement UI
+│       └── ...
+└── scripts/
+    ├── root.gd            ← project entry point
+    ├── autoload/
+    │   ├── config.gd      ← all game constants (singleton)
+    │   ├── combat.gd      ← attack resolution
+    │   ├── economy.gd     ← per-tick credit generation
+    │   └── ai.gd          ← CPU player decision-making
+    ├── entities/
+    │   ├── unit.gd        ← unit entity logic
+    │   ├── building.gd     ← building logic
+    │   └── projectile.gd   ← projectile logic
+    ├── game/
+    │   ├── tile_map.gd    ← procedural terrain
+    │   ├── camera.gd      ← scrolling camera
+    │   └── scene_game.gd  ← main game scene logic
+    └── ui/
+        ├── hud.gd         ← HUD logic
+        └── build_menu.gd  ← build menu logic
+```
 
 ### Physics (unchanged from original)
 - Gravity: 900 px/s²
 - Terminal velocity: 600 px/s
 - Jump velocity: -360 px/s (negative = upward)
 - Separate-axis AABB tile collision (horizontal resolved, then vertical)
-- `int()` replaced with `Math.floor()` for tile coordinate conversion (fixes Python bug)
 
 ### Game Loop
-```javascript
-let lastTime = 0;
-function loop(timestamp) {
-  const dt = Math.min((timestamp - lastTime) / 1000, 0.25);
-  lastTime = timestamp;
-  if (scene !== 'game_over') {
-    update(dt);
-  }
-  render();
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
-```
-
-### Responsive Canvas
-```javascript
-function resizeCanvas() {
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = window.innerWidth * dpr;
-  canvas.height = window.innerHeight * dpr;
-  canvas.style.width = window.innerWidth + 'px';
-  canvas.style.height = window.innerHeight + 'px';
-  ctx.scale(dpr, dpr);
-}
-window.addEventListener('resize', resizeCanvas);
-```
+Godot's built-in `_process()` / `_physics_process()` delta loop. No custom loop required.
 
 ### Deploy
-```
-https://github.com/infinitybiscuit/fortress-command
-→ Settings → Pages → Source: main branch, / (root)
-→ Game live at: https://infinitybiscuit.github.io/fortress-command/
+Export via Godot's built-in export presets:
+```bash
+# Desktop (Linux/Windows/macOS)
+godot --headless --export-release "Linux/X11" build/
+
+# Mobile (Android/iOS)
+godot --headless --export-release "Android" build/app.apk
 ```
 
 ---
 
-## 7. Porting Reference (Python → JavaScript)
+## 7. Original to Godot Reference (Pythonista 3 → Godot 4)
 
-| Python Original | Web Port |
+| Pythonista 3 Original | Godot 4 Equivalent |
 |---|---|
-| `scene` module (Pythonista) | HTML5 Canvas 2D API |
-| `scene.Scene` base class | Custom `GameScene` class with `update()` loop |
-| `scene.run(scene)` | `requestAnimationFrame` |
-| `scene.Touch` | Pointer Events API |
-| `scene.Shape` drawing | Canvas 2D `fillRect`, `strokeRect`, arcs |
-| TileMap via Python `random` seed | `Math.random()` (no seed for true variation) |
-| `int()` truncation for negative coords | `Math.floor()` (fixes original bug) |
-| `__init__.py` module pattern | ES6 classes in single file |
-| File-based module imports | Class definitions in script order |
+| `scene` module | Godot's scene system (`Node2D`, `CharacterBody2D`, etc.) |
+| `scene.Scene` base class | `_process()` / `_physics_process()` loop |
+| `scene.run(scene)` | Press F5 in editor or `--headless --export` |
+| `scene.Touch` | `InputEventScreenTouch` / `InputEventMouseButton` |
+| `scene.Shape` drawing | `ColorRect`, `Polygon2D`, `CircleShape2D` |
+| TileMap via Python `random` seed | `ConfigFile` or inline `randi()` / `randf()` |
+| `int()` truncation for negative coords | `int()` (GDScript truncates toward zero; use `floor()` for flooring) |
+| Config dicts from `config.py` | `config.gd` autoload singleton |
 | Hardcoded `seed=42` | Removed — different map every play |
 | No audio | Audio deferred to v2 |
-| Config dicts from `config.py` | `CONFIG` object literal |
 
 ---
 
@@ -311,8 +274,22 @@ https://github.com/infinitybiscuit/fortress-command
 
 ```
 fortress-command/
-├── index.html    ← single-file game (HTML+CSS+JS, ~1500–2000 lines)
-├── SPEC.md       ← this file
-├── README.md     ← how to play, controls, deploy notes
-└── LICENSE       ← MIT
+├── godot/
+│   ├── project.godot          ← Godot 4 project file
+│   ├── scenes/
+│   │   ├── root.tscn          ← root scene
+│   │   ├── game/              ← game scenes
+│   │   ├── entities/          ← unit & building scenes
+│   │   └── ui/                ← HUD, menus, build menu
+│   └── scripts/
+│       ├── root.gd            ← project entry point
+│       ├── autoload/           ← singleton systems
+│       ├── entities/          ← unit & building scripts
+│       ├── game/              ← game logic scripts
+│       └── ui/                ← UI scripts
+├── entities.txt               ← unit definitions
+├── foundation.txt             ← building/terrain definitions
+├── SPEC.md                    ← this file
+├── README.md                 ← how to play, setup, project layout
+└── LICENSE                   ← MIT
 ```
