@@ -218,11 +218,9 @@ func _attack_target(target: Node) -> void:
 	if target == null or not is_instance_valid(target):
 		return
 	
-	# Fire attack
+	# Fire attack — damage is applied by the spawned projectile on impact
 	attack_timer = attack_rate
 	if target.has_method("take_damage"):
-		target.take_damage(attack_damage)
-		# Emit signal for projectile/effects system
 		emit_signal("attack_fired", target, attack_damage)
 
 signal attack_fired(target: Node, damage: float)

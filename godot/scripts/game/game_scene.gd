@@ -284,7 +284,11 @@ func spawn_unit(unit_type: String, position: Vector2, faction: int) -> Node:
 	# Connect unit death signal
 	if unit.has_signal("unit_died"):
 		unit.unit_died.connect(_on_unit_died.bind(unit))
-	
+
+	# Spawn a projectile when this unit fires
+	if unit.has_signal("attack_fired"):
+		unit.attack_fired.connect(_on_attacker_fired.bind(unit))
+
 	unit_spawned.emit(unit)
 	return unit
 
@@ -292,6 +296,26 @@ func _on_unit_died(unit: Node) -> void:
 	# Remove from tracking arrays
 	all_units.erase(unit)
 	selected_units.erase(unit)
+
+## ── Projectiles ──────────────────────────────────────────────────────────────────
+const _PROJECTILE_SCRIPT: GDScript = preload("res://scripts/entities/projectile.gd")
+
+## Called when any unit or building fires; spawns a visual projectile that
+## carries the damage and applies it to the target on impact.
+func _on_attacker_fired(target: Node, damage: float, shooter: Node) -> void:
+	if not is_instance_valid(shooter) or not is_instance_valid(target):
+		return
+	var from_pos: Vector2 = shooter.global_position
+	# Units originate at their feet; lift the muzzle toward the body centre
+	if shooter is CharacterBody2D:
+		from_pos -= Vector2(0, 14)
+	else:
+		# Buildings originate at top-left; fire from their centre
+		from_pos += Vector2(shooter.world_width * 0.5, shooter.world_height * 0.5)
+
+	var proj: Node2D = _PROJECTILE_SCRIPT.new()
+	add_child(proj)
+	proj.setup(from_pos, target, damage, shooter.faction)
 
 ## ── Building Spawning ────────────────────────────────────────────────────────────
 func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> Node:
@@ -320,6 +344,10 @@ func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> 
 	# Wire unit_trained signal so trained units actually spawn
 	if building.has_signal("unit_trained"):
 		building.unit_trained.connect(_on_unit_trained.bind(building))
+
+	# Spawn a projectile when this building (e.g. turret) fires
+	if building.has_signal("attack_fired"):
+		building.attack_fired.connect(_on_attacker_fired.bind(building))
 	
 	building_spawned.emit(building)
 	return building
@@ -489,6 +517,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					for unit in selected_units:
 						if is_instance_valid(unit):
 							unit.attack_target(enemy)
+					_clear_selection()
 					return
 
 			# If units are already selected, left-click issues orders first
@@ -499,15 +528,17 @@ func _unhandled_input(event: InputEvent) -> void:
 					for unit in selected_units:
 						if is_instance_valid(unit):
 							unit.attack_target(enemy)
+					_clear_selection()
 					return
 
 				# Not clicking on own unit — move order (or re-select if clicking own unit)
 				var own_unit: Node = _unit_at_point(world_pos, 0)
 				if own_unit == null:
-					# Empty ground or building → issue move command
+					# Empty ground or building → issue move command, then release units
 					for unit in selected_units:
 						if is_instance_valid(unit):
 							unit.move_to(world_pos)
+					_clear_selection()
 					return
 				# else fall through to re-select the clicked own unit
 

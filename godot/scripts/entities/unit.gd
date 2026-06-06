@@ -308,8 +308,8 @@ func fire_at_target() -> void:
 	# Check range
 	var distance: float = global_position.distance_to(attack_target_ref.global_position)
 	if distance <= attack_range:
+		# Damage is applied by the spawned projectile on impact
 		attack_fired.emit(attack_target_ref, attack_damage)
-		attack_target_ref.take_damage(attack_damage)
 
 func take_damage(amount: float) -> void:
 	if current_state == State.DEAD:
