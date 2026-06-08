@@ -30,6 +30,9 @@ var _building_tiles: Dictionary = {}
 ## Tracks tiles that block unit movement (walls/mines only)
 var _unit_blocking_tiles: Dictionary = {}
 
+## Tracks wall tiles with their owner faction: "tx,ty" -> faction (int)
+var _wall_faction_tiles: Dictionary = {}
+
 ## ── Initialisation ───────────────────────────────────────────────────────────
 func _init() -> void:
 	_clear_tiles()
@@ -51,6 +54,7 @@ func generate() -> void:
 	_clear_tiles()
 	_building_tiles.clear()
 	_unit_blocking_tiles.clear()
+	_wall_faction_tiles.clear()
 
 	var ground_top: int = MAP_HEIGHT - GROUND_LEVEL_TILE  # = 17
 
@@ -196,6 +200,36 @@ func can_place_building(tile_x: int, tile_y: int, w: int, h: int) -> bool:
 			return false
 
 	return true
+
+
+## Mark tiles as belonging to a faction's wall (blocks enemies, not friendlies)
+func mark_wall_tiles(tile_x: int, tile_y: int, w: int, h: int, faction: int) -> void:
+	for tx in range(tile_x, tile_x + w):
+		for ty in range(tile_y, tile_y + h):
+			var key: String = str(tx) + "," + str(ty)
+			_wall_faction_tiles[key] = faction
+
+
+func clear_wall_tiles(tile_x: int, tile_y: int, w: int, h: int) -> void:
+	for tx in range(tile_x, tile_x + w):
+		for ty in range(tile_y, tile_y + h):
+			_wall_faction_tiles.erase(str(tx) + "," + str(ty))
+
+
+## Faction-aware solid check: terrain is always solid; walls only block enemies.
+func is_solid_for_faction(tx: int, ty: int, unit_faction: int) -> bool:
+	if ty < 0 or ty >= MAP_HEIGHT:
+		return true
+	if tx < 0 or tx >= MAP_WIDTH:
+		return true
+	var key: String = str(tx) + "," + str(ty)
+	# Wall tile — only solid for units from a different faction
+	if _wall_faction_tiles.has(key):
+		return _wall_faction_tiles[key] != unit_faction
+	# Other blocking tiles (non-wall buildings) — always solid
+	if _unit_blocking_tiles.has(key):
+		return true
+	return tiles[tx][ty] != TILE_EMPTY
 
 
 ## ── Debug helpers ─────────────────────────────────────────────────────────────

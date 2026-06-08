@@ -196,7 +196,7 @@ func _apply_physics(delta: float) -> void:
 		var ty_bot: int = int(floor((position.y - 2.0) / ts))
 		var blocked: bool = false
 		for ty in range(ty_top, ty_bot + 1):
-			if tilemap_ref.is_solid(tx, ty):
+			if tilemap_ref.is_solid_for_faction(tx, ty, int(faction)):
 				blocked = true
 				break
 		if blocked:

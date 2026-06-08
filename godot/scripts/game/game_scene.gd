@@ -423,6 +423,13 @@ func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> 
 	all_buildings.append(building)
 	building.add_to_group("buildings")
 
+	# Mark wall tiles as faction-owned so enemies are blocked but friendlies pass through
+	var bdata: Dictionary = GameConfig.BUILDING_TYPES.get(building_type, {})
+	if bdata.get("blocks_units", false):
+		var bw: int = bdata.get("width_tiles", 1)
+		var bh: int = bdata.get("height_tiles", 1)
+		tilemap.mark_wall_tiles(tile_pos.x, tile_pos.y, bw, bh, faction)
+
 	# Connect building destruction signal
 	if building.has_signal("building_destroyed"):
 		building.building_destroyed.connect(_on_building_destroyed.bind(building))
@@ -441,6 +448,7 @@ func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> 
 func _on_building_destroyed(building: Node) -> void:
 	all_buildings.erase(building)
 	tilemap.clear_building_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
+	tilemap.clear_wall_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
 
 	# Check if destroyed building is a player's HQ — trigger game over
 	for i in range(players.size()):
