@@ -15,6 +15,7 @@ const MAX_DELTA: float = 0.25
 @onready var units_node: Node2D = $Units
 @onready var buildings_node: Node2D = $Buildings
 @onready var hud: HUD = $CanvasLayer/HUD
+@onready var camera: FortressCamera = $Camera2D
 
 ## ── Game State ────────────────────────────────────────────────────────────────────
 enum GameMode { NONE, ONE_V_ONE_CPU, TWO_V_TWO, ONE_V_ONE, SKIRMISH }
@@ -736,3 +737,11 @@ func get_hq_for_player(player_idx: int) -> Node:
 
 func is_valid_player(player_idx: int) -> bool:
 	return player_idx >= 0 and player_idx < players.size()
+
+
+## ── Camera Control ───────────────────────────────────────────────────────────────
+## Pan the game camera to a world-space position.
+## Called by HUD when player clicks on the minimap.
+func pan_camera_to(world_pos: Vector2) -> void:
+	if camera != null:
+		camera.pan_to(world_pos)

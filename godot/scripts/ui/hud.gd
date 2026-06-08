@@ -79,7 +79,23 @@ func _setup_minimap() -> void:
 
 func _on_minimap_update_timer_timeout() -> void:
 	if has_node("/root/MinimapRenderer"):
-		get_node("/root/MinimapRenderer").update_minimap()
+		var renderer = get_node("/root/MinimapRenderer")
+		renderer.update_minimap()
+		set_minimap_texture(renderer.get_minimap_texture())
+
+
+func _on_minimap_texture_rect_clicked(event: InputEventMouseButton) -> void:
+	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
+		return
+	var renderer = get_node("/root/MinimapRenderer")
+	var mx: float = event.position.x
+	var my: float = event.position.y
+	var world_x: float = mx * renderer.INV_SCALE_X
+	var world_y: float = my * renderer.INV_SCALE_Y
+	var world_pos := Vector2(world_x, world_y)
+	var scene := get_tree().get_current_scene()
+	if scene != null and scene.has_method("pan_camera_to"):
+		scene.pan_camera_to(world_pos)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -287,3 +303,5 @@ func set_minimap_texture(texture: Texture2D) -> void:
 	var tex_rect: TextureRect = $MinimapPanel/MinimapTextureRect
 	if tex_rect:
 		tex_rect.texture = texture
+		if not tex_rect.gui_input.is_connected(_on_minimap_texture_rect_clicked):
+			tex_rect.gui_input.connect(_on_minimap_texture_rect_clicked)

@@ -4,14 +4,23 @@ class_name MinimapRenderer
 extends Node
 
 ## ── Map constants ─────────────────────────────────────────────────────────────────
-const MAP_WIDTH_PIXELS: int = 200 * 32   # 6400
-const MAP_HEIGHT_PIXELS: int = 20 * 32    # 640
+## Map world size: 200 tiles × 32px = 6400px wide, 20 tiles × 32px = 640px tall
+const MAP_W: int = 6400
+const MAP_H: int = 640
+## Minimap display size in pixels
 const MINIMAP_W: int = 180
 const MINIMAP_H: int = 40
 
-## Scale factors: minimap pixels per world pixel
-const SCALE_X: float = float(MINIMAP_W) / float(MAP_WIDTH_PIXELS)   # ~0.028
-const SCALE_Y: float = float(MINIMAP_H) / float(MAP_HEIGHT_PIXELS)  # ~0.0625
+## Scale: minimap pixels per world pixel.
+## Using visible viewport (1280×640) as reference so tiles are visible:
+##   SCALE_X = MINIMAP_W / VISIBLE_W = 180/1280 ≈ 0.14  → 32px tile = 4.5px on minimap
+##   SCALE_Y = MINIMAP_H / VISIBLE_H = 40/640   ≈ 0.0625 → 32px tile = 2px on minimap
+const SCALE_X: float = float(MINIMAP_W) / 1280.0   # 0.140625
+const SCALE_Y: float = float(MINIMAP_H) / 640.0    # 0.0625
+
+## Inverse scale: world pixels per minimap pixel (for click → world conversion)
+const INV_SCALE_X: float = 1280.0 / float(MINIMAP_W)   # 7.111
+const INV_SCALE_Y: float = 640.0 / float(MINIMAP_H)     # 16.0
 
 ## ── Faction colors ─────────────────────────────────────────────────────────────────
 const COLOR_FACTION: Array = [
@@ -22,6 +31,8 @@ const COLOR_FACTION: Array = [
 ]
 const COLOR_GROUND: Color    = Color(0.30, 0.25, 0.18)
 const COLOR_PLATFORM: Color  = Color(0.45, 0.40, 0.35)
+const COLOR_BRIDGE: Color    = Color(0.55, 0.45, 0.30)
+const COLOR_RAMP: Color      = Color(0.40, 0.35, 0.28)
 const COLOR_BACKGROUND: Color = Color(0.05, 0.05, 0.08)
 
 ## ── Texture / Image (the actual render target) ───────────────────────────────
@@ -99,6 +110,10 @@ func _draw_terrain(scene: Node) -> void:
 					tile_color = COLOR_GROUND
 				GameConfig.TILE_PLATFORM:
 					tile_color = COLOR_PLATFORM
+				GameConfig.TILE_BRIDGE:
+					tile_color = COLOR_BRIDGE
+				GameConfig.TILE_RAMP:
+					tile_color = COLOR_RAMP
 				_:
 					continue   # skip unknown tile types
 
@@ -113,7 +128,7 @@ func _draw_terrain(scene: Node) -> void:
 
 ## ── Units pass (additive on top of terrain) ──────────────────────────────────
 func _draw_units_on_top(scene: Node) -> void:
-	# Re-draw terrain base so units always draw on top of fresh terrain
+	# Redraw terrain every frame so units always draw on fresh terrain
 	var tilemap: Node = _get_tilemap()
 	if tilemap != null:
 		var map_w: int = GameConfig.MAP_WIDTH_TILES
@@ -131,6 +146,10 @@ func _draw_units_on_top(scene: Node) -> void:
 						tile_color = COLOR_GROUND
 					GameConfig.TILE_PLATFORM:
 						tile_color = COLOR_PLATFORM
+					GameConfig.TILE_BRIDGE:
+						tile_color = COLOR_BRIDGE
+					GameConfig.TILE_RAMP:
+						tile_color = COLOR_RAMP
 					_:
 						continue
 				var px: int = int(float(tx * tile_sz) * SCALE_X)
@@ -155,7 +174,7 @@ func _draw_units_on_top(scene: Node) -> void:
 		var ph: int = max(int(world_h * SCALE_Y), 2)
 		_minimap_image.fill_rect(Rect2i(px, py, pw, ph), color)
 
-	# Draw units as small dots (2×2 px)
+	# Draw units as small dots (2×2 px), centered on position
 	var units: Array = scene.all_units
 	for unit in units:
 		if not is_instance_valid(unit):

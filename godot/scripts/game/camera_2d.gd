@@ -22,6 +22,10 @@ const ZOOM_STEP: float = 0.1
 const WORLD_WIDTH: float = 6400.0
 const WORLD_HEIGHT: float = 640.0
 
+## Smooth pan the camera to target world position.
+func pan_to(world_pos: Vector2) -> void:
+	_target_position = world_pos
+
 ## ── State ──────────────────────────────────────────────────────────────────────
 var _target_position: Vector2 = Vector2.ZERO
 
