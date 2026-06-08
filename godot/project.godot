@@ -65,7 +65,7 @@ game_config="*res://scripts/autoload/game_config.gd"
 ;audio_manager="*res://scripts/autoload/audio_manager.gd"
 game_manager="*res://scripts/autoload/game_manager.gd"
 game_renderer="*res://scripts/autoload/game_renderer.gd"
-minimap_renderer="*res://scripts/autoload/minimap_renderer.gd"
+MinimapRenderer="*res://scripts/autoload/minimap_renderer.gd"
 [preset.0]
 name="HTML5"
 platform="Web"
