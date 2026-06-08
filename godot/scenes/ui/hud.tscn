@@ -207,5 +207,7 @@ mouse_filter = 1
 
 [node name="MinimapTextureRect" type="TextureRect" parent="MinimapPanel"]
 layout_mode = 2
-expand_mode = 4
-stretch_mode = 1
+size_flags_horizontal = 3
+size_flags_vertical = 3
+expand_mode = 0
+stretch_mode = 0
