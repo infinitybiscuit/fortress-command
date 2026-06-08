@@ -399,6 +399,7 @@ func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> 
 func _on_building_destroyed(building: Node) -> void:
 	all_buildings.erase(building)
 	tilemap.clear_building_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
+	building.queue_free()
 
 	# Check if destroyed building is a player's HQ — trigger game over
 	for i in range(players.size()):
@@ -528,6 +529,8 @@ func _try_place_building(btype: String, world_pos: Vector2) -> void:
 ## ── Input Handling ──────────────────────────────────────────────────────────
 var _last_click_time: float = 0.0
 var _last_click_pos: Vector2 = Vector2.ZERO
+var _last_right_click_time: float = 0.0
+var _last_right_click_pos: Vector2 = Vector2.ZERO
 const _DOUBLE_CLICK_SEC: float = 0.35
 const _DOUBLE_CLICK_PX: float = 20.0
 const _DRAG_MIN_DISTANCE: float = 10.0
@@ -596,9 +599,34 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			if event.pressed:
-				if selected_units.size() > 0 or _selected_building != null:
-					_clear_selection()
+			if event.pressed and selected_units.size() > 0:
+				# Detect double-right-click on an enemy target
+				var now: float = Time.get_ticks_msec() / 1000.0
+				var is_double: bool = (now - _last_right_click_time < _DOUBLE_CLICK_SEC and
+					world_pos.distance_to(_last_right_click_pos) < _DOUBLE_CLICK_PX)
+				_last_right_click_time = now
+				_last_right_click_pos = world_pos
+
+				if is_double:
+					# Check for enemy unit at click position
+					var enemy: Node = _unit_at_point(world_pos, -1)
+					if enemy != null:
+						for unit in selected_units:
+							if is_instance_valid(unit):
+								unit.attack_target(enemy)
+						return
+					# Check for enemy building at click position
+					var enemy_building: Node = _building_at_point(world_pos, -1)
+					if enemy_building != null:
+						for unit in selected_units:
+							if is_instance_valid(unit):
+								unit.attack_target(enemy_building)
+						return
+				# Single right-click with selected units — clear selection (cancel)
+				_clear_selection()
+				return
+			else:
+				_clear_selection()
 			return
 
 		# Remaining logic only fires for left-button press (not release, not right-click)
@@ -714,6 +742,22 @@ func _unit_at_point(world_point: Vector2, faction_filter: int) -> Node:
 			continue
 		if unit.contains_point(world_point):
 			return unit
+	return null
+
+## Returns the first building whose rect contains the point.
+## faction_filter: 0+ to require that faction, -1 to require any NON-zero (enemy) faction.
+func _building_at_point(world_point: Vector2, faction_filter: int) -> Node:
+	for building in all_buildings:
+		if not is_instance_valid(building):
+			continue
+		if faction_filter == -1:
+			if building.faction == 0:
+				continue
+		elif building.faction != faction_filter:
+			continue
+		var brect := Rect2(building.global_position, Vector2(building.world_width, building.world_height))
+		if brect.has_point(world_point):
+			return building
 	return null
 
 func get_buildings_for_faction(faction: int) -> Array:
