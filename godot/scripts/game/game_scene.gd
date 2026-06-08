@@ -589,9 +589,16 @@ func _unhandled_input(event: InputEvent) -> void:
 						if is_instance_valid(unit) and unit.faction == 0:
 							if _drag_rect.intersects(unit.get_bounds()):
 								select_unit(unit)
-				_is_dragging = false
-				queue_redraw()
-			return
+			_is_dragging = false
+			queue_redraw()
+		return
+
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+		if event.pressed:
+			# Right-click always cancels selection
+			if selected_units.size() > 0 or _selected_building != null:
+				_clear_selection()
+		return
 
 		if event.pressed:
 			# Build placement mode takes priority
@@ -614,7 +621,6 @@ func _unhandled_input(event: InputEvent) -> void:
 					for unit in selected_units:
 						if is_instance_valid(unit):
 							unit.attack_target(enemy)
-					_clear_selection()
 					return
 
 			# If units are already selected, left-click issues orders first
@@ -625,17 +631,14 @@ func _unhandled_input(event: InputEvent) -> void:
 					for unit in selected_units:
 						if is_instance_valid(unit):
 							unit.attack_target(enemy)
-					_clear_selection()
 					return
 
-				# Not clicking on own unit — move order (or re-select if clicking own unit)
+				# Not clicking on own unit — move order (keep selection)
 				var own_unit: Node = _unit_at_point(world_pos, 0)
 				if own_unit == null:
-					# Empty ground or building → issue move command, then release units
 					for unit in selected_units:
 						if is_instance_valid(unit):
 							unit.move_to(world_pos)
-					_clear_selection()
 					return
 				# else fall through to re-select the clicked own unit
 
@@ -655,9 +658,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_clear_building_selection()
 				select_unit(player_unit)
 				hud.update_selection_info(player_unit.unit_type.capitalize())
-			else:
-				# Clicked nothing — clear all selections
-				_clear_selection()
+			# else: clicked nothing — leave current selection untouched
 
 
 func _clear_building_selection() -> void:
