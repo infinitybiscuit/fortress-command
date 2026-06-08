@@ -148,43 +148,85 @@ func _process_ai() -> void:
 			_process_ai_player(i)
 
 func _process_ai_player(player_idx: int) -> void:
-	var player_faction: int = players[player_idx]["faction"]
-	var ai_units: Array = get_units_for_faction(player_faction)
-	if ai_units.size() == 0:
-		return
+	var player: Dictionary = players[player_idx]
+	var player_faction: int = player["faction"]
+	var money: int = player.get("money", 0)
 
-	# Collect all enemy units and buildings
-	var enemies: Array = []
+	var ai_buildings: Array = get_buildings_for_faction(player_faction)
+	var ground_y: int = tilemap.ground_surface_tile_y()
+	var hq_node: Node = player.get("hq")
+
+	# Categorise existing AI buildings
+	var has_barracks: bool = false
+	var has_mine: bool = false
+	var barracks_node: Node = null
+	for b in ai_buildings:
+		if not is_instance_valid(b) or not b.alive:
+			continue
+		match b.building_type:
+			"barracks":
+				has_barracks = true
+				if barracks_node == null:
+					barracks_node = b
+			"mine":
+				has_mine = true
+
+	# Build a mine to boost income (place 4 tiles left of HQ)
+	if not has_mine and money >= 200 and hq_node != null and is_instance_valid(hq_node):
+		var mine_tx: int = hq_node.tile_x - 4
+		var mine_ty: int = ground_y - 2
+		if tilemap.can_place_building(mine_tx, mine_ty, 2, 2):
+			player["money"] -= 200
+			spawn_building("mine", Vector2i(mine_tx, mine_ty), player_faction)
+
+	# Build a barracks (place 8 tiles left of HQ)
+	if not has_barracks and money >= 150 and hq_node != null and is_instance_valid(hq_node):
+		var barracks_tx: int = hq_node.tile_x - 8
+		var barracks_ty: int = ground_y - 2
+		if tilemap.can_place_building(barracks_tx, barracks_ty, 3, 2):
+			player["money"] -= 150
+			barracks_node = spawn_building("barracks", Vector2i(barracks_tx, barracks_ty), player_faction)
+			has_barracks = true
+
+	# Train soldiers from barracks when ready and affordable
+	if has_barracks and barracks_node != null and is_instance_valid(barracks_node):
+		if not barracks_node.is_constructing and money >= 50:
+			if barracks_node.queue_train("soldier"):
+				player["money"] -= 50
+
+	# Collect enemy targets (units + buildings)
+	var enemy_targets: Array = []
 	for unit in all_units:
 		if is_instance_valid(unit) and unit.faction != player_faction:
-			enemies.append(unit)
-	for building in all_buildings:
-		if is_instance_valid(building) and building.faction != player_faction:
-			enemies.append(building)
+			if unit.current_state != unit.State.DEAD:
+				enemy_targets.append(unit)
+	for b in all_buildings:
+		if is_instance_valid(b) and b.faction != player_faction and b.alive:
+			enemy_targets.append(b)
 
-	if enemies.size() == 0:
-		return
+	# Order all living AI units to engage nearest enemy or advance toward enemy side
+	var ai_units: Array = get_units_for_faction(player_faction)
+	for ai_unit in ai_units:
+		if not is_instance_valid(ai_unit) or ai_unit.current_state == ai_unit.State.DEAD:
+			continue
+		if ai_unit.current_state == ai_unit.State.ATTACKING:
+			continue
 
-	# Find the closest enemy across all units and buildings
-	var best_target: Node = null
-	var best_dist: float = INF
-	for enemy in enemies:
-		for ai_unit in ai_units:
-			if not is_instance_valid(ai_unit):
+		var best_target: Node = null
+		var best_dist: float = INF
+		for enemy in enemy_targets:
+			if not is_instance_valid(enemy):
 				continue
 			var d: float = ai_unit.global_position.distance_to(enemy.global_position)
 			if d < best_dist:
 				best_dist = d
 				best_target = enemy
 
-	print("AI(", player_idx, "): ai_units=", ai_units.size(), " enemies=", enemies.size(), " best_target=", best_target.get("unit_type") if best_target.get("unit_type") != null else best_target.get("building_type"), " dist=", best_dist)
-	if best_target != null and best_dist < 800.0:
-		for ai_unit in ai_units:
-			if not is_instance_valid(ai_unit):
-				continue
-			if ai_unit.current_state != ai_unit.State.DEAD:
-				print("AI(", player_idx, "): ordering attack from ", ai_unit.unit_type, " -> ", best_target.get("unit_type") if best_target.get("unit_type") != null else best_target.get("building_type"))
-				ai_unit.attack_target(best_target)
+		if best_target != null:
+			ai_unit.attack_target(best_target)
+		else:
+			# No enemies found — advance toward the player's side of the map
+			ai_unit.move_to(Vector2(400.0, ai_unit.global_position.y))
 
 ## ── Game Mode Setup ──────────────────────────────────────────────────────────────
 func set_game_mode(mode_name: String) -> void:

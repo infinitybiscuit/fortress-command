@@ -260,17 +260,19 @@ func _velocity_move_to_target() -> void:
 		velocity.x = sign(dx) * speed
 
 func _velocity_attack() -> void:
-	velocity.x = 0.0
-	if attack_target_ref != null and is_instance_valid(attack_target_ref):
-		var distance: float = global_position.distance_to(attack_target_ref.global_position)
-		if distance > attack_range:
-			attack_target_ref = null
-			_set_state(State.IDLE)
-		else:
-			fire_at_target()
-	else:
+	if attack_target_ref == null or not is_instance_valid(attack_target_ref):
 		attack_target_ref = null
 		_set_state(State.IDLE)
+		return
+
+	var distance: float = global_position.distance_to(attack_target_ref.global_position)
+	if distance > attack_range:
+		# Chase: walk toward target until in range
+		var dx: float = attack_target_ref.global_position.x - global_position.x
+		velocity.x = sign(dx) * speed
+	else:
+		velocity.x = 0.0
+		fire_at_target()
 
 func _velocity_repair(delta: float) -> void:
 	velocity.x = 0.0
