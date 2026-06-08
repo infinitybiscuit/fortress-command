@@ -78,14 +78,8 @@ func _setup_minimap() -> void:
 
 
 func _on_minimap_update_timer_timeout() -> void:
-	_update_minimap_texture()
-
-func _update_minimap_texture() -> void:
-	if not has_node("/root/MinimapRenderer"):
-		return
-	var renderer = get_node("/root/MinimapRenderer")
-	var tex: Texture2D = renderer.get_minimap_texture()
-	set_minimap_texture(tex)
+	if has_node("/root/MinimapRenderer"):
+		get_node("/root/MinimapRenderer").update_minimap()
 
 
 # ═══════════════════════════════════════════════════════════════════
