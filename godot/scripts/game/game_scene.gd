@@ -322,7 +322,7 @@ func spawn_unit(unit_type: String, position: Vector2, faction: int) -> Node:
 
 	# Connect unit death signal
 	if unit.has_signal("unit_died"):
-		unit.unit_died.connect(_on_unit_died.bind(unit))
+		unit.unit_died.connect(_on_unit_died)
 
 	# Spawn a projectile when this unit fires
 	if unit.has_signal("attack_fired"):

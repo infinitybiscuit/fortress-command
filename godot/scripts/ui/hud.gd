@@ -23,8 +23,9 @@ signal train_item_selected(unit_type: String)
 @onready var _train_list: VBoxContainer = $BuildMenuPanel/VBox/TrainSection/TrainScroll/TrainList
 @onready var _build_tab: Button = $BuildTab
 @onready var _minimap_panel: PanelContainer = $MinimapPanel
+@onready var _minimap_update_timer: Timer = $MinimapUpdateTimer
 
-# ─── State ───────────────────────────────────────────────────────────
+# ─── State ────────────────────────────────────────────────────────────
 var _build_menu_open: bool = false
 var _credits: int = 300
 var _income: int = 5
@@ -58,6 +59,33 @@ func _ready() -> void:
 
 	# Start flash timer but keep it stopped initially
 	_credits_flash_timer.timeout.connect(_on_credits_flash_timer_timeout)
+
+	# Initialize minimap
+	_setup_minimap()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Minimap Setup
+# ═══════════════════════════════════════════════════════════════════
+
+func _setup_minimap() -> void:
+	# Set up minimap update timer
+	_minimap_update_timer.timeout.connect(_on_minimap_update_timer_timeout)
+	_minimap_update_timer.start(0.1)  # Update 10 times per second
+	
+	# Initial minimap render
+	_update_minimap_texture()
+
+
+func _on_minimap_update_timer_timeout() -> void:
+	_update_minimap_texture()
+
+func _update_minimap_texture() -> void:
+	if not has_node("/root/MinimapRenderer"):
+		return
+	var renderer = get_node("/root/MinimapRenderer")
+	var tex: Texture2D = renderer.get_minimap_texture()
+	set_minimap_texture(tex)
 
 
 # ═══════════════════════════════════════════════════════════════════
