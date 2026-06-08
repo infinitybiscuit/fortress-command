@@ -592,7 +592,7 @@ func _unhandled_input(event: InputEvent) -> void:
 									select_unit(unit)
 				_is_dragging = false
 				queue_redraw()
-			return
+				return
 
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			if event.pressed:
