@@ -587,7 +587,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					_clear_selection()
 					for unit in all_units:
 						if is_instance_valid(unit) and unit.faction == 0:
-							if _drag_rect.encloses(unit.get_bounds()):
+							if _drag_rect.intersects(unit.get_bounds()):
 								select_unit(unit)
 				_is_dragging = false
 				queue_redraw()
