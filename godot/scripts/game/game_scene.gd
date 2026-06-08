@@ -571,35 +571,36 @@ func _unhandled_input(event: InputEvent) -> void:
 	if get_viewport().gui_get_hovered_control() != null:
 		return
 
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+	if event is InputEventMouseButton:
 		var world_pos: Vector2 = get_global_mouse_position()
 
-		if event.pressed:
-			# Begin drag selection
-			_drag_start = world_pos
-			_is_dragging = false
-		else:
-			# Mouse button released — check for drag-to-select
-			if _is_dragging:
-				var own_unit: Node = _unit_at_point(world_pos, 0)
-				if own_unit == null:
-					# Dragged on empty ground — select all player units in rect
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				# Begin drag selection
+				_drag_start = world_pos
+				_is_dragging = false
+			else:
+				# Mouse button released — check for drag-to-select
+				if _is_dragging:
+					var own_unit: Node = _unit_at_point(world_pos, 0)
+					if own_unit == null:
+						# Dragged on empty ground — select all player units in rect
+						_clear_selection()
+						for unit in all_units:
+							if is_instance_valid(unit) and unit.faction == 0:
+								if _drag_rect.intersects(unit.get_bounds()):
+									select_unit(unit)
+				_is_dragging = false
+				queue_redraw()
+			return
+
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			if event.pressed:
+				if selected_units.size() > 0 or _selected_building != null:
 					_clear_selection()
-					for unit in all_units:
-						if is_instance_valid(unit) and unit.faction == 0:
-							if _drag_rect.intersects(unit.get_bounds()):
-								select_unit(unit)
-			_is_dragging = false
-			queue_redraw()
-		return
+			return
 
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
-		if event.pressed:
-			# Right-click always cancels selection
-			if selected_units.size() > 0 or _selected_building != null:
-				_clear_selection()
-		return
-
+		# Remaining logic only fires for left-button press (not release, not right-click)
 		if event.pressed:
 			# Build placement mode takes priority
 			if _pending_build_type != "":
