@@ -12,15 +12,13 @@ const MINIMAP_W: int = 180
 const MINIMAP_H: int = 40
 
 ## Scale: minimap pixels per world pixel.
-## Using visible viewport (1280×640) as reference so tiles are visible:
-##   SCALE_X = MINIMAP_W / VISIBLE_W = 180/1280 ≈ 0.14  → 32px tile = 4.5px on minimap
-##   SCALE_Y = MINIMAP_H / VISIBLE_H = 40/640   ≈ 0.0625 → 32px tile = 2px on minimap
-const SCALE_X: float = float(MINIMAP_W) / 1280.0   # 0.140625
-const SCALE_Y: float = float(MINIMAP_H) / 640.0    # 0.0625
+## Full map is 6400×640 world px → 180×40 minimap px
+const SCALE_X: float = float(MINIMAP_W) / float(MAP_W)   # 180/6400 = 0.028125
+const SCALE_Y: float = float(MINIMAP_H) / float(MAP_H)   # 40/640  = 0.0625
 
 ## Inverse scale: world pixels per minimap pixel (for click → world conversion)
-const INV_SCALE_X: float = 1280.0 / float(MINIMAP_W)   # 7.111
-const INV_SCALE_Y: float = 640.0 / float(MINIMAP_H)     # 16.0
+const INV_SCALE_X: float = float(MAP_W) / float(MINIMAP_W)   # 6400/180 ≈ 35.56
+const INV_SCALE_Y: float = float(MAP_H) / float(MINIMAP_H)   # 640/40  = 16.0
 
 ## ── Faction colors ─────────────────────────────────────────────────────────────────
 const COLOR_FACTION: Array = [
