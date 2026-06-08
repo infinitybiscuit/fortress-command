@@ -677,11 +677,8 @@ func _clear_selection() -> void:
 func select_unit(unit: Node) -> void:
 	if not is_instance_valid(unit):
 		return
-	
-	# Deselect all first
-	deselect_all()
-	
-	# Select the new unit
+	if unit.is_selected:
+		return
 	unit.select()
 	selected_units.append(unit)
 	unit_selected.emit(unit)
