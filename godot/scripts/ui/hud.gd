@@ -73,8 +73,8 @@ func _setup_minimap() -> void:
 	_minimap_update_timer.timeout.connect(_on_minimap_update_timer_timeout)
 	_minimap_update_timer.start(0.1)  # Update 10 times per second
 	
-	# Initial minimap render
-	_update_minimap_texture()
+	# Initial minimap render — trigger the HUD timer directly
+	_on_minimap_update_timer_timeout()
 
 
 func _on_minimap_update_timer_timeout() -> void:
