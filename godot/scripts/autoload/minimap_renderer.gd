@@ -1,6 +1,5 @@
 ## MinimapRenderer — Fortress Command minimap rendering via ImageTexture.
 ## Draws terrain/buildings/units to an Image, blits it to an ImageTexture each frame.
-class_name MinimapRenderer
 extends Node
 
 ## ── Map constants ─────────────────────────────────────────────────────────────────
