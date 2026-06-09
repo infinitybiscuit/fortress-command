@@ -608,8 +608,14 @@ func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> 
 	all_buildings.append(building)
 	building.add_to_group("buildings")
 
-	# Mark wall tiles as faction-owned so enemies are blocked but friendlies pass through
+	# Mark bridge/ramp tiles so units can walk across them
 	var bdata: Dictionary = GameConfig.BUILDING_TYPES.get(building_type, {})
+	if bdata.get("is_bridge", false):
+		tilemap.mark_bridge_tiles(tile_pos.x, tile_pos.y, building.width_tiles, building.height_tiles, building.get_instance_id())
+	if bdata.get("is_ramp", false):
+		tilemap.mark_ramp_tiles(tile_pos.x, tile_pos.y, building.width_tiles, building.height_tiles, building.get_instance_id())
+
+	# Mark wall tiles as faction-owned so enemies are blocked but friendlies pass through
 	if bdata.get("blocks_units", false):
 		var bw: int = bdata.get("width_tiles", 1)
 		var bh: int = bdata.get("height_tiles", 1)
@@ -635,6 +641,8 @@ func _on_building_destroyed(building: Node) -> void:
 	all_buildings.erase(building)
 	tilemap.clear_building_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
 	tilemap.clear_wall_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
+	# Clear bridge/ramp tiles if this was a span building
+	tilemap.clear_span_tiles(building.get_instance_id())
 	# Note: building.queue_free() is now handled by building._delayed_free()
 	# to give in-flight projectiles a chance to complete without crashing
 
@@ -754,7 +762,7 @@ func _try_place_building(btype: String, world_pos: Vector2) -> void:
 	var h: int = data.get("height_tiles", 1)
 	# Place so the bottom of the building sits on the clicked tile row
 	var place_tile_y: int = tile_pos.y - h + 1
-	if not tilemap.can_place_building(tile_pos.x, place_tile_y, w, h):
+	if not tilemap.can_place_building(tile_pos.x, place_tile_y, w, h, btype):
 		hud.update_selection_info("Can't place here!")
 		return
 	players[0]["money"] -= cost

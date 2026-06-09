@@ -14,6 +14,8 @@ const MAP_HEIGHT: int = 20
 const TILE_EMPTY: int = 0
 const TILE_GROUND: int = 1
 const TILE_PLATFORM: int = 2
+const TILE_BRIDGE: int = 3
+const TILE_RAMP: int = 4
 
 ## Platform row deltas above ground surface [3, 7, 11] — highest to lowest
 ## groundTop = MAP_HEIGHT - 3 = 17 → platforms at rows 13, 9, 5
@@ -32,6 +34,12 @@ var _unit_blocking_tiles: Dictionary = {}
 
 ## Tracks wall tiles with their owner faction: "tx,ty" -> faction (int)
 var _wall_faction_tiles: Dictionary = {}
+
+## Tracks bridge tiles: "tx,ty" -> building_id (int)
+var _bridge_tiles: Dictionary = {}
+
+## Tracks ramp tiles: "tx,ty" -> building_id (int)
+var _ramp_tiles: Dictionary = {}
 
 ## ── Initialisation ───────────────────────────────────────────────────────────
 func _init() -> void:
@@ -55,6 +63,8 @@ func generate() -> void:
 	_building_tiles.clear()
 	_unit_blocking_tiles.clear()
 	_wall_faction_tiles.clear()
+	_bridge_tiles.clear()
+	_ramp_tiles.clear()
 
 	var ground_top: int = MAP_HEIGHT - GROUND_LEVEL_TILE  # = 17
 
@@ -115,6 +125,9 @@ func is_solid(tx: int, ty: int) -> bool:
 	if _unit_blocking_tiles.has(key):
 		return true
 	var t: int = tiles[tx][ty]
+	# BRIDGE and RAMP are walkable solid surfaces
+	if t == TILE_BRIDGE or t == TILE_RAMP:
+		return true
 	return t != TILE_EMPTY
 
 ## ── Coordinate conversion ───────────────────────────────────────────────────
@@ -179,7 +192,7 @@ func clear_building_tiles(tile_x: int, tile_y: int, w: int, h: int) -> void:
 
 ## ── Building placement validation ─────────────────────────────────────────────
 ## Returns true if a building of size (w×h) can be placed at (tile_x, tile_y)
-func can_place_building(tile_x: int, tile_y: int, w: int, h: int) -> bool:
+func can_place_building(tile_x: int, tile_y: int, w: int, h: int, btype: String = "") -> bool:
 	var gs_y: int = ground_surface_tile_y()
 	# A building sits on ground when its bottom edge is one tile above gs_y
 	var sits_on_ground: bool = (tile_y + h - 1 == gs_y - 1)
@@ -190,11 +203,21 @@ func can_place_building(tile_x: int, tile_y: int, w: int, h: int) -> bool:
 			var key: String = str(tx) + "," + str(ty)
 			if _building_tiles.has(key):
 				return false
+			# Bridges and ramps can be placed over empty tiles (to span gaps)
+			if btype == "bridge" or btype == "ramp":
+				continue
 			if tile != TILE_EMPTY and not (sits_on_ground and tile == TILE_GROUND):
 				return false
 
 	# Must have solid ground directly below the building's bottom edge
+	# (bridges/ramps: only need ONE edge tile to have ground below — the other
+	#  edge can span over a gap, the bridge/ramp itself is the walkable surface)
 	var bottom_ty: int = tile_y + h - 1
+	if btype == "bridge" or btype == "ramp":
+		# For bridge/ramp: only one side needs ground below
+		if is_solid(tile_x, bottom_ty + 1) or is_solid(tile_x + w - 1, bottom_ty + 1):
+			return true
+		return false
 	for tx in range(tile_x, tile_x + w):
 		if not is_solid(tx, bottom_ty + 1):
 			return false
@@ -214,6 +237,48 @@ func clear_wall_tiles(tile_x: int, tile_y: int, w: int, h: int) -> void:
 	for tx in range(tile_x, tile_x + w):
 		for ty in range(tile_y, tile_y + h):
 			_wall_faction_tiles.erase(str(tx) + "," + str(ty))
+
+
+## Mark tiles as bridge surface (solid, walkable, spans the building width)
+func mark_bridge_tiles(tile_x: int, tile_y: int, w: int, h: int, building_id: int) -> void:
+	for tx in range(tile_x, tile_x + w):
+		for ty in range(tile_y, tile_y + h):
+			var key: String = str(tx) + "," + str(ty)
+			tiles[tx][ty] = TILE_BRIDGE
+			_bridge_tiles[key] = building_id
+
+
+## Mark tiles as ramp surface (solid, walkable, connects height levels)
+func mark_ramp_tiles(tile_x: int, tile_y: int, w: int, h: int, building_id: int) -> void:
+	for tx in range(tile_x, tile_x + w):
+		for ty in range(tile_y, tile_y + h):
+			var key: String = str(tx) + "," + str(ty)
+			tiles[tx][ty] = TILE_RAMP
+			_ramp_tiles[key] = building_id
+
+
+## Clear bridge/ramp tiles that belong to a destroyed building
+func clear_span_tiles(building_id: int) -> void:
+	var keys_to_remove: Array = []
+	for key in _bridge_tiles:
+		if _bridge_tiles[key] == building_id:
+			var parts: Array = key.split(",")
+			var tx: int = int(parts[0])
+			var ty: int = int(parts[1])
+			tiles[tx][ty] = TILE_EMPTY
+			keys_to_remove.append(key)
+	for k in keys_to_remove:
+		_bridge_tiles.erase(k)
+	keys_to_remove = []
+	for key in _ramp_tiles:
+		if _ramp_tiles[key] == building_id:
+			var parts: Array = key.split(",")
+			var tx: int = int(parts[0])
+			var ty: int = int(parts[1])
+			tiles[tx][ty] = TILE_EMPTY
+			keys_to_remove.append(key)
+	for k in keys_to_remove:
+		_ramp_tiles.erase(k)
 
 
 ## Faction-aware solid check: terrain is always solid; walls only block enemies.
