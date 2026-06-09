@@ -126,24 +126,43 @@ func _make_overlay_button(label_text: String) -> Button:
 	btn.text = label_text
 	btn.custom_minimum_size = Vector2(280, 56)
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.204, 0.502, 1.0, 0.9)
-	style.set_border_radius_all(4)
-	style.set_corner_radius_all(4)
-	style.set_content_margin_all(16)
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	style.content_margin_left = 16
+	style.content_margin_top = 16
+	style.content_margin_right = 16
+	style.content_margin_bottom = 16
 	btn.add_theme_stylebox_override("normal", style)
+
 	var hover := StyleBoxFlat.new()
 	hover.bg_color = Color(0.204, 0.502, 1.0, 1.0)
-	hover.set_border_radius_all(4)
-	hover.set_corner_radius_all(4)
-	hover.set_content_margin_all(16)
+	hover.corner_radius_top_left = 4
+	hover.corner_radius_top_right = 4
+	hover.corner_radius_bottom_left = 4
+	hover.corner_radius_bottom_right = 4
+	hover.content_margin_left = 16
+	hover.content_margin_top = 16
+	hover.content_margin_right = 16
+	hover.content_margin_bottom = 16
 	btn.add_theme_stylebox_override("hover", hover)
+
 	var pressed := StyleBoxFlat.new()
 	pressed.bg_color = Color(0.1, 0.3, 0.8, 1.0)
-	pressed.set_border_radius_all(4)
-	pressed.set_corner_radius_all(4)
-	pressed.set_content_margin_all(16)
+	pressed.corner_radius_top_left = 4
+	pressed.corner_radius_top_right = 4
+	pressed.corner_radius_bottom_left = 4
+	pressed.corner_radius_bottom_right = 4
+	pressed.content_margin_left = 16
+	pressed.content_margin_top = 16
+	pressed.content_margin_right = 16
+	pressed.content_margin_bottom = 16
 	btn.add_theme_stylebox_override("pressed", pressed)
+
 	btn.add_theme_font_size_override("font_size", 20)
 	return btn
 
