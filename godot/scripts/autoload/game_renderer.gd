@@ -165,9 +165,6 @@ static func draw_building(canvas: CanvasItem, building: Building, cam_offset: Ve
 	var world_h: float = building.world_height
 	var rect: Rect2 = Rect2(screen_pos, Vector2(world_w, world_h))
 	
-	# DEBUG: yellow outline showing exact rect screen position
-	canvas.draw_rect(rect, Color(1, 1, 0, 0.8), false, 2.0)
-	
 	# Selection ring
 	if building.is_selected:
 		var sel_color: Color = Color(0, 1, 0.4)
@@ -434,16 +431,17 @@ static func _draw_building_ramp(canvas: CanvasItem, rect: Rect2, pc: Color, fact
 	var w: float = rect.size.x
 	var h: float = rect.size.y
 	var ramp_color: Color = _lerp_color(PLAYER_COLORS[faction % 4], [0.0, 0.0, 0.0], 0.30)
-	# Left edge is at ground (bottom), right edge rises to platform height (top)
+	# Triangle: bottom-left, bottom-right, top-right (rising slope left→right)
 	var pts: Array = [
 		Vector2(rect.position.x, rect.end.y),
 		Vector2(rect.end.x, rect.end.y),
-		Vector2(rect.end.x, rect.position.y + h * 0.35),
-		Vector2(rect.position.x, rect.end.y)
+		Vector2(rect.end.x, rect.position.y + h * 0.25),
 	]
 	canvas.draw_colored_polygon(pts, ramp_color)
-	# Top surface highlight
-	canvas.draw_line(Vector2(rect.position.x, rect.end.y - 1), Vector2(rect.end.x, rect.position.y + h * 0.35), Color(1, 1, 1, 0.20), 2.0)
+	# Surface highlight along the slope
+	canvas.draw_line(Vector2(rect.position.x, rect.end.y - 1), Vector2(rect.end.x, rect.position.y + h * 0.25), Color(1, 1, 1, 0.22), 2.0)
+	# Bottom edge shadow
+	canvas.draw_line(Vector2(rect.position.x, rect.end.y), Vector2(rect.end.x, rect.end.y), Color(0, 0, 0, 0.38), 1.5)
 
 ## ── Terrain Drawing ────────────────────────────────────────────────────────────
 

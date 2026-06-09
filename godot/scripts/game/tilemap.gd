@@ -209,25 +209,23 @@ func can_place_building(tile_x: int, tile_y: int, w: int, h: int, btype: String 
 			if tile != TILE_EMPTY and not (sits_on_ground and tile == TILE_GROUND):
 				return false
 
-	# For bridge/ramp: must have solid ground directly below
 	var bottom_ty: int = tile_y + h - 1
-	if btype == "bridge" or btype == "ramp":
-		if not is_solid(tile_x, bottom_ty + 1):
-			return false
-		# Must attach to an existing bridge/platform (bridge) or ramp/bridge/platform (ramp)
+
+	if btype == "bridge":
+		# Bridges span gaps — no ground-below requirement.
+		# Must attach left or right to an existing platform or bridge tile.
 		var left_tile: int = get_tile(tile_x - 1, tile_y)
-		var right_tile: int = get_tile(tile_x + 1, tile_y)
-		if btype == "bridge":
-			var adj: bool = (left_tile == TILE_BRIDGE or left_tile == TILE_PLATFORM or
-			                 right_tile == TILE_BRIDGE or right_tile == TILE_PLATFORM)
-			if not adj:
-				return false
-		else:
-			var adj: bool = (left_tile == TILE_RAMP or left_tile == TILE_BRIDGE or left_tile == TILE_PLATFORM or
-			                 right_tile == TILE_RAMP or right_tile == TILE_BRIDGE or right_tile == TILE_PLATFORM)
-			if not adj:
-				return false
-		return true
+		var right_tile: int = get_tile(tile_x + w, tile_y)
+		var adj: bool = (left_tile == TILE_BRIDGE or left_tile == TILE_PLATFORM or
+		                 right_tile == TILE_BRIDGE or right_tile == TILE_PLATFORM)
+		return adj
+
+	if btype == "ramp":
+		# Ramps need solid ground below — they're stacked to create stairs.
+		# No adjacency requirement; place anywhere with support beneath.
+		return is_solid(tile_x, bottom_ty + 1)
+
+	# All other buildings: every tile beneath the footprint must be solid.
 	for tx in range(tile_x, tile_x + w):
 		if not is_solid(tx, bottom_ty + 1):
 			return false
