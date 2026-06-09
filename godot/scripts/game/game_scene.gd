@@ -669,10 +669,10 @@ func _setup_hud() -> void:
 	# Populate build list (player can't build HQs)
 	var icons: Dictionary = {
 		"barracks": "⚔", "turret": "🗼", "wall": "🧱",
-		"mine": "⛏", "workshop": "🔧"
+		"mine": "⛏", "workshop": "🔧", "bridge": "🌉", "ramp": "🔼"
 	}
 	var build_entries: Array = []
-	for btype in ["barracks", "turret", "wall", "mine", "workshop"]:
+	for btype in ["barracks", "turret", "wall", "mine", "workshop", "bridge", "ramp"]:
 		var data: Dictionary = GameConfig.BUILDING_TYPES.get(btype, {})
 		build_entries.append({
 			"name": btype.capitalize(),
