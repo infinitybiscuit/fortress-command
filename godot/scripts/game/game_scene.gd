@@ -17,12 +17,17 @@ const MAX_DELTA: float = 0.25
 @onready var hud: HUD = $CanvasLayer/HUD
 @onready var camera: FortressCamera = $Camera2D
 
+## ── Overlay UI (title menu + game over) ──────────────────────────────────────────
+var _title_menu_layer: CanvasLayer
+var _game_over_layer: CanvasLayer
+var _game_over_result_label: Label
+var _game_paused: bool = false  # blocked while overlay is showing
+
 ## ── Game State ────────────────────────────────────────────────────────────────────
 enum GameMode { NONE, ONE_V_ONE_CPU, TWO_V_TWO, ONE_V_ONE, SKIRMISH }
 
 var current_game_mode: GameMode = GameMode.NONE
 var game_is_started: bool = false
-var game_paused: bool = false
 
 ## Players
 ## Each player dict: { "faction": int, "income": int, "money": int, "is_ai": bool, "hq": Node }
@@ -61,15 +66,179 @@ signal income_updated(player_idx: int, new_rate: int)
 ## ── Initialization ───────────────────────────────────────────────────────────────
 func _ready() -> void:
 	players = []
-	set_game_mode("1v1_cpu")
+	game_over.connect(_on_game_over)
 	_setup_hud()
+	_show_title_menu()
+
+## ── Title Menu ────────────────────────────────────────────────────────────────────
+func _show_title_menu() -> void:
+	# Block game loop until a mode is selected
+	game_is_started = false
+	_game_paused = true
+
+	_title_menu_layer = CanvasLayer.new()
+	_title_menu_layer.layer = 100
+	add_child(_title_menu_layer)
+
+	# Dark background
+	var bg := Panel.new()
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.color = Color(0.0, 0.0, 0.0, 0.85)
+	_title_menu_layer.add_child(bg)
+
+	# Centered column
+	var col := VBoxContainer.new()
+	col.alignment = VBoxContainer.ALIGNMENT_CENTER
+	col.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	col.position = Vector2(0, 200)
+	col.custom_minimum_size = Vector2(400, 0)
+	_title_menu_layer.add_child(col)
+
+	# Title
+	var title := Label.new()
+	title.text = "FORTRESS COMMAND"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 48)
+	title.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	title.custom_minimum_size = Vector2(400, 80)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(title)
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 40)
+	col.add_child(spacer)
+
+	# Mode buttons — labels match what set_game_mode() expects
+	var modes: Array = [
+		["1 vs CPU",       "1v1_cpu"],
+		["1 vs 1 Local",   "1v1"],
+		["Free-for-All (3)", "2v2"],
+		["Free-for-All (4)", "skirmish"],
+	]
+	for m in modes:
+		var btn := _make_overlay_button(m[0])
+		btn.pressed.connect(func(): _on_mode_selected(m[1]))
+		col.add_child(btn)
+
+func _make_overlay_button(label_text: String) -> Button:
+	var btn := Button.new()
+	btn.text = label_text
+	btn.custom_minimum_size = Vector2(280, 56)
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.204, 0.502, 1.0, 0.9)
+	style.set_border_radius_all(4)
+	style.set_corner_radius_all(4)
+	style.set_content_margin_all(16)
+	btn.add_theme_stylebox_override("normal", style)
+	var hover := StyleBoxFlat.new()
+	hover.bg_color = Color(0.204, 0.502, 1.0, 1.0)
+	hover.set_border_radius_all(4)
+	hover.set_corner_radius_all(4)
+	hover.set_content_margin_all(16)
+	btn.add_theme_stylebox_override("hover", hover)
+	var pressed := StyleBoxFlat.new()
+	pressed.bg_color = Color(0.1, 0.3, 0.8, 1.0)
+	pressed.set_border_radius_all(4)
+	pressed.set_corner_radius_all(4)
+	pressed.set_content_margin_all(16)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_font_size_override("font_size", 20)
+	return btn
+
+func _on_mode_selected(mode_name: String) -> void:
+	_title_menu_layer.queue_free()
+	_title_menu_layer = null
+	_game_paused = false
+	# Clear any previous game state before starting fresh
+	players.clear()
+	_clear_all_entities()
+	set_game_mode(mode_name)
+
+## ── Game Over Overlay ─────────────────────────────────────────────────────────────
+func _on_game_over(winner: int) -> void:
+	game_is_started = false
+	_game_paused = true
+
+	_game_over_layer = CanvasLayer.new()
+	_game_over_layer.layer = 100
+	add_child(_game_over_layer)
+
+	# Dark background
+	var bg := Panel.new()
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.color = Color(0.0, 0.0, 0.0, 0.75)
+	_game_over_layer.add_child(bg)
+
+	# Centered column
+	var col := VBoxContainer.new()
+	col.alignment = VBoxContainer.ALIGNMENT_CENTER
+	col.position = Vector2(0, 180)
+	col.custom_minimum_size = Vector2(400, 0)
+	_game_over_layer.add_child(col)
+
+	# Result label
+	_game_over_result_label = Label.new()
+	_game_over_result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_game_over_result_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_game_over_result_label.add_theme_font_size_override("font_size", 64)
+	col.add_child(_game_over_result_label)
+
+	# Player 0 is the human — win if winner != 0
+	if winner != 0:
+		_game_over_result_label.text = "DEFEAT"
+		_game_over_result_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))
+	else:
+		_game_over_result_label.text = "VICTORY"
+		_game_over_result_label.add_theme_color_override("font_color", Color(0.0, 1.0, 0.4, 1.0))
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 30)
+	col.add_child(spacer)
+
+	# Buttons row
+	var row := HBoxContainer.new()
+	row.alignment = HBoxContainer.ALIGNMENT_CENTER
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(row)
+
+	var restart_btn := _make_overlay_button("RESTART")
+	restart_btn.pressed.connect(_on_restart_pressed)
+	row.add_child(restart_btn)
+
+	var menu_btn := _make_overlay_button("MENU")
+	menu_btn.pressed.connect(_on_main_menu_pressed)
+	row.add_child(menu_btn)
+
+func _on_restart_pressed() -> void:
+	_game_over_layer.queue_free()
+	_game_over_layer = null
+	# Recall the current mode name and replay
+	var mode_name: String
+	match current_game_mode:
+		GameMode.ONE_V_ONE_CPU: mode_name = "1v1_cpu"
+		GameMode.TWO_V_TWO:     mode_name = "2v2"
+		GameMode.ONE_V_ONE:     mode_name = "1v1"
+		GameMode.SKIRMISH:      mode_name = "skirmish"
+		_:                       mode_name = "1v1_cpu"
+	players.clear()
+	_clear_all_entities()
+	_game_paused = false
+	set_game_mode(mode_name)
+
+func _on_main_menu_pressed() -> void:
+	_game_over_layer.queue_free()
+	_game_over_layer = null
+	_show_title_menu()
 
 ## ── Main Game Loop ────────────────────────────────────────────────────────────────
 func _process(delta: float) -> void:
 	# Clamp delta to prevent large jumps on lag spikes
 	delta = min(delta, MAX_DELTA)
 	
-	if not game_is_started or game_paused:
+	if not game_is_started or _game_paused:
 		return
 	
 	# Economy tick every 1 second
@@ -622,7 +791,7 @@ func _draw() -> void:
 	draw_rect(_drag_rect, Color(0.3, 0.5, 1.0, 0.8), false, 1)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not game_is_started or game_paused:
+	if not game_is_started or _game_paused:
 		return
 	if get_viewport().gui_get_hovered_control() != null:
 		return
