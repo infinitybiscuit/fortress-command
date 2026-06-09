@@ -608,12 +608,15 @@ func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> 
 	all_buildings.append(building)
 	building.add_to_group("buildings")
 
-	# Mark bridge/ramp tiles so units can walk across them
+	# Mark bridge/ramp tiles so units can walk across them.
+	# Use bdata dimensions rather than building.width_tiles to avoid any _ready() timing ambiguity.
 	var bdata: Dictionary = GameConfig.BUILDING_TYPES.get(building_type, {})
+	var bw: int = bdata.get("width_tiles", 1)
+	var bh: int = bdata.get("height_tiles", 1)
 	if bdata.get("is_bridge", false):
-		tilemap.mark_bridge_tiles(tile_pos.x, tile_pos.y, building.width_tiles, building.height_tiles, building.get_instance_id())
+		tilemap.mark_bridge_tiles(tile_pos.x, tile_pos.y, bw, bh, building.get_instance_id())
 	if bdata.get("is_ramp", false):
-		tilemap.mark_ramp_tiles(tile_pos.x, tile_pos.y, building.width_tiles, building.height_tiles, building.get_instance_id())
+		tilemap.mark_ramp_tiles(tile_pos.x, tile_pos.y, bw, bh, building.get_instance_id())
 
 	# Mark wall tiles as faction-owned so enemies are blocked but friendlies pass through
 	if bdata.get("blocks_units", false):
@@ -639,11 +642,12 @@ func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> 
 func _on_building_destroyed(building: Node) -> void:
 	all_buildings.erase(building)
 	var bdata: Dictionary = GameConfig.BUILDING_TYPES.get(building.building_type, {})
-	# Use position-based clear for bridge/ramp — avoids any ID lookup failure
+	var bw: int = bdata.get("width_tiles", building.width_tiles)
+	var bh: int = bdata.get("height_tiles", building.height_tiles)
 	if bdata.get("is_bridge", false) or bdata.get("is_ramp", false):
-		tilemap.clear_span_tiles_at(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
-	tilemap.clear_wall_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
-	tilemap.clear_building_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
+		tilemap.clear_span_tiles_at(building.tile_x, building.tile_y, bw, bh)
+	tilemap.clear_wall_tiles(building.tile_x, building.tile_y, bw, bh)
+	tilemap.clear_building_tiles(building.tile_x, building.tile_y, bw, bh)
 	# Note: building.queue_free() is now handled by building._delayed_free()
 	# to give in-flight projectiles a chance to complete without crashing
 

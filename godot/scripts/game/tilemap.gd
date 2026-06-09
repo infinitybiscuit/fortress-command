@@ -41,9 +41,6 @@ var _bridge_tiles: Dictionary = {}
 ## Tracks ramp tiles: "tx,ty" -> building_id (int)
 var _ramp_tiles: Dictionary = {}
 
-## Stores original tile value before bridge/ramp overwrote it: "tx,ty" -> original tile int
-var _span_original_tiles: Dictionary = {}
-
 ## ── Initialisation ───────────────────────────────────────────────────────────
 func _init() -> void:
 	_clear_tiles()
@@ -68,7 +65,6 @@ func generate() -> void:
 	_wall_faction_tiles.clear()
 	_bridge_tiles.clear()
 	_ramp_tiles.clear()
-	_span_original_tiles.clear()
 
 	var ground_top: int = MAP_HEIGHT - GROUND_LEVEL_TILE  # = 17
 
@@ -256,7 +252,6 @@ func mark_bridge_tiles(tile_x: int, tile_y: int, w: int, h: int, building_id: in
 	for tx in range(tile_x, tile_x + w):
 		for ty in range(tile_y, tile_y + h):
 			var key: String = str(tx) + "," + str(ty)
-			_span_original_tiles[key] = tiles[tx][ty]
 			tiles[tx][ty] = TILE_BRIDGE
 			_bridge_tiles[key] = building_id
 
@@ -266,43 +261,21 @@ func mark_ramp_tiles(tile_x: int, tile_y: int, w: int, h: int, building_id: int)
 	for tx in range(tile_x, tile_x + w):
 		for ty in range(tile_y, tile_y + h):
 			var key: String = str(tx) + "," + str(ty)
-			_span_original_tiles[key] = tiles[tx][ty]
 			tiles[tx][ty] = TILE_RAMP
 			_ramp_tiles[key] = building_id
 
 
-## Clear bridge/ramp tiles at the given footprint, restoring original terrain underneath.
-## Called directly from _on_building_destroyed using the building's stored position/size
-## so there is no dependency on a building_id lookup that could silently fail.
+## Clear bridge/ramp tiles at the given footprint.
+## Unconditionally restores every tile in the footprint — no guard on tracking dicts
+## so a missed mark_bridge_tiles call can never leave a ghost TILE_BRIDGE behind.
 func clear_span_tiles_at(tile_x: int, tile_y: int, w: int, h: int) -> void:
 	for tx in range(tile_x, tile_x + w):
 		for ty in range(tile_y, tile_y + h):
 			var key: String = str(tx) + "," + str(ty)
-			if _bridge_tiles.has(key) or _ramp_tiles.has(key):
-				tiles[tx][ty] = _span_original_tiles.get(key, TILE_EMPTY)
-				_bridge_tiles.erase(key)
-				_ramp_tiles.erase(key)
-				_span_original_tiles.erase(key)
-
-
-## Legacy ID-based clear — kept for compatibility but clear_span_tiles_at is preferred.
-func clear_span_tiles(building_id: int) -> void:
-	var keys_to_remove: Array = []
-	for key in _bridge_tiles:
-		if _bridge_tiles[key] == building_id:
-			keys_to_remove.append(key)
-	for key in _ramp_tiles:
-		if _ramp_tiles[key] == building_id:
-			if not keys_to_remove.has(key):
-				keys_to_remove.append(key)
-	for key in keys_to_remove:
-		var parts: Array = key.split(",")
-		var tx: int = int(parts[0])
-		var ty: int = int(parts[1])
-		tiles[tx][ty] = _span_original_tiles.get(key, TILE_EMPTY)
-		_bridge_tiles.erase(key)
-		_ramp_tiles.erase(key)
-		_span_original_tiles.erase(key)
+			# Always clear to TILE_EMPTY — bridge/ramp destruction removes the crossing.
+			tiles[tx][ty] = TILE_EMPTY
+			_bridge_tiles.erase(key)
+			_ramp_tiles.erase(key)
 
 
 func is_ramp_tile(tx: int, ty: int) -> bool:
