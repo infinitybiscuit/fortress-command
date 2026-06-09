@@ -49,6 +49,11 @@ var _drag_rect: Rect2 = Rect2()  # Default Rect2: pos=(0,0), size=(0,0)
 ## Build placement state
 var _pending_build_type: String = ""
 
+## Stretch-build state (bridge/ramp)
+var _stretch_active: bool = false
+var _stretch_start: Vector2 = Vector2.ZERO  # world pos at anchor
+var _stretch_end: Vector2 = Vector2.ZERO    # live world pos during drag
+
 ## Tick timers
 var economy_tick_timer: float = 0.0
 var ai_tick_timer: float = 0.0
@@ -751,6 +756,105 @@ func _select_building(building: Node) -> void:
 		hud.show_train_section(false)
 
 
+func _try_place_building_stretch(world_pos: Vector2) -> void:
+	var btype: String = _pending_build_type
+	var data: Dictionary = GameConfig.BUILDING_TYPES.get(btype, {})
+	var cost_per_tile: int = data.get("cost_per_tile", data.get("cost", 15))
+
+	var start_tile: Vector2i = tilemap.world_to_tile(_stretch_start.x, _stretch_start.y)
+	var end_tile: Vector2i = tilemap.world_to_tile(world_pos.x, world_pos.y)
+
+	if start_tile == end_tile:
+		hud.update_selection_info("Span too short!")
+		return
+
+	var is_bridge: bool = data.get("is_bridge", false)
+	var is_ramp: bool = data.get("is_ramp", false)
+
+	# Bridges are horizontal-only
+	if is_bridge:
+		var tile_dy: int = absi(end_tile.y - start_tile.y)
+		if tile_dy > 0:
+			hud.update_selection_info("Bridge must be horizontal!")
+			return
+
+	# Both ends must have solid ground below (anchor points)
+	var start_bottom: int = start_tile.y + 1
+	var end_bottom: int = end_tile.y + 1
+	if not tilemap.is_solid(start_tile.x, start_bottom) and not tilemap.is_solid(start_tile.x + 1, start_bottom):
+		hud.update_selection_info("Start needs ground below!")
+		return
+	if not tilemap.is_solid(end_tile.x, end_bottom) and not tilemap.is_solid(end_tile.x + 1, end_bottom):
+		hud.update_selection_info("End needs ground below!")
+		return
+
+	var tile_count: int
+	var dx: int = end_tile.x - start_tile.x
+	var dy: int = end_tile.y - start_tile.y
+
+	if is_bridge:
+		tile_count = absi(dx)
+		if tile_count < 2:
+			hud.update_selection_info("Bridge too short (min 2 tiles)!")
+			return
+		# All intermediate + end tiles must be empty (no building overlap)
+		var min_x: int = mini(start_tile.x, end_tile.x)
+		var max_x: int = maxi(start_tile.x, end_tile.x)
+		var tile_y_check: int = start_tile.y
+		for tx in range(min_x, max_x + 1):
+			var tile: int = tilemap.get_tile(tx, tile_y_check)
+			if tile != GameConfig.TILE_EMPTY and tile != GameConfig.TILE_BRIDGE:
+				hud.update_selection_info("Bridge path is blocked!")
+				return
+
+	elif is_ramp:
+		tile_count = maxi(absi(dx), absi(dy))
+		if tile_count < 2:
+			hud.update_selection_info("Ramp too short (min 2 tiles)!")
+			return
+		# Intermediate tiles along the diagonal path must be empty
+		var sign_x: int = signi(dx)
+		var sign_y: int = signi(dy)
+		for i in range(tile_count + 1):
+			var tx: int = start_tile.x + i * sign_x
+			var ty: int = start_tile.y + i * sign_y
+			var tile: int = tilemap.get_tile(tx, ty)
+			if tile != GameConfig.TILE_EMPTY and tile != GameConfig.TILE_RAMP:
+				hud.update_selection_info("Ramp path is blocked!")
+				return
+
+	var total_cost: int = cost_per_tile * tile_count
+	if players.size() == 0 or players[0].get("money", 0) < total_cost:
+		hud.update_selection_info("Not enough credits!")
+		return
+
+	# Place entity at start tile; it spans tile_count tiles wide/tall
+	var entity_w: int = 1
+	var entity_h: int = 1
+	if is_bridge:
+		entity_w = tile_count + 1
+	elif is_ramp:
+		# Ramp entity height covers the vertical span
+		entity_h = tile_count + 1
+
+	players[0]["money"] -= total_cost
+	var building: Node = spawn_building(btype, start_tile, 0)
+
+	# Override width/height so tilemap marks the full span
+	building.width_tiles = entity_w
+	building.height_tiles = entity_h
+
+	# Re-mark bridge/ramp tiles for the full span
+	if is_bridge:
+		tilemap.mark_bridge_tiles(start_tile.x, start_tile.y, entity_w, entity_h, building.get_instance_id())
+	elif is_ramp:
+		tilemap.mark_ramp_tiles(start_tile.x, start_tile.y, entity_w, entity_h, building.get_instance_id())
+
+	hud.update_credits(players[0]["money"])
+	hud.update_selection_info("Placed " + btype.capitalize() + " (" + str(tile_count) + " tiles)")
+	_pending_build_type = ""
+
+
 func _try_place_building(btype: String, world_pos: Vector2) -> void:
 	var data: Dictionary = GameConfig.BUILDING_TYPES.get(btype, {})
 	var cost: int = data.get("cost", 0)
@@ -789,6 +893,14 @@ func _input(event: InputEvent) -> void:
 	if not (event.button_mask & MOUSE_BUTTON_LEFT):
 		return
 	var world_pos: Vector2 = get_global_mouse_position()
+
+	# Bridge/ramp stretch preview — update end position every frame during drag
+	if _stretch_active:
+		_stretch_end = world_pos
+		queue_redraw()
+		return
+
+	# Normal drag-selection rectangle
 	var dist: float = world_pos.distance_to(_drag_start)
 	if dist >= _DRAG_MIN_DISTANCE:
 		_is_dragging = true
@@ -803,8 +915,26 @@ func _input(event: InputEvent) -> void:
 		_drag_rect = Rect2(top_left, size)
 		queue_redraw()
 
-## ── Drag-selection rectangle rendering ───────────────────────────────────
+## ── Drag-selection + stretch-build preview rendering ─────────────────────────
 func _draw() -> void:
+	# Stretch-build preview line
+	if _stretch_active and _pending_build_type != "":
+		var tile_sz: float = GameConfig.TILE_SIZE
+		var start_tile: Vector2i = tilemap.world_to_tile(_stretch_start.x, _stretch_start.y)
+		var end_tile: Vector2i = tilemap.world_to_tile(_stretch_end.x, _stretch_end.y)
+		var start_pt: Vector2 = tilemap.tile_to_world(start_tile.x, start_tile.y) + Vector2(tile_sz / 2.0, tile_sz / 2.0)
+		var end_pt: Vector2 = tilemap.tile_to_world(end_tile.x, end_tile.y) + Vector2(tile_sz / 2.0, tile_sz / 2.0)
+		# Filled rectangle under the span
+		var top_left: Vector2 = Vector2(minf(start_pt.x, end_pt.x), minf(start_pt.y, end_pt.y))
+		var span_size: Vector2 = Vector2(absf(end_pt.x - start_pt.x) + tile_sz, absf(end_pt.y - start_pt.y) + tile_sz)
+		var fill_color: Color = Color(1.0, 0.85, 0.0, 0.18) if _pending_build_type == "bridge" else Color(0.0, 0.85, 1.0, 0.18)
+		draw_rect(Rect2(top_left, span_size), fill_color, true)
+		# Dashed line along the span
+		draw_dashed_line(start_pt, end_pt, Color(1.0, 0.9, 0.0, 0.9), 3.0, 8.0)
+		# Anchor circles
+		draw_circle(start_pt, 6.0, Color(0.0, 1.0, 0.2, 0.9))
+		draw_circle(end_pt, 6.0, Color(1.0, 0.3, 0.0, 0.9))
+
 	if not _is_dragging:
 		return
 	if _drag_rect.size == Vector2.ZERO:
@@ -825,11 +955,26 @@ func _unhandled_input(event: InputEvent) -> void:
 
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				# Begin drag selection
+				# Bridge/ramp stretch-build: click to anchor, drag to set end
+				if _pending_build_type == "bridge" or _pending_build_type == "ramp":
+					_stretch_active = true
+					_stretch_start = world_pos
+					_stretch_end = world_pos
+					hud.update_selection_info("Drag to set end, release to place " + _pending_build_type.capitalize())
+					return
+
+				# Begin drag selection (for unit selection rectangle)
 				_drag_start = world_pos
 				_is_dragging = false
 			else:
-				# Mouse button released — check for drag-to-select
+				# Mouse button released
+				# Stretch-build release: place the span building
+				if _stretch_active:
+					_try_place_building_stretch(world_pos)
+					_stretch_active = false
+					queue_redraw()
+					return
+
 				if _is_dragging:
 					var own_unit: Node = _unit_at_point(world_pos, 0)
 					if own_unit == null:
