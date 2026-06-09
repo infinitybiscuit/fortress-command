@@ -446,10 +446,16 @@ func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> 
 	return building
 
 func _on_building_destroyed(building: Node) -> void:
+	print("DEBUG _on_building_destroyed: building=", building)
 	all_buildings.erase(building)
 	tilemap.clear_building_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
-	building.queue_free()
 	tilemap.clear_wall_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
+	if is_instance_valid(building):
+		print("DEBUG _on_building_destroyed: calling queue_free()")
+		building.queue_free()
+		print("DEBUG _on_building_destroyed: queue_free done")
+	else:
+		print("DEBUG _on_building_destroyed: building already invalid")
 
 	# Check if destroyed building is a player's HQ — trigger game over
 	for i in range(players.size()):
@@ -650,34 +656,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			if event.pressed and selected_units.size() > 0:
-				# Detect double-right-click on an enemy target
-				var now: float = Time.get_ticks_msec() / 1000.0
-				var is_double: bool = (now - _last_right_click_time < _DOUBLE_CLICK_SEC and
-					world_pos.distance_to(_last_right_click_pos) < _DOUBLE_CLICK_PX)
-				_last_right_click_time = now
-				_last_right_click_pos = world_pos
-
-				if is_double:
-					# Check for enemy unit at click position
-					var enemy: Node = _unit_at_point(world_pos, -1)
-					if enemy != null:
-						for unit in selected_units:
-							if is_instance_valid(unit):
-								unit.attack_target(enemy)
-						return
-					# Check for enemy building at click position
-					var enemy_building: Node = _building_at_point(world_pos, -1)
-					if enemy_building != null:
-						for unit in selected_units:
-							if is_instance_valid(unit):
-								unit.attack_target(enemy_building)
-						return
-				# Single right-click with selected units — clear selection (cancel)
 				_clear_selection()
 				return
 			else:
 				_clear_selection()
-			return
+				return
 
 		# Remaining logic only fires for left-button press (not release, not right-click)
 		if event.pressed:
@@ -702,15 +685,26 @@ func _unhandled_input(event: InputEvent) -> void:
 						if is_instance_valid(unit):
 							unit.attack_target(enemy)
 					return
+				var enemy_building: Node = _building_at_point(world_pos, -1)
+				if enemy_building != null:
+					for unit in selected_units:
+						if is_instance_valid(unit):
+							unit.attack_target(enemy_building)
+					return
 
 			# If units are already selected, left-click issues orders first
 			if selected_units.size() > 0:
 				var enemy: Node = _unit_at_point(world_pos, -1)
 				if enemy != null:
-					# Clicked directly on an enemy — attack order
 					for unit in selected_units:
 						if is_instance_valid(unit):
 							unit.attack_target(enemy)
+					return
+				var enemy_building: Node = _building_at_point(world_pos, -1)
+				if enemy_building != null:
+					for unit in selected_units:
+						if is_instance_valid(unit):
+							unit.attack_target(enemy_building)
 					return
 
 				# Not clicking on own unit — move order (keep selection)
