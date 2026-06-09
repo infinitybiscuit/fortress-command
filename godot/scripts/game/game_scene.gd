@@ -637,12 +637,13 @@ func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> 
 	return building
 
 func _on_building_destroyed(building: Node) -> void:
-	print("DEBUG _on_building_destroyed: building=", building)
 	all_buildings.erase(building)
-	tilemap.clear_building_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
+	var bdata: Dictionary = GameConfig.BUILDING_TYPES.get(building.building_type, {})
+	# Use position-based clear for bridge/ramp — avoids any ID lookup failure
+	if bdata.get("is_bridge", false) or bdata.get("is_ramp", false):
+		tilemap.clear_span_tiles_at(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
 	tilemap.clear_wall_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
-	# Clear bridge/ramp tiles if this was a span building
-	tilemap.clear_span_tiles(building.get_instance_id())
+	tilemap.clear_building_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
 	# Note: building.queue_free() is now handled by building._delayed_free()
 	# to give in-flight projectiles a chance to complete without crashing
 
