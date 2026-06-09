@@ -424,7 +424,7 @@ static func _draw_building_bridge(canvas: CanvasItem, rect: Rect2, pc: Color, fa
 		var px: float = deck_rect.position.x + i * (plank_w + plank_gap)
 		if px + plank_w > deck_rect.end.x:
 			break
-		canvas.draw_rect(Rect2(px, deck_rect.position.y, plank_w, deck_rect.size.y), _lerp_color(pc, [0.0, 0.0, 0.0], 0.22))
+		canvas.draw_rect(Rect2(px, deck_rect.position.y, plank_w, deck_rect.size.y), _lerp_color([pc.r, pc.g, pc.b], [0.0, 0.0, 0.0], 0.22))
 		canvas.draw_rect(Rect2(px, deck_rect.position.y, plank_w, 1), Color(1, 1, 1, 0.18))
 
 
