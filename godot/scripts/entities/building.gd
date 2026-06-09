@@ -76,6 +76,7 @@ var world_height: int = 96
 var hp: float = 500.0
 var max_hp: float = 500.0
 var alive: bool = true
+var dead: bool = false  # True once HP reached 0; keeps building alive for in-flight projectiles
 
 ## Selection & Faction
 var is_selected: bool = false
@@ -270,7 +271,7 @@ func _process_training(delta: float) -> void:
 
 ## ── Combat Methods ─────────────────────────────────────────────────────────────
 func take_damage(amount: float) -> void:
-	if not alive:
+	if not alive or dead:
 		return
 	
 	hp -= amount
@@ -282,10 +283,21 @@ func take_damage(amount: float) -> void:
 
 func die() -> void:
 	alive = false
-	building_destroyed.emit(self)
+	dead = true
 	# Remove collision to unblock path
 	if collision_shape:
 		collision_shape.disabled = true
+	# Emit signal deferred — gives in-flight projectiles one frame to complete
+	# without the building vanishing mid-flight. Building frees itself after.
+	building_destroyed.emit(self)
+	# Delayed self-removal: enough time for projectiles in-flight to resolve
+	call_deferred("_delayed_free")
+
+func _delayed_free() -> void:
+	# Small delay to let any final projectiles hit before removal
+	await get_tree().create_timer(0.1).timeout
+	if is_instance_valid(self):
+		queue_free()
 
 func repair(amount: float) -> void:
 	if not alive:

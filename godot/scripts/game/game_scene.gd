@@ -450,12 +450,8 @@ func _on_building_destroyed(building: Node) -> void:
 	all_buildings.erase(building)
 	tilemap.clear_building_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
 	tilemap.clear_wall_tiles(building.tile_x, building.tile_y, building.width_tiles, building.height_tiles)
-	if is_instance_valid(building):
-		print("DEBUG _on_building_destroyed: calling queue_free()")
-		building.queue_free()
-		print("DEBUG _on_building_destroyed: queue_free done")
-	else:
-		print("DEBUG _on_building_destroyed: building already invalid")
+	# Note: building.queue_free() is now handled by building._delayed_free()
+	# to give in-flight projectiles a chance to complete without crashing
 
 	# Check if destroyed building is a player's HQ — trigger game over
 	for i in range(players.size()):
