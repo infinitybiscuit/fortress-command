@@ -623,7 +623,7 @@ func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> 
 
 	# Connect building destruction signal
 	if building.has_signal("building_destroyed"):
-		building.building_destroyed.connect(_on_building_destroyed.bind(building))
+		building.building_destroyed.connect(_on_building_destroyed)
 
 	# Wire unit_trained signal so trained units actually spawn
 	if building.has_signal("unit_trained"):
