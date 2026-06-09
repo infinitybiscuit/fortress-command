@@ -81,7 +81,7 @@ func _show_title_menu() -> void:
 	add_child(_title_menu_layer)
 
 	# Dark background
-var bg := ColorRect.new()
+	var bg := ColorRect.new()
 	bg.color = Color(0.0, 0.0, 0.0, 0.85)
 	_title_menu_layer.add_child(bg)
 
@@ -166,7 +166,7 @@ func _on_game_over(winner: int) -> void:
 	add_child(_game_over_layer)
 
 	# Dark background
-var bg := ColorRect.new()
+	var bg := ColorRect.new()
 	bg.color = Color(0.0, 0.0, 0.0, 0.75)
 	_game_over_layer.add_child(bg)
 
