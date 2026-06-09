@@ -561,12 +561,11 @@ func spawn_unit(unit_type: String, position: Vector2, faction: int) -> Node:
 	return unit
 
 func _on_unit_died(unit: Node) -> void:
-	# Remove from tracking arrays
+	# Remove from tracking arrays — unit self-frees via _delayed_free()
 	all_units.erase(unit)
 	selected_units.erase(unit)
-	# Actually remove the unit from the scene tree
-	if is_instance_valid(unit):
-		unit.queue_free()
+	# Note: unit.queue_free() is now handled by unit._delayed_free()
+	# to give in-flight projectiles a chance to complete without crashing
 
 ## ── Projectiles ──────────────────────────────────────────────────────────────────
 const _PROJECTILE_SCRIPT: GDScript = preload("res://scripts/entities/projectile.gd")

@@ -49,8 +49,12 @@ func _physics_process(delta: float) -> void:
 	global_position += (to_target / dist) * step
 
 func _impact() -> void:
+	# Double-check validity and alive-state before applying damage
+	# (unit.dead flag is set in die() before queue_free() runs)
 	if target != null and is_instance_valid(target) and target.has_method("take_damage"):
-		if target.get("faction") != faction:
+		var state = target.get("current_state")
+		var is_dead = target.get("dead") if target.has("dead") else (state == 4)
+		if not is_dead and target.get("faction") != faction:
 			target.take_damage(damage)
 	queue_free()
 

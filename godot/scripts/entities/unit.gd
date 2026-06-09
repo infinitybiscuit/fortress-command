@@ -76,6 +76,7 @@ const STATS: Dictionary = {
 ## ── Runtime State ─────────────────────────────────────────────────────────────
 var current_state: State = State.IDLE
 var is_selected: bool = false
+var dead: bool = false  # True once health reaches 0; keeps unit alive for in-flight projectiles
 
 ## Current stats (populated from STATS based on unit_type)
 var health: float = 100.0
@@ -315,7 +316,7 @@ func fire_at_target() -> void:
 		attack_fired.emit(attack_target_ref, attack_damage)
 
 func take_damage(amount: float) -> void:
-	if current_state == State.DEAD:
+	if current_state == State.DEAD or dead:
 		return
 
 	health -= amount
@@ -328,9 +329,24 @@ func take_damage(amount: float) -> void:
 		die()
 
 func die() -> void:
+	dead = true
 	_set_state(State.DEAD)
 	velocity = Vector2.ZERO
+	# Deferred: clear attack ref so projectile can finish tracking this unit
+	call_deferred("_clear_attack_refs")
+	# Signal fires — game scene removes from all_units arrays
 	unit_died.emit(self)
+	# Delayed self-removal so in-flight projectiles can complete without crashing
+	call_deferred("_delayed_free")
+
+func _clear_attack_refs() -> void:
+	attack_target_ref = null
+	repair_target_ref = null
+
+func _delayed_free() -> void:
+	await get_tree().create_timer(0.1).timeout
+	if is_instance_valid(self):
+		queue_free()
 
 ## ── Repair Methods ─────────────────────────────────────────────────────────────
 func repair_target(target: Node) -> void:
