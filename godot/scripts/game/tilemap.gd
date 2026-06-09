@@ -289,6 +289,12 @@ func clear_span_tiles(building_id: int) -> void:
 		_ramp_tiles.erase(k)
 
 
+func is_ramp_tile(tx: int, ty: int) -> bool:
+	if tx < 0 or tx >= MAP_WIDTH or ty < 0 or ty >= MAP_HEIGHT:
+		return false
+	return tiles[tx][ty] == TILE_RAMP
+
+
 ## Faction-aware solid check: terrain is always solid; walls only block enemies.
 func is_solid_for_faction(tx: int, ty: int, unit_faction: int) -> bool:
 	if ty < 0 or ty >= MAP_HEIGHT:

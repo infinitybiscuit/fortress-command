@@ -198,6 +198,14 @@ func _apply_physics(delta: float) -> void:
 		var blocked: bool = false
 		for ty in range(ty_top, ty_bot + 1):
 			if tilemap_ref.is_solid_for_faction(tx, ty, int(faction)):
+				# Ramp tile while grounded: step up one tile instead of blocking.
+				# This is the Lemmings staircase mechanic — units auto-climb each step.
+				if on_ground and tilemap_ref.is_ramp_tile(tx, ty):
+					var clear_above: bool = not tilemap_ref.is_solid_for_faction(tx, ty - 1, int(faction))
+					if clear_above:
+						position.y -= float(ts)
+						velocity.y = 0.0
+						break  # don't block — horizontal movement proceeds
 				blocked = true
 				break
 		if blocked:
