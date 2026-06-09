@@ -209,15 +209,25 @@ func can_place_building(tile_x: int, tile_y: int, w: int, h: int, btype: String 
 			if tile != TILE_EMPTY and not (sits_on_ground and tile == TILE_GROUND):
 				return false
 
-	# Must have solid ground directly below the building's bottom edge
-	# (bridges/ramps: only need ONE edge tile to have ground below — the other
-	#  edge can span over a gap, the bridge/ramp itself is the walkable surface)
+	# For bridge/ramp: must have solid ground directly below
 	var bottom_ty: int = tile_y + h - 1
 	if btype == "bridge" or btype == "ramp":
-		# For bridge/ramp: only one side needs ground below
-		if is_solid(tile_x, bottom_ty + 1) or is_solid(tile_x + w - 1, bottom_ty + 1):
-			return true
-		return false
+		if not is_solid(tile_x, bottom_ty + 1):
+			return false
+		# Must attach to an existing bridge/platform (bridge) or ramp/bridge/platform (ramp)
+		var left_tile: int = get_tile(tile_x - 1, tile_y)
+		var right_tile: int = get_tile(tile_x + 1, tile_y)
+		if btype == "bridge":
+			var adj: bool = (left_tile == TILE_BRIDGE or left_tile == TILE_PLATFORM or
+			                 right_tile == TILE_BRIDGE or right_tile == TILE_PLATFORM)
+			if not adj:
+				return false
+		else:
+			var adj: bool = (left_tile == TILE_RAMP or left_tile == TILE_BRIDGE or left_tile == TILE_PLATFORM or
+			                 right_tile == TILE_RAMP or right_tile == TILE_BRIDGE or right_tile == TILE_PLATFORM)
+			if not adj:
+				return false
+		return true
 	for tx in range(tile_x, tile_x + w):
 		if not is_solid(tx, bottom_ty + 1):
 			return false

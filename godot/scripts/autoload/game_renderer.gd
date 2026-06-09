@@ -400,32 +400,32 @@ static func _draw_building_workshop(canvas: CanvasItem, rect: Rect2, pc: Color, 
 		canvas.draw_rect(Rect2(sw_x, sw_y, 8, 14), Color(0.67, 0.73, 0.8))
 
 static func _draw_building_bridge(canvas: CanvasItem, rect: Rect2, pc: Color, faction: int, building: Building) -> void:
-	# Bridge visually spans 4 tiles wide (4 * 32 = 128px) centred on the entity tile
-	var w: float = 128.0
-	var h: float = rect.size.y
-	# Centre the wide bridge on the rect's centre
-	var cx: float = rect.position.x + rect.size.x / 2.0
-	var cy: float = rect.position.y
-	var bridge_rect: Rect2 = Rect2(cx - w / 2.0, cy, w, h)
+	# Single-tile bridge: wooden plank deck (32x32), supports at each horizontal end
+	var w: float = rect.size.x   # 32px
+	var h: float = rect.size.y   # 32px
 
-	# Draw two support posts at the ends
-	canvas.draw_rect(Rect2(bridge_rect.position.x + 2, bridge_rect.position.y, 6, h), _lerp_color(PLAYER_COLORS[faction % 4], [0.0, 0.0, 0.0], 0.38))
-	canvas.draw_rect(Rect2(bridge_rect.end.x - 8, bridge_rect.position.y, 6, h), _lerp_color(PLAYER_COLORS[faction % 4], [0.0, 0.0, 0.0], 0.38))
-	canvas.draw_rect(Rect2(bridge_rect.position.x + 2, bridge_rect.position.y, 2, h), _lerp_color(PLAYER_COLORS[faction % 4], [1.0, 1.0, 1.0], 0.18))
-	canvas.draw_rect(Rect2(bridge_rect.end.x - 8, bridge_rect.position.y, 2, h), _lerp_color(PLAYER_COLORS[faction % 4], [1.0, 1.0, 1.0], 0.18))
+	# Left support post
+	canvas.draw_rect(Rect2(rect.position.x + 2, rect.position.y, 5, h), _lerp_color(PLAYER_COLORS[faction % 4], [0.0, 0.0, 0.0], 0.38))
+	canvas.draw_rect(Rect2(rect.position.x + 2, rect.position.y, 2, h), _lerp_color(PLAYER_COLORS[faction % 4], [1.0, 1.0, 1.0], 0.18))
 
-	# Draw plank deck
-	var plank_w: float = 8.0
+	# Right support post
+	canvas.draw_rect(Rect2(rect.end.x - 7, rect.position.y, 5, h), _lerp_color(PLAYER_COLORS[faction % 4], [0.0, 0.0, 0.0], 0.38))
+	canvas.draw_rect(Rect2(rect.end.x - 7, rect.position.y, 2, h), _lerp_color(PLAYER_COLORS[faction % 4], [1.0, 1.0, 1.0], 0.18))
+
+	# Plank deck fill
+	var deck_rect: Rect2 = Rect2(rect.position.x + 7, rect.position.y + 3, w - 14, h - 6)
+	canvas.draw_rect(deck_rect, pc)
+
+	# Plank lines
+	var plank_w: float = 4.0
 	var plank_gap: float = 2.0
-	var plank_count: int = int((w - 20) / (plank_w + plank_gap))
-	var deck_y: float = bridge_rect.position.y + 3
-	var deck_h: float = h - 6
+	var plank_count: int = int((deck_rect.size.x) / (plank_w + plank_gap))
 	for i in range(plank_count):
-		var px: float = bridge_rect.position.x + 10 + i * (plank_w + plank_gap)
-		if px + plank_w > bridge_rect.end.x - 10:
+		var px: float = deck_rect.position.x + i * (plank_w + plank_gap)
+		if px + plank_w > deck_rect.end.x:
 			break
-		canvas.draw_rect(Rect2(px, deck_y, plank_w, deck_h), pc)
-		canvas.draw_rect(Rect2(px, deck_y, plank_w, 1), Color(1, 1, 1, 0.18))
+		canvas.draw_rect(Rect2(px, deck_rect.position.y, plank_w, deck_rect.size.y), _lerp_color(pc, [0.0, 0.0, 0.0], 0.22))
+		canvas.draw_rect(Rect2(px, deck_rect.position.y, plank_w, 1), Color(1, 1, 1, 0.18))
 
 
 static func _draw_building_ramp(canvas: CanvasItem, rect: Rect2, pc: Color, faction: int, building: Building) -> void:
