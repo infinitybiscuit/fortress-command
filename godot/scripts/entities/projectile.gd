@@ -53,7 +53,7 @@ func _impact() -> void:
 	# (unit.dead flag is set in die() before queue_free() runs)
 	if target != null and is_instance_valid(target) and target.has_method("take_damage"):
 		var state = target.get("current_state")
-		var is_dead = target.get("dead") if target.has("dead") else (state == 4)
+		var is_dead = target.get("dead") == true if target.get("dead") != null else (state == 4)
 		if not is_dead and target.get("faction") != faction:
 			target.take_damage(damage)
 	queue_free()
