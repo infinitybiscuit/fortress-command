@@ -282,6 +282,7 @@ func take_damage(amount: float) -> void:
 		die()
 
 func die() -> void:
+	print("[DIE] building_type=", building_type, " tile=(", tile_x, ",", tile_y, ") connections=", building_destroyed.get_connections().size())
 	alive = false
 	dead = true
 	# Remove collision to unblock path

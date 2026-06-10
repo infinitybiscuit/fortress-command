@@ -614,8 +614,10 @@ func spawn_building(building_type: String, tile_pos: Vector2i, faction: int) -> 
 	var bw: int = bdata.get("width_tiles", 1)
 	var bh: int = bdata.get("height_tiles", 1)
 	if bdata.get("is_bridge", false):
+		print("[MARK] bridge at building.tile=(", building.tile_x, ",", building.tile_y, ") mark_pos=(", tile_pos.x, ",", tile_pos.y, ")")
 		tilemap.mark_bridge_tiles(tile_pos.x, tile_pos.y, bw, bh, building.get_instance_id())
 	if bdata.get("is_ramp", false):
+		print("[MARK] ramp at building.tile=(", building.tile_x, ",", building.tile_y, ") mark_pos=(", tile_pos.x, ",", tile_pos.y, ")")
 		tilemap.mark_ramp_tiles(tile_pos.x, tile_pos.y, bw, bh, building.get_instance_id())
 
 	# Mark wall tiles as faction-owned so enemies are blocked but friendlies pass through
@@ -644,8 +646,11 @@ func _on_building_destroyed(building: Node) -> void:
 	var bdata: Dictionary = GameConfig.BUILDING_TYPES.get(building.building_type, {})
 	var bw: int = bdata.get("width_tiles", building.width_tiles)
 	var bh: int = bdata.get("height_tiles", building.height_tiles)
+	print("[DESTROY] type=", building.building_type, " tile=(", building.tile_x, ",", building.tile_y, ") size=(", bw, "x", bh, ") is_bridge=", bdata.get("is_bridge", false), " is_ramp=", bdata.get("is_ramp", false))
 	if bdata.get("is_bridge", false) or bdata.get("is_ramp", false):
+		print("[DESTROY]   tile BEFORE clear = ", tilemap.get_tile(building.tile_x, building.tile_y))
 		tilemap.clear_span_tiles_at(building.tile_x, building.tile_y, bw, bh)
+		print("[DESTROY]   tile AFTER clear  = ", tilemap.get_tile(building.tile_x, building.tile_y))
 	tilemap.clear_wall_tiles(building.tile_x, building.tile_y, bw, bh)
 	tilemap.clear_building_tiles(building.tile_x, building.tile_y, bw, bh)
 	# Note: building.queue_free() is now handled by building._delayed_free()
