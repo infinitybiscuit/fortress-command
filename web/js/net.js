@@ -119,6 +119,12 @@ function loadPeerJs() {
   return peerLib;
 }
 
+// Long messages are split into pieces of this many characters. Kept well under
+// PeerJS's 16300-byte JSON limit, since quotes in the text grow when the piece
+// is itself encoded as JSON.
+const PIECE = 'piece';
+const PIECE_SIZE = 6000;
+
 // peer: the guest's own Peer, torn down with its only connection. The host's
 // Peer outlives each guest's connection, so it passes null.
 function wrapConnection(conn, peer) {
@@ -129,10 +135,31 @@ function wrapConnection(conn, peer) {
     closed = true;
     t.emit('close');
   };
-  conn.on('data', (d) => t.emit('message', d));
+  // PeerJS's JSON channel refuses any message over ~16KB (and reports it as an
+  // error), and a big battle's update plus the terrain is more than that. So
+  // long messages go out in pieces and are joined up again on arrival.
+  let nextId = 0;
+  const pieces = new Map();
+  conn.on('data', (d) => {
+    if (d?.t !== PIECE) { t.emit('message', d); return; }
+    const got = pieces.get(d.id) || [];
+    got.push(d.d);
+    if (got.length < d.n) { pieces.set(d.id, got); return; }
+    pieces.delete(d.id);
+    try { t.emit('message', JSON.parse(got.join(''))); } catch { /* garbled — skip it */ }
+  });
   conn.on('close', close);
-  conn.on('error', close);
-  t.send = (obj) => { if (conn.open) conn.send(obj); };
+  // Errors such as an oversized message don't end the connection; a real drop
+  // fires 'close', and the game's heartbeat catches anything else.
+  conn.on('error', (e) => console.warn('connection error', e?.type || e));
+  t.send = (obj) => {
+    if (!conn.open) return;
+    const text = JSON.stringify(obj);
+    if (text.length <= PIECE_SIZE) { conn.send(obj); return; }
+    const id = ++nextId;
+    const n = Math.ceil(text.length / PIECE_SIZE);
+    for (let i = 0; i < n; i++) conn.send({ t: PIECE, id, n, d: text.slice(i * PIECE_SIZE, (i + 1) * PIECE_SIZE) });
+  };
   t.pc = conn.peerConnection;
   // Bytes queued but not yet sent: lets the host skip updates for a slow link.
   t.buffered = () => conn.dataChannel?.bufferedAmount ?? 0;
