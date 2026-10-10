@@ -44,7 +44,7 @@ export function canHitAir(u) {
 
 // Visual-only effects (rendered by render.js drawEffects).
 export function deathEffect(u) {
-  return { kind: u.vehicle || u.air ? 'wreck' : 'fall', x: u.x, y: u.y, facing: u.facing, f: u.faction, t: 0, life: u.vehicle || u.air ? 5 : 6 };
+  return { kind: u.vehicle || u.air ? 'wreck' : 'fall', type: u.type, x: u.x, y: u.y, facing: u.facing, f: u.faction, t: 0, life: u.vehicle || u.air ? 5 : 6 };
 }
 export function debrisEffect(x, y, size) {
   const parts = [];

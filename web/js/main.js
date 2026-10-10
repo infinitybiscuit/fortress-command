@@ -11,7 +11,7 @@ import {
 } from './net.js';
 import {
   drawBackground, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
-  drawEffects, updateEffects, drawMarker, G, SKY_TOP,
+  drawEffects, updateEffects, drawMarker, drawWeather, G, skyTop, setTheme, THEMES, currentTheme,
 } from './render.js';
 
 const $ = (id) => document.getElementById(id);
@@ -152,6 +152,10 @@ function issue(cmd) {
 }
 const ids = (list) => list.map((u) => u.id);
 
+// Names and badges come from the theme (Rise of the Robots renames units).
+const nameOf = (t) => currentTheme().names?.[t] || capitalize(t);
+const iconOf = (t) => currentTheme().icons?.[t] || UNIT_ICONS[t] || BUILD_ICONS[t];
+
 // ── Selection helpers ──────────────────────────────────────────────────────
 const selectedUnits = () => (game ? game.units.filter((u) => u.selected && u.faction === active) : []);
 
@@ -271,7 +275,7 @@ function confirmPlacement() {
   if (!check.valid) { toast("Can't place here!"); return; }
   const err = issue({ c: 'place', type: pendingBuild, tx: ghost.tx, ty: ghost.ty });
   if (err) { toast(err); return; }
-  toast(`${capitalize(pendingBuild)} placed`, 'info');
+  toast(`${nameOf(pendingBuild)} placed`, 'info');
   // Bridges and ramps are usually laid in runs — stay in placement mode,
   // previewing the next tile along.
   if (pendingBuild === 'bridge' || pendingBuild === 'ramp') {
@@ -418,7 +422,7 @@ function renderPanel() {
         : 'Must sit on solid ground or a platform.';
     const zoneTip = ' Build inside the green zone near your base.';
     panel.innerHTML = `
-      <div class="panel-head"><div class="panel-title">${BUILD_ICONS[pendingBuild]} Place ${capitalize(pendingBuild)}</div>
+      <div class="panel-head"><div class="panel-title">${iconOf(pendingBuild)} Place ${nameOf(pendingBuild)}</div>
         <div class="panel-sub">💰 ${d.cost} · ${d.buildTime}s</div></div>
       <div class="hint">Tap the battlefield to position it, then tap the same spot again or press Place. ${tip}${zoneTip}</div>
       <div class="row" style="margin-top:auto">
@@ -429,7 +433,7 @@ function renderPanel() {
   }
 
   if (mode === 'building') {
-    const name = capitalize(b.type);
+    const name = nameOf(b.type);
     const hp = `${Math.ceil(b.hp)}/${b.maxHp} HP`;
     let body = '';
     if (b.constructing) {
@@ -442,11 +446,11 @@ function renderPanel() {
         const u = UNIT_TYPES[t];
         return `<button class="tile-btn" data-train="${t}" ${money >= u.cost ? '' : 'disabled'}>
           ${counts[t] ? `<span class="badge">${counts[t]}</span>` : ''}
-          <span class="ic">${UNIT_ICONS[t]}</span><span class="nm">${capitalize(t)}</span>
+          <span class="ic">${iconOf(t)}</span><span class="nm">${nameOf(t)}</span>
           <span class="ct">💰${u.cost} · ${u.trainTime}s</span></button>`;
       }).join('')}</div>
       <div class="progress"><div style="width:${b.trainCurrent ? (1 - b.trainTimer / b.trainTotal) * 100 : 0}%"></div></div>
-      <div class="hint">${b.trainCurrent ? `Training ${capitalize(b.trainCurrent)}${b.queue.length ? ` · ${b.queue.length} queued` : ''}` : 'Tap a unit to queue it.'}</div>`;
+      <div class="hint">${b.trainCurrent ? `Training ${nameOf(b.trainCurrent)}${b.queue.length ? ` · ${b.queue.length} queued` : ''}` : 'Tap a unit to queue it.'}</div>`;
     } else {
       const info = {
         hq: `Command centre. Earns +${BUILDING_TYPES.hq.income}/s. Lose it and you lose.`,
@@ -459,7 +463,7 @@ function renderPanel() {
       body = `<div class="hint">${info}</div>`;
     }
     panel.innerHTML = `
-      <div class="panel-head"><div class="panel-title">${BUILD_ICONS[b.type] || '🏰'} ${name}</div>
+      <div class="panel-head"><div class="panel-title">${iconOf(b.type) || '🏰'} ${name}</div>
         <div class="panel-sub">${hp}</div>
         <button class="small-btn" data-act="deselect">✕</button></div>
       ${body}
@@ -472,13 +476,13 @@ function renderPanel() {
   const buildGrid = `<div class="grid">${BUILD_MENU.map((t) => {
     const d = BUILDING_TYPES[t];
     return `<button class="tile-btn" data-build="${t}" ${money >= d.cost ? '' : 'disabled'}>
-      <span class="ic">${BUILD_ICONS[t]}</span><span class="nm">${capitalize(t)}</span><span class="ct">💰${d.cost}</span></button>`;
+      <span class="ic">${iconOf(t)}</span><span class="nm">${nameOf(t)}</span><span class="ct">💰${d.cost}</span></button>`;
   }).join('')}</div>`;
 
   if (mode === 'units') {
     const counts = {};
     for (const u of sel) counts[u.type] = (counts[u.type] || 0) + 1;
-    const summary = Object.entries(counts).map(([t, n]) => `${UNIT_ICONS[t]}×${n}`).join('  ');
+    const summary = Object.entries(counts).map(([t, n]) => `${iconOf(t)}×${n}`).join('  ');
     panel.innerHTML = `
       <div class="panel-head"><div class="panel-title">${sel.length} selected <span class="panel-sub">${summary}</span></div>
         <button class="small-btn" data-act="deselect">✕</button></div>
@@ -508,12 +512,12 @@ panel.addEventListener('click', (e) => {
     clearSelection();
     pendingBuild = t;
     ghost = null;
-    setStatus(`Tap to place ${capitalize(t)}`);
+    setStatus(`Tap to place ${nameOf(t)}`);
   } else if (btn.dataset.train) {
     const t = btn.dataset.train;
     if (selectedBuilding && p.money >= UNIT_TYPES[t].cost) {
       const err = issue({ c: 'train', id: selectedBuilding.id, type: t });
-      if (!err) toast(`${capitalize(t)} queued`, 'info');
+      if (!err) toast(`${nameOf(t)} queued`, 'info');
     }
   } else {
     const sel = selectedUnits();
@@ -527,7 +531,7 @@ panel.addEventListener('click', (e) => {
         if (!b) break;
         if (sellArmed?.id === b.id && performance.now() < sellArmed.until) {
           sellArmed = null;
-          const name = capitalize(b.type);
+          const name = nameOf(b.type);
           const refund = game.sellValue(b);
           issue({ c: 'sell', id: b.id });
           clearSelection();
@@ -1359,6 +1363,9 @@ function draw(dt) {
     drawBuildZones(lctx, zones.sort((a, b) => a[0] - b[0]), v);
   }
 
+  lctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawWeather(lctx, bw, bh, camAX, topA);
+
   markers = markers.filter((m) => (m.t -= dt) > 0);
   eachCopy(() => {
     if (pendingBuild && ghost) drawGhost(lctx, ghost);
@@ -1367,12 +1374,35 @@ function draw(dt) {
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const top = (topA - camAY) * P - offY;
-  if (top > 0) { ctx.fillStyle = SKY_TOP; ctx.fillRect(0, 0, canvas.width, top + 1); }
+  if (top > 0) { ctx.fillStyle = skyTop(); ctx.fillRect(0, 0, canvas.width, top + 1); }
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(low, 0, 0, bw, bh, -offX, top, bw * P, bh * P);
 
   mctx.setTransform(1, 0, 0, 1, 0, 0);
   drawMinimap(mctx, game, mini.width, mini.height, v, minimapCache, pendingBuild ? game.buildZones(active) : null);
+}
+
+// ── Themes ─────────────────────────────────────────────────────────────────
+// A look for the battlefield and menus, chosen on the title screen and kept
+// on this device. Purely cosmetic: online opponents can use different themes.
+const THEME_KEY = 'fortress-theme';
+const TAGLINES = { classic: 'Build. Train. Conquer.', robots: 'Rise of the Robots. The machines are coming.' };
+function applyTheme(id) {
+  const t = setTheme(id);
+  document.body.dataset.theme = t.id;
+  $('btn-theme').textContent = `Theme: ${t.name}`;
+  $('tagline').textContent = TAGLINES[t.id] || TAGLINES.classic;
+  panelKey = '';
+  try { localStorage.setItem(THEME_KEY, t.id); } catch { /* storage unavailable */ }
+}
+$('btn-theme').addEventListener('click', () => {
+  const i = THEMES.indexOf(currentTheme());
+  applyTheme(THEMES[(i + 1) % THEMES.length].id);
+});
+{
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch { /* storage unavailable */ }
+  applyTheme(saved || 'classic');
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────
