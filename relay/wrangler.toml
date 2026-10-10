@@ -1,0 +1,5 @@
+# Only needed if you deploy from a computer with `npx wrangler deploy`.
+# Deploying by pasting src/index.js into the Cloudflare dashboard works too.
+name = "fortress-relay"
+main = "src/index.js"
+compatibility_date = "2026-09-01"

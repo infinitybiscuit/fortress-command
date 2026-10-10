@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#141a38">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Fortress">
+  <meta name="format-detection" content="telephone=no">
+  <title>Fortress Command</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="hud">
+      <div class="hud-left">
+        <div id="credits" class="credits">💰 500</div>
+        <div id="income" class="income">+5/s</div>
+      </div>
+      <div class="hud-center">
+        <div id="player-chip" class="player-chip"></div>
+        <div id="mode-label" class="mode-label"></div>
+      </div>
+      <div class="hud-right">
+        <button id="btn-switch" class="hud-btn hidden" aria-label="Switch player">⇄</button>
+        <button id="btn-pause" class="hud-btn" aria-label="Pause">⏸</button>
+      </div>
+    </header>
+
+    <main id="stage">
+      <canvas id="world"></canvas>
+      <div id="status" class="status"></div>
+      <div id="toast" class="toast"></div>
+      <div class="zoom-ctrl">
+        <button id="btn-zoom-in" class="round-btn" aria-label="Zoom in">＋</button>
+        <button id="btn-zoom-out" class="round-btn" aria-label="Zoom out">－</button>
+      </div>
+    </main>
+
+    <div id="minimap-wrap"><canvas id="minimap"></canvas></div>
+
+    <section id="panel"></section>
+  </div>
+
+  <div id="overlay-title" class="overlay">
+    <div class="overlay-card">
+      <h1>FORTRESS<br>COMMAND</h1>
+      <p class="tagline">Build. Train. Conquer.</p>
+      <div class="menu-buttons" id="mode-buttons"></div>
+      <details class="howto">
+        <summary>How to play</summary>
+        <ul>
+          <li><b>Drag</b> the battlefield to pan, <b>pinch</b> to zoom.</li>
+          <li><b>Tap</b> one of your units to select it. <b>Double-tap</b> to grab every unit of that type on screen. <b>All units</b> selects your whole army.</li>
+          <li>With units selected, tap the ground to <b>move</b> or tap an enemy to <b>attack</b>.</li>
+          <li>Tap a <b>Barracks</b>, <b>Workshop</b> or <b>Airbase</b> to train units.</li>
+          <li>The <b>Build</b> menu shows when nothing is selected (tap ✕ to clear a selection). Pick a structure, tap where it goes, then tap again (or <b>Place</b>) to build. Green means valid.</li>
+          <li><b>Bridges</b> extend sideways off platforms. Stack <b>ramps</b> into stairs that units climb automatically.</li>
+          <li>Destroy every enemy HQ to win.</li>
+        </ul>
+      </details>
+      <p class="version"></p>
+    </div>
+  </div>
+
+  <div id="overlay-online" class="overlay hidden">
+    <div class="overlay-card">
+      <h2 class="online-title">ONLINE<br>1 VS 1</h2>
+      <div id="online-home">
+        <p class="tagline">Play a friend on their own phone. One of you hosts, the other joins with the room code.</p>
+        <div class="menu-buttons">
+          <button class="menu-btn" id="btn-host">Host a game</button>
+          <div class="join-row">
+            <input id="join-code" class="code-input" maxlength="5" placeholder="CODE" autocapitalize="characters"
+              autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Room code">
+            <button class="menu-btn" id="btn-join">Join</button>
+          </div>
+          <button class="menu-btn secondary" id="btn-online-back">Back</button>
+        </div>
+      </div>
+      <div id="online-wait" class="hidden">
+        <p class="tagline" id="online-status"></p>
+        <div class="room-code" id="room-code"></div>
+        <div class="menu-buttons">
+          <button class="menu-btn" id="btn-share">Share invite</button>
+          <button class="menu-btn secondary" id="btn-online-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay-pause" class="overlay hidden">
+    <div class="overlay-card">
+      <h2>PAUSED</h2>
+      <div class="menu-buttons">
+        <button class="menu-btn" id="btn-resume">Resume</button>
+        <button class="menu-btn" id="btn-restart">Restart</button>
+        <button class="menu-btn secondary" id="btn-quit">Main Menu</button>
+      </div>
+      <p class="version"></p>
+    </div>
+  </div>
+
+  <div id="overlay-gameover" class="overlay hidden">
+    <div class="overlay-card">
+      <h2 id="result-label">VICTORY</h2>
+      <p id="result-sub" class="tagline"></p>
+      <div class="menu-buttons">
+        <button class="menu-btn" id="btn-again">Restart</button>
+        <button class="menu-btn secondary" id="btn-menu">Main Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="rotate-hint">Rotate your phone to portrait</div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

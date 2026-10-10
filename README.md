@@ -4,6 +4,10 @@ A side-scrolling platformer / RTS crossover built in Godot 4.
 
 Build bases, train armies, construct defences, and conquer the opposing forces across a procedurally generated battlefield.
 
+## Web version (iPhone)
+
+The `web/` folder has a no-build HTML5 port tuned for iPhone portrait play. See [`web/README.md`](web/README.md).
+
 ## How to Play
 
 Open the project in Godot 4 (editior or exported binary). Select a scene under `godot/scenes/game/` and press F5 to run.
