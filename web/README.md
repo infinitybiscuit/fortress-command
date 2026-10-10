@@ -45,15 +45,15 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
     - **Techs** in welding goggles (Engineer).
     - Armoured cyborg **Enforcers** (Sniper).
   - **Vehicles:**
-    - **Cruiser:** a police interceptor with a flashing light bar (Jeep).
-    - **Hunter:** a robot tank with twin plasma cannons (Tank).
-    - **Walker:** a two-legged missile mech (Artillery).
+    - **Cruiser:** a hovering police spinner with a flashing light bar (Jeep).
+    - **Hunter:** a hulking tracked killing machine with a red-eyed sensor head and twin plasma cannons (Tank).
+    - **Walker:** a two-legged enforcement mech with arm cannons and a missile pod (Artillery).
   - **Aircraft:**
-    - **Drone:** a hovering hunter machine with a searchlight (Helicopter).
-    - **Dropship:** a VTOL gunship (Bomber).
+    - **Drone:** a twin-turbine aerial hunter-killer with a searchlight (Helicopter).
+    - **Dropship:** a heavy VTOL with glowing engine pods (Bomber).
   - **Buildings:** Command tower, Bunker, Pulse Gun, Barrier, Reactor, Factory, Skyport, Girder and Ramp.
   - **Effects:** buildings go up behind a holographic frame, shots are plasma bolts and missiles, and fallen machines leave chrome scrap.
-  - **Menus:** the interface switches to dark steel and neon.
+  - **Menus:** the interface switches to dark steel and neon, and units appear as their own pixel-art sprites.
 
 Each theme is one file in `js/themes/`. It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
 

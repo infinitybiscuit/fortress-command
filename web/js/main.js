@@ -11,7 +11,7 @@ import {
 } from './net.js';
 import {
   drawBackground, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
-  drawEffects, updateEffects, drawMarker, drawWeather, G, skyTop, setTheme, THEMES, currentTheme,
+  drawEffects, updateEffects, drawMarker, drawWeather, G, skyTop, setTheme, THEMES, currentTheme, unitIcon,
 } from './render.js';
 
 const $ = (id) => document.getElementById(id);
@@ -154,7 +154,11 @@ const ids = (list) => list.map((u) => u.id);
 
 // Names and badges come from the theme (Rise of the Robots renames units).
 const nameOf = (t) => currentTheme().names?.[t] || capitalize(t);
-const iconOf = (t) => currentTheme().icons?.[t] || UNIT_ICONS[t] || BUILD_ICONS[t];
+const iconOf = (t) => {
+  const th = currentTheme();
+  if (th.spriteIcons && UNIT_TYPES[t]) return `<img class="sprite-ic" src="${unitIcon(t, active)}" alt="">`;
+  return th.icons?.[t] || UNIT_ICONS[t] || BUILD_ICONS[t];
+};
 
 // ── Selection helpers ──────────────────────────────────────────────────────
 const selectedUnits = () => (game ? game.units.filter((u) => u.selected && u.faction === active) : []);

@@ -347,3 +347,7 @@ body[data-theme="robots"] .toast.info { background: rgba(22, 82, 110, 0.95); }
 body[data-theme="robots"] .code-input { background: #05040a; }
 body[data-theme="robots"] .howto ul { color: var(--text); }
 body[data-theme="robots"] .round-btn { background: rgba(17, 15, 27, 0.85); }
+
+/* Sprite icons (themes that show units as their own pixel art in menus) */
+.sprite-ic { height: 26px; width: auto; max-width: 64px; image-rendering: pixelated; vertical-align: middle; }
+.summary .sprite-ic, .panel-sub .sprite-ic { height: 16px; }
