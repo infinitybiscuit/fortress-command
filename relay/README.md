@@ -25,7 +25,7 @@ Online games connect the two phones directly when they can. Some networks, espec
 - To try it before it's built into the game, open the game with `?relayUrl=https://fortress-relay.<your-subdomain>.workers.dev&relay=only` added to the address. Online games then *must* go through the relay. During a match the label under your name shows `· relay`.
 
 **5. Turn it on for everyone**
-- Put the Worker URL into `RELAY_URL` in [`web/js/config.js`](../web/js/config.js) and deploy the site.
+- Put the Worker URL into `RELAY_URL` in [`web/js/config.js`](../web/js/config.js) and deploy the site. (Done: the game uses `https://fortress-relay.tj-coles.workers.dev/`.)
 
 ## From a computer instead
 
