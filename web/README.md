@@ -53,7 +53,7 @@ Play friends on their own devices, anywhere with internet:
 
 Colours follow seat order: Blue, Red, Green, Yellow. Everyone uses the normal controls. Online games can't be paused. ⏸ opens the menu, but the battle keeps going. The latency shows under your name; the host sees their slowest guest. If your HQ falls while others fight on, you can keep watching. When the battle ends, the host taps **Back to lobby** to bring everyone back for another round. New players can join then too.
 
-**How it works.** The phones connect directly to each other (WebRTC, via the bundled [PeerJS](https://peerjs.com) library). PeerJS's free public server only introduces them. The host's phone runs the game, and each guest connects to the host. Guests send their orders and receive the battlefield state about 12 times a second, smoothed between updates. Both players must be on the same app version; the menu shows it.
+**How it works.** The phones connect directly to each other (WebRTC, via the bundled [PeerJS](https://peerjs.com) library). A matchmaking server only introduces them: our own Cloudflare Worker (see [`../relay`](../relay/README.md)), or PeerJS's free public server if ours doesn't answer. The host's phone runs the game, and each guest connects to the host. Guests send their orders and receive the battlefield state about 12 times a second, smoothed between updates. Both players must be on the same app version; the menu shows it.
 
 **Dropped connections.** Phones lose signal, switch between Wi-Fi and mobile data, and lock their screens, so a guest who drops mid-battle keeps their seat:
 - Their phone reconnects by itself, for up to a minute, and puts them back where they were. Everyone sees "… lost connection — reconnecting…" and then "… reconnected".
