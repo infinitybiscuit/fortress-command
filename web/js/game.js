@@ -47,6 +47,8 @@ export class Game {
     return u;
   }
 
+  buildingById(id) { return this.buildings.find((b) => b.id === id && !b.dead) || null; }
+
   spawnBuilding(type, tx, ty, faction) {
     const b = new Building(this, type, tx, ty, faction);
     this.buildings.push(b);

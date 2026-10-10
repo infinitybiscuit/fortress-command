@@ -63,6 +63,7 @@ export class Unit {
 
   moveTo(x) {
     if (this.dead) return;
+    this.resume = null;
     this.moveX = x;
     this.target = null;
     this.state = State.MOVING;
@@ -70,6 +71,7 @@ export class Unit {
 
   attack(target) {
     if (this.dead || !target || target.dead) return;
+    this.resume = null;
     // Engineers repair friendly buildings and vehicles.
     if (this.repairRate > 0 && target.faction === this.faction && (target.kind === 'building' || target.vehicle)) {
       this.target = target;
@@ -101,7 +103,17 @@ export class Unit {
       }
       case State.ATTACKING: {
         const t = this.target;
-        if (!t || t.dead) { this.target = null; this.state = State.IDLE; this.vx = 0; break; }
+        if (!t || t.dead) {
+          this.target = null;
+          this.state = State.IDLE;
+          this.vx = 0;
+          // A wall that was in the way is down — carry on with the original order.
+          const r = this.resume;
+          if (r?.target && !r.target.dead) this.attack(r.target);
+          else if (r?.moveX != null) this.moveTo(r.moveX);
+          this.resume = null;
+          break;
+        }
         const [cx, cy] = this.centre();
         if (distTo(cx, cy, t) > this.range) {
           const [tx] = t.centre();
@@ -132,7 +144,18 @@ export class Unit {
         this.vx = 0;
     }
     if (this.vx !== 0) this.facing = Math.sign(this.vx);
+    const wasMoving = this.state === State.MOVING;
+    this.blockedBy = null;
     this.applyPhysics(dt);
+
+    // Walked into an enemy wall: knock it down, then resume the order.
+    const wall = this.blockedBy;
+    if (wall && !wall.dead && this.target !== wall && this.repairRate === 0) {
+      const resume = wasMoving ? { moveX: this.moveX }
+        : this.state === State.ATTACKING ? { target: this.target } : null;
+      this.attack(wall);
+      this.resume = resume;
+    }
   }
 
   scanForEnemy() {
@@ -154,8 +177,15 @@ export class Unit {
     if (best) this.attack(best);
   }
 
-  // Separate-axis AABB tile collision; (x, y) is the unit's feet.
+  // Sub-step so fast units (or a long frame) can't tunnel through a 32px tile.
   applyPhysics(dt) {
+    const travel = Math.max(Math.abs(this.vx), Math.abs(this.vy) + GRAVITY * dt) * dt;
+    const n = Math.min(8, Math.max(1, Math.ceil(travel / 12)));
+    for (let i = 0; i < n; i++) this.stepPhysics(dt / n);
+  }
+
+  // Separate-axis AABB tile collision; (x, y) is the unit's feet.
+  stepPhysics(dt) {
     const map = this.game.map;
     const ts = TILE_SIZE;
     const halfW = this.w / 2;
@@ -179,6 +209,8 @@ export class Unit {
           break;
         }
         blocked = true;
+        const wallId = map.enemyWallAt(tx, ty, this.faction);
+        if (wallId != null) this.blockedBy = this.game.buildingById(wallId);
         break;
       }
       if (blocked) {
@@ -403,8 +435,30 @@ export class Projectile {
       this.impact(this.target.dead ? null : this.target);
       return;
     }
-    this.x += (dx / dist) * step;
-    this.y += (dy / dist) * step;
+    const nx = this.x + (dx / dist) * step;
+    const ny = this.y + (dy / dist) * step;
+    // Enemy walls stop direct fire (lobbed artillery arcs over them).
+    const wall = this.wallOnPath(this.x, this.y, nx, ny);
+    if (wall && wall !== this.target) {
+      this.x = Math.max(wall.x, Math.min(nx, wall.x + wall.w));
+      this.y = ny;
+      this.impact(wall);
+      return;
+    }
+    this.x = nx;
+    this.y = ny;
+  }
+
+  wallOnPath(x0, y0, x1, y1) {
+    const map = this.game.map;
+    const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 8));
+    for (let i = 1; i <= n; i++) {
+      const px = x0 + ((x1 - x0) * i) / n;
+      const py = y0 + ((y1 - y0) * i) / n;
+      const id = map.enemyWallAt(Math.floor(px / TILE_SIZE), Math.floor(py / TILE_SIZE), this.faction);
+      if (id != null) return this.game.buildingById(id);
+    }
+    return null;
   }
 
   hit(e, amount) {

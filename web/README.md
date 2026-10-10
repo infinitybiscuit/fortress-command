@@ -43,6 +43,10 @@ after each block, so you can lay several in a row.
 Desktop works too: click instead of tap, mouse wheel zooms, WASD or the arrow keys pan,
 and Esc cancels.
 
+## Walls
+
+Walls block enemy units, and your own troops walk straight through them. Enemies that run into a wall stop and attack it, then carry on with their orders once it falls. Walls also stop direct fire: bullets and tank shells aimed past a wall hit the wall instead. Lobbed artillery shells arc over walls.
+
 ## Vehicles (Workshop)
 
 | Vehicle | Cost | Build | Role |

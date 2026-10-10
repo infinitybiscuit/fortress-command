@@ -68,6 +68,15 @@ export class TileMap {
 
   isRamp(tx, ty) { return this.get(tx, ty) === TILE_RAMP; }
 
+  // Id of the wall building at a tile if it belongs to a faction other than
+  // `faction`, else null.
+  enemyWallAt(tx, ty, faction) {
+    if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return null;
+    const k = key(tx, ty);
+    if (!this.wallTiles.has(k) || this.wallTiles.get(k) === faction) return null;
+    return this.buildingTiles.get(k) ?? null;
+  }
+
   worldToTile(wx, wy) { return [Math.floor(wx / TILE_SIZE), Math.floor(wy / TILE_SIZE)]; }
 
   canPlace(tx, ty, w, h, type) {
