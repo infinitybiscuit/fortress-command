@@ -71,10 +71,12 @@
 
   <div id="overlay-online" class="overlay hidden">
     <div class="overlay-card">
-      <h2 class="online-title">ONLINE<br>1 VS 1</h2>
+      <h2 class="online-title">ONLINE<br>BATTLE</h2>
       <div id="online-home">
-        <p class="tagline">Play a friend on their own phone. One of you hosts, the other joins with the room code.</p>
+        <p class="tagline">Play friends on their own phones — up to 4 players. One of you hosts, the others join with the room code.</p>
         <div class="menu-buttons">
+          <input id="player-name" class="code-input name-input" maxlength="12" placeholder="YOUR NAME" autocomplete="off"
+            autocorrect="off" spellcheck="false" enterkeyhint="done" aria-label="Your name">
           <button class="menu-btn" id="btn-host">Host a game</button>
           <div class="join-row">
             <input id="join-code" class="code-input" maxlength="5" placeholder="CODE" autocapitalize="characters"
@@ -86,10 +88,19 @@
       </div>
       <div id="online-wait" class="hidden">
         <p class="tagline" id="online-status"></p>
-        <div class="room-code" id="room-code"></div>
         <div class="menu-buttons">
-          <button class="menu-btn" id="btn-share">Share invite</button>
-          <button class="menu-btn secondary" id="btn-online-cancel">Cancel</button>
+          <button class="menu-btn secondary" id="btn-online-cancel">Back</button>
+        </div>
+      </div>
+      <div id="online-lobby" class="hidden">
+        <p class="lobby-label">ROOM CODE</p>
+        <div class="room-code" id="room-code"></div>
+        <ul class="lobby-slots" id="lobby-slots"></ul>
+        <p class="tagline lobby-status" id="lobby-status"></p>
+        <div class="menu-buttons">
+          <button class="menu-btn" id="btn-lobby-main">Start game</button>
+          <button class="menu-btn secondary" id="btn-share">Share invite</button>
+          <button class="menu-btn secondary" id="btn-lobby-leave">Leave room</button>
         </div>
       </div>
     </div>

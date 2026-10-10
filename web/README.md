@@ -37,23 +37,30 @@ In **Free-for-All (3)** and **(4)**, the battlefield is a loop. Walk, drive or f
 
 Every player in every mode starts with two soldiers in front of their HQ.
 
-## Online 1 vs 1 (two phones)
+## Online (2–4 players)
 
-Play a friend on their own device, anywhere with internet:
+Play friends on their own devices, anywhere with internet:
 
-1. Both players open the game and tap **🌐 Online 1 vs 1**.
-2. One player taps **Host a game** and gets a 5-letter room code. **Share invite** opens the iOS share sheet with a link that drops your friend straight into the game.
-3. The other player types the code and taps **Join**, or opens the invite link.
+1. Everyone opens the game, taps **🌐 Online (2–4 players)** and types a name.
+2. One player taps **Host a game** and gets a 5-letter room code. **Share invite** opens the iOS share sheet with a link that drops friends straight into the lobby.
+3. The others type the code and tap **Join**, or open the invite link.
 
-The host plays **Blue** (left) and the guest plays **Red** (right). Both use the normal controls. Online games can't be paused. ⏸ opens the menu, but the battle keeps going. The latency to your opponent shows under your name. After a game, the host can start a **Rematch**.
+**Lobby.** The lobby has four seats. The host sits in the first one, and each player who joins takes the next **Open** seat. The host can tap an empty seat to switch it between **Open**, **CPU** and **Closed**, and can remove a player with ✕. Each guest taps **Ready**. **Start game** lights up once there are at least two players (people or CPU) and every guest is ready.
 
-**How it works.** The phones connect directly to each other (WebRTC, via the bundled [PeerJS](https://peerjs.com) library). PeerJS's free public server only introduces them. The host's phone runs the game. The guest sends its orders and receives the battlefield state about 12 times a second, smoothed between updates. Both players must be on the same app version; the menu shows it.
+**The battle.** The map depends on how many seats are filled:
+- 2 players get the normal 1 vs 1 map.
+- 3 or 4 players get the looping Free-for-All map.
+
+Colours follow seat order: Blue, Red, Green, Yellow. Everyone uses the normal controls. Online games can't be paused. ⏸ opens the menu, but the battle keeps going. The latency shows under your name; the host sees their slowest guest. If your HQ falls while others fight on, you can keep watching. When the battle ends, the host taps **Back to lobby** to bring everyone back for another round. New players can join then too.
+
+**How it works.** The phones connect directly to each other (WebRTC, via the bundled [PeerJS](https://peerjs.com) library). PeerJS's free public server only introduces them. The host's phone runs the game, and each guest connects to the host. Guests send their orders and receive the battlefield state about 12 times a second, smoothed between updates. Both players must be on the same app version; the menu shows it.
 
 **Limits.**
-- If either player leaves or closes the app, the game ends for both.
+- If a guest leaves mid-battle, the CPU takes over their army and the game carries on. If the host leaves, the game ends for everyone.
+- Players can only join from the lobby, not once a battle has started.
 - If the host switches away from the app, the game freezes until they come back.
 - Some mobile carriers and strict networks block direct connections. With the optional Cloudflare relay set up (see [`../relay`](../relay/README.md)), those games are routed through Cloudflare instead. Without it, put one or both phones on Wi-Fi. The label under your name shows whether a match is `direct` or going through the `relay`.
-- Two tabs on one device can play each other without the internet by adding `?net=local` to the URL, which is handy for testing.
+- Several tabs on one device can play each other without the internet by adding `?net=local` to the URL, which is handy for testing.
 
 ## Controls (touch)
 

@@ -292,3 +292,24 @@ button {
 .version { font-size: 8px; color: var(--dim); }
 .room-code { color: var(--gold); text-shadow: 3px 3px 0 #000; font-size: 36px; }
 .code-input { font-size: 18px; background: #0e100a; }
+
+/* Online lobby */
+.name-input { letter-spacing: 0.08em; font-size: 14px; }
+.lobby-label { font-family: var(--pixel); font-size: 9px; color: var(--dim); margin: 0 0 4px; }
+#online-lobby .room-code { margin-bottom: 14px; }
+.lobby-slots { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.slot {
+  display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 8px 0 10px;
+  background: var(--panel); border: 2px solid; border-color: var(--bevel-dark) var(--bevel-light) var(--bevel-light) var(--bevel-dark);
+  font-family: var(--pixel); font-size: 10px; text-align: left;
+}
+.slot.empty { opacity: 0.7; }
+.swatch { flex: 0 0 14px; height: 14px; border: 2px solid #000; background: #333; }
+.slot-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot-tag { font-size: 8px; color: var(--dim); }
+.slot-tag.ready { color: var(--good); }
+.slot-tag.waiting { color: var(--gold); }
+.slot-btn { min-width: 74px; min-height: 34px; padding: 0 6px; font-family: var(--pixel); font-size: 8px; }
+.slot-btn.kick { min-width: 34px; color: var(--danger); }
+.lobby-status { margin-bottom: 14px; }
+.menu-btn:disabled { opacity: 0.45; }

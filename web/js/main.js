@@ -1,7 +1,7 @@
 // Fortress Command (web) — app shell: camera, touch input, UI panels and main loop.
 import {
   WORLD_W, WORLD_H, MAP_W, TILE_SIZE, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
-  UNIT_ICONS, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize,
+  UNIT_ICONS, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize, ONLINE_LAYOUTS,
 } from './config.js';
 import { Game } from './game.js';
 import { canReach } from './entities.js';
@@ -36,6 +36,7 @@ let ghost = null;           // current placement preview
 let markers = [];           // move-order feedback
 let statusText = '';
 let panelKey = '';
+let eliminatedNoted = false; // told this player they're out but the game goes on
 let sellArmed = null;       // { id, until } — sell needs a second tap to confirm
 const minimapCache = {};
 
@@ -116,14 +117,20 @@ function toast(text, kind = 'error') {
 function setStatus(text) { statusText = text; $('status').textContent = text; }
 
 // ── Online session ─────────────────────────────────────────────────────────
-// role: null offline, 'host' (runs the game, plays Blue) or 'guest' (Red).
-const net = { role: null, transport: null, room: null, code: '', snapTimer: 0, mapVersion: -1, pingMs: null, route: null };
+// role: null offline, 'host' (runs the game and the lobby, plays Blue) or
+// 'guest'. The host keeps one connection per guest in `peers`; a guest's only
+// connection is `host`. `slots` is the lobby: up to four seats, each
+// { kind: 'host' | 'human' | 'cpu' | 'open' | 'closed', name, ready }.
+const net = {
+  role: null, room: null, code: '', phase: 'lobby', snapTimer: 0, mapVersion: -1, pingMs: null, route: null,
+  host: null, peers: [], slots: [], mySlot: 0, names: [],
+};
 const online = () => net.role !== null;
 
 // Every player order goes through here: applied locally, or sent to the host
-// when we're the guest. Returns an error message (local only) or null.
+// when we're a guest. Returns an error message (local only) or null.
 function issue(cmd) {
-  if (net.role === 'guest') { net.transport.send({ t: 'cmd', cmd }); return null; }
+  if (net.role === 'guest') { net.host.send({ t: 'cmd', cmd }); return null; }
   return applyCommand(game, active, cmd);
 }
 const ids = (list) => list.map((u) => u.id);
@@ -567,28 +574,32 @@ function showOverlay(id) {
   for (const o of ['overlay-title', 'overlay-online', 'overlay-pause', 'overlay-gameover']) $(o).classList.toggle('hidden', o !== id);
 }
 
+// opts: { mode } replaces MODES[key] (online games), { mirror } makes a
+// guest's snapshot-driven copy, { you } is the faction this device controls.
 function startGame(key, opts = {}) {
   modeKey = key;
+  const mode = opts.mode || MODES[key];
   if (opts.mirror) {
-    game = createMirror(key);
+    game = createMirror(mode);
   } else {
-    game = new Game(key, {
+    game = new Game(mode, {
       onGameOver: (winner) => {
-        if (net.role === 'host') net.transport.send({ t: 'over', winner });
+        if (net.role === 'host') broadcast({ t: 'over', winner });
         setTimeout(() => gameOver(winner), 600);
       },
       onMessage: (m) => {
         toast(m, 'info');
-        if (net.role === 'host') net.transport.send({ t: 'msg', text: m });
+        if (net.role === 'host') broadcast({ t: 'msg', text: m });
       },
     });
   }
-  active = net.role === 'guest' ? 1 : 0;
+  active = opts.you ?? 0;
+  eliminatedNoted = false;
   selectedBuilding = null;
   cancelPlacement();
   markers = [];
   panelKey = '';
-  $('mode-label').textContent = MODES[key].label;
+  $('mode-label').textContent = mode.label;
   $('btn-switch').classList.toggle('hidden', game.humanCount < 2 || online());
   $('btn-restart').classList.toggle('hidden', online());
   $('btn-quit').textContent = online() ? 'Leave game' : 'Main Menu';
@@ -620,13 +631,14 @@ function gameOver(winner) {
     const won = winner === active;
     label.textContent = won ? 'VICTORY' : 'DEFEAT';
     label.style.color = won ? 'var(--good)' : 'var(--danger)';
-    if (net.role === 'host') {
-      sub.textContent = won ? `Battle won in ${formatTime(game.time)}.` : 'Your HQ was destroyed.';
-      again.textContent = 'Rematch';
-    } else {
-      sub.textContent = `${won ? `Battle won in ${formatTime(game.time)}.` : 'Your HQ was destroyed.'} Waiting for the host to start a rematch…`;
+    let text = won ? `Battle won in ${formatTime(game.time)}.`
+      : winner >= 0 ? `${net.names[winner] || PLAYER_NAMES[winner]} (${PLAYER_NAMES[winner]}) won the battle.` : 'Nobody survived.';
+    if (net.role === 'host') again.textContent = 'Back to lobby';
+    else {
+      text += ' Waiting for the host…';
       again.classList.add('hidden');
     }
+    sub.textContent = text;
   } else if (game.humanCount > 1) {
     label.textContent = winner >= 0 ? `${PLAYER_NAMES[winner].toUpperCase()} WINS` : 'DRAW';
     label.style.color = winner >= 0 ? `rgb(${PLAYER_COLORS[winner].map((v) => v * 255).join(',')})` : '#fff';
@@ -657,12 +669,19 @@ function buildModeButtons() {
 }
 
 // ── Online lobby & session ─────────────────────────────────────────────────
-function lobbyView(which, status = '', code = '') {
-  $('online-home').classList.toggle('hidden', which !== 'home');
-  $('online-wait').classList.toggle('hidden', which !== 'wait');
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const NAME_KEY = 'fortress-name';
+
+function playerName() {
+  const n = $('player-name').value.trim().replace(/\s+/g, ' ').slice(0, 12);
+  try { localStorage.setItem(NAME_KEY, n); } catch { /* storage unavailable */ }
+  return n || (net.role === 'host' ? 'Host' : 'Player');
+}
+
+function lobbyView(which, status = '') {
+  for (const v of ['home', 'wait', 'lobby']) $(`online-${v}`).classList.toggle('hidden', v !== which);
   $('online-status').textContent = status;
-  $('room-code').textContent = code;
-  $('btn-share').classList.toggle('hidden', !code);
+  if (which === 'lobby') renderLobby();
 }
 
 function openLobby(prefill = '') {
@@ -670,16 +689,88 @@ function openLobby(prefill = '') {
   showOverlay('overlay-online');
   lobbyView('home');
   $('join-code').value = prefill;
+  try { $('player-name').value = localStorage.getItem(NAME_KEY) || ''; } catch { /* storage unavailable */ }
 }
 
+// Seats that will play, in seat order. Their position is their faction.
+const seated = (slots) => slots.map((sl, i) => ({ ...sl, slot: i })).filter((sl) => ['host', 'human', 'cpu'].includes(sl.kind));
+
+function renderLobby() {
+  $('room-code').textContent = net.code;
+  const isHost = net.role === 'host';
+  const order = seated(net.slots).map((sl) => sl.slot);
+  $('lobby-slots').innerHTML = net.slots.map((sl, i) => {
+    const f = order.indexOf(i);
+    const col = f >= 0 ? `rgb(${PLAYER_COLORS[f].map((v) => Math.round(v * 255)).join(',')})` : '#333';
+    const you = i === net.mySlot ? ' (you)' : '';
+    let name;
+    let tag = '';
+    let btn = '';
+    switch (sl.kind) {
+      case 'host': name = esc(sl.name) + you; tag = '<span class="slot-tag ready">HOST</span>'; break;
+      case 'human':
+        name = esc(sl.name) + you;
+        tag = sl.ready ? '<span class="slot-tag ready">READY</span>' : '<span class="slot-tag waiting">NOT READY</span>';
+        if (isHost) btn = `<button class="small-btn slot-btn kick" data-kick="${i}" aria-label="Remove ${esc(sl.name)}">✕</button>`;
+        break;
+      case 'cpu': name = 'CPU'; break;
+      case 'open': name = 'Open — waiting…'; break;
+      default: name = 'Closed'; break;
+    }
+    if (isHost && ['cpu', 'open', 'closed'].includes(sl.kind)) {
+      btn = `<button class="small-btn slot-btn" data-cycle="${i}">${sl.kind === 'cpu' ? 'CPU' : sl.kind === 'open' ? 'OPEN' : 'CLOSED'} ▸</button>`;
+    }
+    const empty = sl.kind === 'open' || sl.kind === 'closed' ? ' empty' : '';
+    return `<li class="slot${empty}"><span class="swatch" style="background:${col}"></span><span class="slot-name">${name}</span>${tag}${btn}</li>`;
+  }).join('');
+
+  const players = seated(net.slots);
+  const notReady = players.filter((sl) => sl.kind === 'human' && !sl.ready).length;
+  const main = $('btn-lobby-main');
+  main.classList.toggle('secondary', !isHost && !!net.slots[net.mySlot]?.ready);
+  if (isHost) {
+    main.textContent = 'Start game';
+    main.disabled = !canStart();
+    $('lobby-status').textContent = players.length < 2 ? 'Share the code with friends, or set a seat to CPU.'
+      : notReady ? `Waiting for ${notReady} player${notReady > 1 ? 's' : ''} to be ready…`
+        : `${players.length} players — ready to start!`;
+  } else {
+    const me = net.slots[net.mySlot];
+    main.disabled = false;
+    main.textContent = me?.ready ? 'Not ready' : 'Ready';
+    $('lobby-status').textContent = me?.ready ? 'Waiting for the host to start…' : "Tap Ready when you're set.";
+  }
+}
+
+$('lobby-slots').addEventListener('click', (e) => {
+  if (net.role !== 'host' || net.phase !== 'lobby') return;
+  const cyc = e.target.closest('[data-cycle]');
+  const kick = e.target.closest('[data-kick]');
+  if (cyc) {
+    const sl = net.slots[+cyc.dataset.cycle];
+    const next = { open: 'cpu', cpu: 'closed', closed: 'open' };
+    net.slots[+cyc.dataset.cycle] = { kind: next[sl.kind] || 'open' };
+    syncLobby();
+  } else if (kick) {
+    const peer = net.peers.find((pp) => pp.slot === +kick.dataset.kick);
+    if (peer) refuse(peer, 'The host removed you from the room.');
+  }
+});
+
+// ── Host side ──
 async function hostOnline() {
+  const name = playerName();
   lobbyView('wait', 'Opening a room…');
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = makeRoomCode();
     try {
       net.code = code;
-      net.room = await hostRoom(code, onHostConnected);
-      lobbyView('wait', 'Waiting for your opponent. Share this room code with them:', code);
+      net.room = await hostRoom(code, onGuestConnected);
+      Object.assign(net, {
+        role: 'host', phase: 'lobby', mySlot: 0, peers: [],
+        slots: [{ kind: 'host', name }, { kind: 'open' }, { kind: 'open' }, { kind: 'open' }],
+      });
+      lobbyView('lobby');
       return;
     } catch (e) {
       if (attempt === 2 || !/taken/.test(e.message)) { lobbyView('wait', e.message); return; }
@@ -687,111 +778,208 @@ async function hostOnline() {
   }
 }
 
-function onHostConnected(transport) {
-  net.role = 'host';
-  net.transport = transport;
-  transport.on('message', onNetMessage);
-  transport.on('close', () => onDisconnect());
-  lobbyView('wait', 'Opponent found — starting…', net.code);
+function broadcast(msg) { for (const p of net.peers) p.transport.send(msg); }
+
+function syncLobby() {
+  if (net.phase !== 'lobby') return; // mid-battle seat changes show up back in the lobby
+  for (const p of net.peers) {
+    if (p.slot >= 0) p.transport.send({ t: 'lobby', slots: net.slots.map(({ kind, name, ready }) => ({ kind, name, ready })), you: p.slot });
+  }
+  if (!$('online-lobby').classList.contains('hidden')) renderLobby();
 }
 
+function canStart() {
+  const players = seated(net.slots);
+  return players.length >= 2 && players.every((sl) => sl.kind !== 'human' || sl.ready);
+}
+
+function onGuestConnected(transport) {
+  if (net.role !== 'host') { transport.close(); return; }
+  const peer = { transport, slot: -1, faction: -1, name: 'Player', pingMs: null };
+  net.peers.push(peer);
+  transport.on('message', (m) => onPeerMessage(peer, m));
+  transport.on('close', () => dropPeer(peer));
+}
+
+// Turn a guest away with a reason, then hang up.
+function refuse(peer, msg) {
+  peer.transport.send({ t: 'error', msg });
+  setTimeout(() => dropPeer(peer), 300);
+}
+
+function onPeerMessage(peer, m) {
+  switch (m.t) {
+    case 'hello': {
+      if (m.v !== VERSION) {
+        refuse(peer, `The host is on ${VERSION} but you're on ${m.v}. Close and reopen the app to update, then try again.`);
+        break;
+      }
+      if (net.phase !== 'lobby') { refuse(peer, 'That game has already started. Ask the host to go back to the lobby.'); break; }
+      const slot = net.slots.findIndex((sl) => sl.kind === 'open');
+      if (slot < 0) { refuse(peer, 'That room is full.'); break; }
+      peer.slot = slot;
+      peer.name = String(m.name || 'Player').slice(0, 12);
+      net.slots[slot] = { kind: 'human', name: peer.name, ready: false };
+      syncLobby();
+      toast(`${peer.name} joined`, 'info');
+      break;
+    }
+    case 'ready':
+      if (net.phase === 'lobby' && peer.slot >= 0) {
+        net.slots[peer.slot].ready = !!m.ready;
+        syncLobby();
+      }
+      break;
+    case 'cmd':
+      if (net.phase === 'game' && game && !game.over && peer.faction >= 0 && game.players[peer.faction]?.alive) {
+        const err = applyCommand(game, peer.faction, m.cmd);
+        if (err) peer.transport.send({ t: 'msg', text: err, error: true });
+      }
+      break;
+    case 'ping': peer.transport.send({ t: 'pong', at: m.at }); break;
+    case 'pong': peer.pingMs = Math.round(performance.now() - m.at); break;
+    case 'bye': dropPeer(peer); break;
+    default: break;
+  }
+}
+
+// A guest left (or was removed): free their seat, and mid-battle hand their
+// army to the CPU so the game carries on.
+function dropPeer(peer) {
+  if (!net.peers.includes(peer)) return;
+  net.peers = net.peers.filter((p) => p !== peer);
+  peer.transport.close();
+  if (peer.slot >= 0) net.slots[peer.slot] = { kind: 'open' };
+  if (net.phase === 'game' && game && !game.over && peer.faction >= 0) {
+    const p = game.players[peer.faction];
+    if (p.alive) {
+      p.isAi = true;
+      const text = `${peer.name} left — the CPU takes over ${PLAYER_NAMES[peer.faction]}`;
+      toast(text, 'info');
+      broadcast({ t: 'msg', text });
+      game.checkGameOver();
+    }
+  }
+  if (peer.slot >= 0) syncLobby();
+}
+
+function startOnlineGame() {
+  if (!canStart()) return;
+  const players = seated(net.slots);
+  const layout = ONLINE_LAYOUTS[players.length];
+  const mode = {
+    label: layout.label, wrap: layout.wrap, online: true,
+    players: players.map((sl, i) => [layout.hqs[i], sl.kind === 'cpu']),
+  };
+  net.names = players.map((sl) => (sl.kind === 'cpu' ? 'CPU' : sl.name));
+  for (const p of net.peers) p.faction = players.findIndex((sl) => sl.slot === p.slot);
+  Object.assign(net, { phase: 'game', mapVersion: -1, snapTimer: 0 });
+  startGame('online', { mode, you: 0 });
+  for (const p of net.peers) p.transport.send({ t: 'start', mode, you: p.faction, names: net.names });
+}
+
+function backToLobby() {
+  net.phase = 'lobby';
+  for (const sl of net.slots) if (sl.kind === 'human') sl.ready = false;
+  for (const p of net.peers) p.faction = -1;
+  game = null;
+  paused = true;
+  showOverlay('overlay-online');
+  lobbyView('lobby');
+  syncLobby();
+}
+
+// ── Guest side ──
 async function joinOnline() {
   const code = $('join-code').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length !== 5) { lobbyView('home'); $('join-code').focus(); return; }
+  const name = playerName();
   net.code = code;
   lobbyView('wait', `Connecting to room ${code}…`);
   try {
     const transport = await joinRoom(code);
-    net.role = 'guest';
-    net.transport = transport;
-    transport.on('message', onNetMessage);
-    transport.on('close', () => onDisconnect());
-    transport.send({ t: 'hello', v: VERSION });
-    lobbyView('wait', 'Connected — waiting for the host to start…');
+    Object.assign(net, { role: 'guest', host: transport, phase: 'lobby' });
+    transport.on('message', onHostMessage);
+    transport.on('close', () => onHostLost());
+    transport.send({ t: 'hello', v: VERSION, name });
+    lobbyView('wait', 'Connected — joining the lobby…');
   } catch (e) {
     lobbyView('wait', e.message);
   }
 }
 
-function startHostedGame() {
-  net.mapVersion = -1;
-  net.snapTimer = 0;
-  startGame('online');
-  net.transport.send({ t: 'start' });
-}
-
-function onNetMessage(m) {
+function onHostMessage(m) {
   switch (m.t) {
-    case 'hello':
-      if (net.role !== 'host') break;
-      if (m.v !== VERSION) {
-        net.transport.send({ t: 'error', msg: `The host is on ${VERSION} but you're on ${m.v}. Close and reopen the app on both phones to update, then try again.` });
-        lobbyView('wait', `Your opponent is on a different version (${m.v}). Ask them to close and reopen the app.`);
-        setTimeout(() => leaveOnline(), 500);
-        break;
-      }
-      startHostedGame();
+    case 'lobby': {
+      const fromGame = net.phase !== 'lobby' || $('online-lobby').classList.contains('hidden');
+      Object.assign(net, { slots: m.slots, mySlot: m.you, phase: 'lobby' });
+      if (fromGame) {
+        game = null;
+        paused = true;
+        showOverlay('overlay-online');
+        lobbyView('lobby');
+      } else renderLobby();
       break;
+    }
     case 'start':
-      if (net.role === 'guest') startGame('online', { mirror: true });
+      net.phase = 'game';
+      net.names = m.names || [];
+      startGame('online', { mode: m.mode, mirror: true, you: m.you });
       break;
     case 'snap':
-      if (net.role === 'guest' && game?.mirror) applySnapshot(game, m);
-      break;
-    case 'cmd':
-      if (net.role === 'host' && game && !game.over) {
-        const err = applyCommand(game, 1, m.cmd);
-        if (err) net.transport.send({ t: 'msg', text: err, error: true });
-      }
+      if (game?.mirror) applySnapshot(game, m);
       break;
     case 'msg':
       toast(m.text, m.error ? 'error' : 'info');
       break;
     case 'over':
-      if (net.role === 'guest' && game) setTimeout(() => gameOver(m.winner), 400);
+      if (game) setTimeout(() => gameOver(m.winner), 400);
       break;
     case 'error':
+      leaveOnline();
+      showOverlay('overlay-online');
       lobbyView('wait', m.msg);
       break;
-    case 'ping':
-      net.transport.send({ t: 'pong', at: m.at });
-      break;
-    case 'pong':
-      net.pingMs = Math.round(performance.now() - m.at);
-      break;
-    case 'bye':
-      onDisconnect('left');
-      break;
-    default:
-      break;
+    case 'ping': net.host.send({ t: 'pong', at: m.at }); break;
+    case 'pong': net.pingMs = Math.round(performance.now() - m.at); break;
+    case 'bye': onHostLost('left'); break;
+    default: break;
   }
 }
 
-function onDisconnect(reason) {
-  if (!net.role) return;
-  const inGame = game && $('overlay-title').classList.contains('hidden') && $('overlay-online').classList.contains('hidden');
+function onHostLost(reason) {
+  if (net.role !== 'guest') return;
+  const inGame = net.phase === 'game' && game && !game.over;
   resetNet();
-  if (!inGame) { lobbyView('wait', 'The connection was lost.'); return; }
+  if (!inGame) {
+    showOverlay('overlay-online');
+    lobbyView('wait', reason === 'left' ? 'The host closed the room.' : 'The connection to the host was lost.');
+    return;
+  }
   paused = true;
-  if (game) game.over = true;
+  game.over = true;
   $('result-label').textContent = 'DISCONNECTED';
   $('result-label').style.color = 'var(--dim)';
-  $('result-sub').textContent = reason === 'left' ? 'Your opponent left the game.' : 'The connection to your opponent was lost.';
+  $('result-sub').textContent = reason === 'left' ? 'The host left the game.' : 'The connection to the host was lost.';
   $('btn-again').classList.add('hidden');
   showOverlay('overlay-gameover');
 }
 
 function resetNet() {
   net.room?.cancel?.();
-  Object.assign(net, { role: null, transport: null, room: null, pingMs: null, route: null });
+  Object.assign(net, { role: null, host: null, room: null, peers: [], slots: [], phase: 'lobby', pingMs: null, route: null });
 }
 
 function leaveOnline() {
-  if (net.transport) {
-    net.transport.send({ t: 'bye' });
-    const t = net.transport;
+  const links = net.role === 'host' ? net.peers.map((p) => p.transport) : net.host ? [net.host] : [];
+  for (const t of links) {
+    t.send({ t: 'bye' });
     setTimeout(() => t.close(), 100);
   }
+  // Give the goodbyes a moment to go out before the host's room shuts.
+  const room = net.room;
+  net.room = null;
+  if (room) setTimeout(() => room.cancel?.(), 200);
   resetNet();
 }
 
@@ -802,7 +990,7 @@ async function shareInvite() {
     if (navigator.share) await navigator.share({ title: 'Fortress Command', text, url });
     else {
       await navigator.clipboard.writeText(`${text}\n${url}`);
-      $('online-status').textContent = 'Invite link copied. Paste it to your opponent:';
+      toast('Invite link copied', 'info');
     }
   } catch { /* share sheet dismissed */ }
 }
@@ -813,6 +1001,11 @@ $('join-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinO
 $('btn-share').addEventListener('click', shareInvite);
 $('btn-online-back').addEventListener('click', () => showOverlay('overlay-title'));
 $('btn-online-cancel').addEventListener('click', () => { leaveOnline(); lobbyView('home'); });
+$('btn-lobby-leave').addEventListener('click', () => { leaveOnline(); lobbyView('home'); });
+$('btn-lobby-main').addEventListener('click', () => {
+  if (net.role === 'host') startOnlineGame();
+  else if (net.role === 'guest') net.host.send({ t: 'ready', ready: !net.slots[net.mySlot]?.ready });
+});
 
 $('btn-pause').addEventListener('click', () => {
   if (!game || game.over) return;
@@ -822,7 +1015,7 @@ $('btn-pause').addEventListener('click', () => {
 $('btn-resume').addEventListener('click', () => { paused = false; showOverlay(null); });
 $('btn-restart').addEventListener('click', () => startGame(modeKey));
 $('btn-again').addEventListener('click', () => {
-  if (net.role === 'host') startHostedGame();
+  if (net.role === 'host') backToLobby();
   else startGame(modeKey);
 });
 $('btn-quit').addEventListener('click', () => { leaveOnline(); paused = true; showOverlay('overlay-title'); });
@@ -842,14 +1035,20 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && game && !game.over && !paused && !online()) { paused = true; showOverlay('overlay-pause'); }
 });
 
-// Online heartbeat: measure latency, shown next to the mode label.
+// Online heartbeat: measure latency, shown next to the mode label (the host
+// shows its slowest guest).
 setInterval(() => {
-  if (!net.transport || !game) return;
-  net.transport.send({ t: 'ping', at: performance.now() });
-  if (!net.route) connectionRoute(net.transport).then((r) => { if (net.transport) net.route = r; });
-  if (online()) {
-    $('mode-label').textContent = `${MODES.online.label}${net.pingMs != null ? ` · ${net.pingMs} ms` : ''}${net.route ? ` · ${net.route}` : ''}`;
+  if (!online() || !game) return;
+  const now = performance.now();
+  if (net.role === 'guest') {
+    net.host.send({ t: 'ping', at: now });
+    if (!net.route) connectionRoute(net.host).then((r) => { if (net.host) net.route = r; });
+  } else {
+    for (const p of net.peers) p.transport.send({ t: 'ping', at: now });
+    const pings = net.peers.map((p) => p.pingMs).filter((v) => v != null);
+    net.pingMs = pings.length ? Math.max(...pings) : null;
   }
+  $('mode-label').textContent = `${game.mode.label}${net.pingMs != null ? ` · ${net.pingMs} ms` : ''}${net.route ? ` · ${net.route}` : ''}`;
 }, 2000);
 
 // ── Main loop ──────────────────────────────────────────────────────────────
@@ -862,13 +1061,18 @@ function frame(now) {
 
   if (game) {
     if (!paused || online()) game.update(dt);
-    if (net.role === 'host' && !game.over) {
+    if (net.role === 'host' && net.phase === 'game' && !game.over) {
       net.snapTimer -= dt;
       if (net.snapTimer <= 0) {
         net.snapTimer = SNAPSHOT_INTERVAL;
-        net.transport.send(encodeSnapshot(game, net.mapVersion));
+        broadcast(encodeSnapshot(game, net.mapVersion));
         net.mapVersion = game.map.version;
       }
+    }
+    // Knocked out of a multiplayer game that's still going: keep watching.
+    if (online() && !game.over && !eliminatedNoted && game.players[active] && !game.players[active].alive) {
+      eliminatedNoted = true;
+      toast('Your HQ fell — you can keep watching', 'info');
     }
     if (game.mirror && !game.over) {
       const stale = performance.now() - game.lastSnapshotAt > 2000;

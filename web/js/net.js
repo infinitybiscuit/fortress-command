@@ -1,7 +1,7 @@
-// Online play. One phone hosts and runs the simulation; the other joins with a
-// room code, sends its orders as commands and renders snapshots of the host's
-// game. Phones connect peer-to-peer over WebRTC (PeerJS); PeerJS's free public
-// broker is only used to introduce the two devices.
+// Online play. One phone hosts and runs the simulation; up to three others
+// join with a room code, send their orders as commands and render snapshots of
+// the host's game. Phones connect peer-to-peer over WebRTC (PeerJS) in a star
+// around the host; PeerJS's free public broker only introduces the devices.
 import { UNIT_TYPES, BUILDING_TYPES, RELAY_URL } from './config.js';
 import { Game } from './game.js';
 import { Unit, Building, deathEffect } from './entities.js';
@@ -90,6 +90,8 @@ function loadPeerJs() {
   return peerLib;
 }
 
+// peer: the guest's own Peer, torn down with its only connection. The host's
+// Peer outlives each guest's connection, so it passes null.
 function wrapConnection(conn, peer) {
   const t = new Emitter();
   let closed = false;
@@ -106,7 +108,7 @@ function wrapConnection(conn, peer) {
   t.close = () => {
     closed = true;
     try { conn.close(); } catch { /* already closed */ }
-    setTimeout(() => peer.destroy(), 300);
+    if (peer) setTimeout(() => peer.destroy(), 300);
   };
   return t;
 }
@@ -124,46 +126,57 @@ function friendlyPeerError(err) {
   }
 }
 
-// Same-browser transport over BroadcastChannel, for testing two tabs on one
-// device (enable with ?net=local).
+// Same-browser transport over BroadcastChannel, for testing several tabs on
+// one device (enable with ?net=local).
 function localHost(code, onConnect) {
   const ch = new BroadcastChannel(`fc-${code}`);
-  let t = null;
+  const guests = new Map(); // guest id → transport
   ch.onmessage = ({ data }) => {
     if (data.from !== 'g') return;
-    if (data.knock && !t) {
+    const id = data.gid;
+    let t = guests.get(id);
+    if (data.knock) {
+      if (t) return;
       t = new Emitter();
-      t.send = (d) => ch.postMessage({ from: 'h', d });
-      t.close = () => { ch.postMessage({ from: 'h', bye: true }); ch.close(); };
-      ch.postMessage({ from: 'h', welcome: true });
+      let open = true;
+      t.send = (d) => { if (open) ch.postMessage({ from: 'h', to: id, d }); };
+      t.close = () => { if (open) ch.postMessage({ from: 'h', to: id, bye: true }); open = false; guests.delete(id); };
+      guests.set(id, t);
+      ch.postMessage({ from: 'h', to: id, welcome: true });
       onConnect(t);
-    } else if (data.bye) t?.emit('close');
-    else if (t && 'd' in data) t.emit('message', data.d);
+    } else if (data.bye) { guests.delete(id); t?.emit('close'); } else if (t && 'd' in data) t.emit('message', data.d);
   };
-  return { cancel: () => ch.close() };
+  return {
+    cancel: () => {
+      for (const id of guests.keys()) ch.postMessage({ from: 'h', to: id, bye: true });
+      ch.close();
+    },
+  };
 }
 
 function localJoin(code) {
   return new Promise((resolve, reject) => {
     const ch = new BroadcastChannel(`fc-${code}`);
+    const gid = Math.random().toString(36).slice(2);
     const t = new Emitter();
-    t.send = (d) => ch.postMessage({ from: 'g', d });
-    t.close = () => { ch.postMessage({ from: 'g', bye: true }); ch.close(); };
-    const knock = setInterval(() => ch.postMessage({ from: 'g', knock: true }), 200);
+    let open = true;
+    t.send = (d) => { if (open) ch.postMessage({ from: 'g', gid, d }); };
+    t.close = () => { if (!open) return; ch.postMessage({ from: 'g', gid, bye: true }); open = false; ch.close(); };
+    const knock = setInterval(() => ch.postMessage({ from: 'g', gid, knock: true }), 200);
     const timeout = setTimeout(() => { clearInterval(knock); ch.close(); reject(new Error('No game found with that code. Check it and try again.')); }, 5000);
     ch.onmessage = ({ data }) => {
-      if (data.from !== 'h') return;
-      if (data.welcome) { clearInterval(knock); clearTimeout(timeout); resolve(t); } else if (data.bye) t.emit('close');
-      else if ('d' in data) t.emit('message', data.d);
+      if (data.from !== 'h' || data.to !== gid) return;
+      if (data.welcome) { clearInterval(knock); clearTimeout(timeout); resolve(t); } else if (data.bye) { open = false; t.emit('close'); } else if ('d' in data) t.emit('message', data.d);
     };
-    ch.postMessage({ from: 'g', knock: true });
+    ch.postMessage({ from: 'g', gid, knock: true });
   });
 }
 
 const useLocal = () => new URLSearchParams(location.search).get('net') === 'local';
 
-// Open a room and wait for an opponent. Resolves once the room is live;
-// onConnect(transport) fires when someone joins.
+// Open a room. Resolves once the room is live; onConnect(transport) fires each
+// time someone joins (the caller decides whether there's room for them).
+// cancel() closes the room and every connection in it.
 export async function hostRoom(code, onConnect) {
   if (useLocal()) return localHost(code, onConnect);
   const Peer = await loadPeerJs();
@@ -171,13 +184,16 @@ export async function hostRoom(code, onConnect) {
   return new Promise((resolve, reject) => {
     const peer = new Peer(ID_PREFIX + code, { config });
     let open = false;
-    let joined = false;
-    peer.on('open', () => { open = true; resolve({ cancel: () => { if (!joined) peer.destroy(); } }); });
-    peer.on('connection', (conn) => {
-      if (joined) { conn.on('open', () => conn.close()); return; } // room is full
-      joined = true;
-      conn.on('open', () => onConnect(wrapConnection(conn, peer)));
+    let closed = false;
+    peer.on('open', () => {
+      open = true;
+      resolve({ cancel: () => { closed = true; peer.destroy(); } });
     });
+    peer.on('connection', (conn) => {
+      conn.on('open', () => onConnect(wrapConnection(conn, null)));
+    });
+    // Stay reachable for late joiners if the matchmaking socket drops.
+    peer.on('disconnected', () => { if (!closed && !peer.destroyed) peer.reconnect(); });
     peer.on('error', (err) => { if (!open) { peer.destroy(); reject(new Error(friendlyPeerError(err))); } });
   });
 }
@@ -237,8 +253,8 @@ export function encodeSnapshot(game, lastMapVersion) {
 
 // The guest's copy of the game: same shape as Game so the renderer and UI
 // work unchanged, but it never simulates — it eases toward the latest snapshot.
-export function createMirror(modeKey) {
-  const g = new Game(modeKey, {});
+export function createMirror(mode) {
+  const g = new Game(mode, {});
   g.units = [];
   g.buildings = [];
   g.projectiles = [];
