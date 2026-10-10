@@ -1,6 +1,6 @@
 // Network-first service worker: always fetch fresh when online, fall back to
 // the cache so the game still launches from the home screen when offline.
-const CACHE = 'fortress-command-v6';
+const CACHE = 'fortress-command-v7';
 const ASSETS = [
   './', 'index.html', 'style.css', 'manifest.webmanifest',
   'js/main.js', 'js/game.js', 'js/entities.js', 'js/tilemap.js', 'js/render.js', 'js/config.js',
@@ -19,8 +19,13 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  // Bypass the HTTP cache (GitHub Pages sets max-age=600) so a new deploy is
+  // picked up immediately; ETags keep unchanged files cheap.
+  const fresh = new URL(e.request.url).origin === location.origin
+    ? fetch(e.request.url, { cache: 'no-cache' })
+    : fetch(e.request);
   e.respondWith(
-    fetch(e.request)
+    fresh
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));

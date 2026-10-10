@@ -3,6 +3,9 @@
 // unit.gd / building.gd. Gameplay stats for units come from unit.gd (the
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
+// Shown on the title and pause screens so it's easy to tell which build is running.
+export const VERSION = 'v7 · Airbase';
+
 export const TILE_SIZE = 32;
 export const MAP_W = 200;
 export const MAP_H = 20;

@@ -1,7 +1,7 @@
 // Fortress Command (web) — app shell: camera, touch input, UI panels and main loop.
 import {
   WORLD_W, WORLD_H, TILE_SIZE, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
-  UNIT_ICONS, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize,
+  UNIT_ICONS, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize,
 } from './config.js';
 import { Game } from './game.js';
 import { State, canReach } from './entities.js';
@@ -675,6 +675,24 @@ buildModeButtons();
 resize();
 requestAnimationFrame(frame);
 
+for (const el of document.querySelectorAll('.version')) el.textContent = `Fortress Command ${VERSION}`;
+
+// Keep the installed app current: check for a new build whenever it's opened,
+// and switch to it as soon as you're back on the title screen.
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  let updateReady = false;
+  const applyUpdate = () => {
+    if (updateReady && !$('overlay-title').classList.contains('hidden')) location.reload();
+  };
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+  }).catch(() => {});
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) return; // first install, nothing to refresh
+    updateReady = true;
+    if (game && !game.over && $('overlay-title').classList.contains('hidden')) toast('Update ready — it loads at the main menu', 'info');
+    applyUpdate();
+  });
+  new MutationObserver(applyUpdate).observe($('overlay-title'), { attributes: true, attributeFilter: ['class'] });
 }
