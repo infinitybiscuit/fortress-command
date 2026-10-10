@@ -55,6 +55,24 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
   - **Effects:** buildings go up behind a holographic frame, shots are plasma bolts and missiles, and fallen machines leave chrome scrap.
   - **Menus:** the interface switches to dark steel and neon, and units appear as their own pixel-art sprites.
 
+- **Medieval:** castles and siege engines on rolling green hills, with blue mountains, distant castles, a village with turning windmills, and birds overhead.
+  - **Infantry:**
+    - **Men-at-Arms** with spears and team tabards (Soldier).
+    - **Knights** in plate with plumed helms and heraldic shields (Heavy).
+    - Sickly **Plague Carriers** ringing their bells (Scout).
+    - **Peasants** in straw hats who mend your buildings (Engineer).
+    - **Longbow** archers (Sniper).
+  - **Siege and mounts:**
+    - **Horseman:** a lancer (Jeep).
+    - **Catapult** (Tank).
+    - **Trebuchet** (Artillery).
+  - **Air:**
+    - **Griffin** riders (Helicopter).
+    - Fire-dropping **Dragons** in team colours (Bomber).
+  - **Buildings:** Castle, Barracks, Tower, Wall, Well (with a bucket going up and down), Siege Works, Aerie, Bridge and Steps.
+  - **Effects:** arrows, boulders and fireballs, and timber scaffolding while building.
+  - **Menus:** oak, parchment and royal red.
+
 Each theme is one file in `js/themes/`. It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
 
 ## Free-for-All: looping map
@@ -183,7 +201,7 @@ After about 3 minutes the CPU builds an airbase and adds helicopters and bombers
 | `js/game.js` | `game/game_scene.gd` (economy, AI, spawning, win check) |
 | `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` (now theme-driven) |
 | `js/pixel.js` | new: pixel-art toolkit and the active palette |
-| `js/themes/*.js` | new: Classic and Rise of the Robots artwork |
+| `js/themes/*.js` | new: Classic, Rise of the Robots and Medieval artwork |
 | `js/main.js` | new: camera, touch input, HUD and panels, overlays, main loop |
 
 ### Differences from the Godot build

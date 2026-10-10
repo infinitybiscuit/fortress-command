@@ -351,3 +351,32 @@ body[data-theme="robots"] .round-btn { background: rgba(17, 15, 27, 0.85); }
 /* Sprite icons (themes that show units as their own pixel art in menus) */
 .sprite-ic { height: 26px; width: auto; max-width: 64px; image-rendering: pixelated; vertical-align: middle; }
 .summary .sprite-ic, .panel-sub .sprite-ic { height: 16px; }
+
+/* ── Medieval: oak, parchment and royal red ─────────────────────────────── */
+body[data-theme="medieval"] {
+  --bg: #1c140c;
+  --panel: #33261a;
+  --panel-2: #54402a;
+  --bevel-light: #8f6e44;
+  --bevel-dark: #140d06;
+  --accent: #8a2a1c;
+  --accent-dim: #4e160e;
+  --text: #f4e8c8;
+  --dim: #c8b48e;
+  --good: #8fd14f;
+  --danger: #e2502e;
+  --gold: #f2c230;
+}
+body[data-theme="medieval"] .menu-btn,
+body[data-theme="medieval"] .act-btn.primary { border-color: #d4a84a #3a1008 #3a1008 #d4a84a; }
+body[data-theme="medieval"] .menu-btn.secondary { border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light); }
+body[data-theme="medieval"] .overlay { background: linear-gradient(#5f97cf 0 16%, #88b6dd 16% 27%, #e6d8c0 27% 31%, #5f8a42 31% 34%, rgba(28, 20, 12, 0.96) 34%); }
+body[data-theme="medieval"] #overlay-pause, body[data-theme="medieval"] #overlay-gameover { background: rgba(20, 14, 8, 0.9); }
+body[data-theme="medieval"] .overlay h1, body[data-theme="medieval"] .overlay h2 { color: #f2c230; text-shadow: 3px 3px 0 #7e1d12, 6px 6px 0 #000; }
+body[data-theme="medieval"] .status { background: rgba(40, 28, 16, 0.88); }
+body[data-theme="medieval"] .toast { background: rgba(138, 42, 28, 0.95); }
+body[data-theme="medieval"] .toast.info { background: rgba(70, 98, 40, 0.95); }
+body[data-theme="medieval"] .code-input { background: #140d06; }
+body[data-theme="medieval"] .howto ul { color: var(--text); }
+body[data-theme="medieval"] .round-btn { background: rgba(51, 38, 26, 0.88); }
+body[data-theme="medieval"] #tagline { color: #fff4d6; text-shadow: 1px 1px 0 #3a1a0a, -1px -1px 0 #3a1a0a, 1px -1px 0 #3a1a0a, -1px 1px 0 #3a1a0a, 2px 2px 0 #3a1a0a; }
