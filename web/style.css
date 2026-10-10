@@ -316,3 +316,34 @@ button {
 .slot-btn.kick { min-width: 34px; color: var(--danger); }
 .lobby-status { margin-bottom: 14px; }
 .menu-btn:disabled { opacity: 0.45; }
+
+/* Theme switch on the title screen */
+.theme-btn { width: 100%; margin-top: 12px; }
+
+/* ── Rise of the Robots: night, rain, neon ─────────────────────────────── */
+body[data-theme="robots"] {
+  --bg: #07060d;
+  --panel: #110f1b;
+  --panel-2: #221d33;
+  --bevel-light: #4b4170;
+  --bevel-dark: #04030a;
+  --accent: #a3122b;
+  --accent-dim: #560913;
+  --text: #e4ecff;
+  --dim: #8f8bab;
+  --good: #38f0ff;
+  --danger: #ff2238;
+  --gold: #ffcf33;
+}
+body[data-theme="robots"] .menu-btn,
+body[data-theme="robots"] .act-btn.primary { border-color: #ff4d63 #3a0510 #3a0510 #ff4d63; }
+body[data-theme="robots"] .menu-btn.secondary { border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light); }
+body[data-theme="robots"] .overlay { background: linear-gradient(#04030a 0 14%, #120b24 14% 26%, #2b1238 26% 33%, #ff3fa8 33% 33.6%, rgba(7, 6, 13, 0.97) 33.6%); }
+body[data-theme="robots"] #overlay-pause, body[data-theme="robots"] #overlay-gameover { background: rgba(5, 4, 10, 0.92); }
+body[data-theme="robots"] .overlay h1, body[data-theme="robots"] .overlay h2 { color: #e4ecff; text-shadow: 3px 3px 0 #ff2238, 6px 6px 0 #000; }
+body[data-theme="robots"] .status { background: rgba(10, 8, 18, 0.88); }
+body[data-theme="robots"] .toast { background: rgba(163, 18, 43, 0.95); }
+body[data-theme="robots"] .toast.info { background: rgba(22, 82, 110, 0.95); }
+body[data-theme="robots"] .code-input { background: #05040a; }
+body[data-theme="robots"] .howto ul { color: var(--text); }
+body[data-theme="robots"] .round-btn { background: rgba(17, 15, 27, 0.85); }

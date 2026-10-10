@@ -31,6 +31,32 @@ The art style is a homage to early-90s home-computer war games: chunky, crisp pi
 - **Life and damage:** buildings rise behind scaffolding while under construction, smoke and burn when damaged, and have small animations (flag, pithead wheel, chimney smoke, tower beacon).
 - **UI:** the olive/khaki interface uses the bundled [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) pixel font (SIL Open Font License, see `vendor/fonts/`).
 
+## Themes
+
+Tap **Theme** on the title screen to switch between looks. The choice is remembered on the device. Themes are cosmetic only: the units, buildings and rules are identical, and online players can each use a different theme.
+
+- **Classic:** the original early-90s jungle war, described above.
+- **Rise of the Robots:** a rain-soaked future war at night.
+  - **Setting:** rain falls over a smoggy neon skyline under a red moon, with searchlights sweeping the clouds. The battlefield is rubble and ash, with the odd skull, and the platforms are steel girders.
+  - **Infantry**, human and machine:
+    - **Rebels** with bandanas and plasma rifles (Soldier).
+    - Chrome **Endo** skeletons with red eyes (Heavy).
+    - **Runners** in shades (Scout).
+    - **Techs** in welding goggles (Engineer).
+    - Armoured cyborg **Enforcers** (Sniper).
+  - **Vehicles:**
+    - **Cruiser:** a police interceptor with a flashing light bar (Jeep).
+    - **Hunter:** a robot tank with twin plasma cannons (Tank).
+    - **Walker:** a two-legged missile mech (Artillery).
+  - **Aircraft:**
+    - **Drone:** a hovering hunter machine with a searchlight (Helicopter).
+    - **Dropship:** a VTOL gunship (Bomber).
+  - **Buildings:** Command tower, Bunker, Pulse Gun, Barrier, Reactor, Factory, Skyport, Girder and Ramp.
+  - **Effects:** buildings go up behind a holographic frame, shots are plasma bolts and missiles, and fallen machines leave chrome scrap.
+  - **Menus:** the interface switches to dark steel and neon.
+
+Each theme is one file in `js/themes/`. It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
+
 ## Free-for-All: looping map
 
 In **Free-for-All (3)** and **(4)**, the battlefield is a loop. Walk, drive or fly off one edge and you come back on the other, and the camera pans endlessly. HQs are spaced evenly around the loop, so every player has a neighbour on each side and nobody gets a safe corner. Units, shots, artillery, aircraft, the minimap and build zones all work across the seam. Orders take the short way round. In 1 vs 1 modes the map still has edges.
@@ -155,7 +181,9 @@ After about 3 minutes the CPU builds an airbase and adds helicopters and bombers
 | `js/tilemap.js` | `game/tilemap.gd` |
 | `js/entities.js` | `entities/unit.gd`, `building.gd`, `projectile.gd` (same AABB physics and ramp step-up) |
 | `js/game.js` | `game/game_scene.gd` (economy, AI, spawning, win check) |
-| `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` |
+| `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` (now theme-driven) |
+| `js/pixel.js` | new: pixel-art toolkit and the active palette |
+| `js/themes/*.js` | new: Classic and Rise of the Robots artwork |
 | `js/main.js` | new: camera, touch input, HUD and panels, overlays, main loop |
 
 ### Differences from the Godot build
