@@ -1,6 +1,6 @@
 // Game state, economy, AI and win conditions. Ported from godot/scripts/game/game_scene.gd.
 import {
-  TILE_SIZE, MODES, PLAYER_NAMES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
+  TILE_SIZE, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
 } from './config.js';
 import { TileMap } from './tilemap.js';
 import { Unit, Building, Projectile, State, canReach, distTo } from './entities.js';
@@ -57,7 +57,7 @@ export class Game {
   }
 
   // Tile placement for a building centred on the touched tile, resting on that row.
-  placementFor(type, wx, wy) {
+  placementFor(type, wx, wy, playerIdx) {
     const d = BUILDING_TYPES[type];
     const [tx, tapTy] = this.map.worldToTile(wx, wy);
     let ty = tapTy;
@@ -67,19 +67,47 @@ export class Game {
       while (ty > 0 && this.map.isSolid(tx, ty)) ty--;
       while (ty < this.map.groundTop - 1 && !this.map.isSolid(tx, ty + 1)) ty++;
     }
-    return this.placementAt(type, tx - Math.floor((d.w - 1) / 2), ty - d.h + 1);
+    return this.placementAt(type, tx - Math.floor((d.w - 1) / 2), ty - d.h + 1, playerIdx);
   }
 
-  placementAt(type, tx, ty) {
+  // Validity of a footprint: terrain/overlap rules, plus (when a player is
+  // given) the build-zone rule. `reason` is 'terrain' or 'zone' when invalid.
+  placementAt(type, tx, ty, playerIdx) {
     const d = BUILDING_TYPES[type];
-    return { tx, ty, w: d.w, h: d.h, valid: this.map.canPlace(tx, ty, d.w, d.h, type) };
+    const terrainOk = this.map.canPlace(tx, ty, d.w, d.h, type);
+    const zoneOk = playerIdx == null || this.inBuildZone(playerIdx, tx, d.w);
+    const reason = !zoneOk ? 'zone' : !terrainOk ? 'terrain' : null;
+    return { tx, ty, w: d.w, h: d.h, valid: !reason, reason };
+  }
+
+  // Tile ranges [from, to) where a player may build: around each of their
+  // zone-extending buildings, BUILD_RADIUS_TILES either side.
+  buildZones(playerIdx) {
+    const spans = this.buildings
+      .filter((b) => b.faction === playerIdx && !b.dead && !b.def.noZone)
+      .map((b) => [b.tx - BUILD_RADIUS_TILES, b.tx + b.wt + BUILD_RADIUS_TILES])
+      .sort((a, b) => a[0] - b[0]);
+    const merged = [];
+    for (const s of spans) {
+      const last = merged[merged.length - 1];
+      if (last && s[0] <= last[1]) last[1] = Math.max(last[1], s[1]);
+      else merged.push([...s]);
+    }
+    return merged;
+  }
+
+  // A footprint is in the zone if it overlaps any zone span.
+  inBuildZone(playerIdx, tx, w) {
+    return this.buildZones(playerIdx).some(([from, to]) => tx < to && tx + w > from);
   }
 
   tryPlaceAt(playerIdx, type, tx, ty) {
     const p = this.players[playerIdx];
     const d = BUILDING_TYPES[type];
     if (p.money < d.cost) return 'Not enough credits!';
-    if (!this.placementAt(type, tx, ty).valid) return "Can't place here!";
+    const pl = this.placementAt(type, tx, ty, playerIdx);
+    if (pl.reason === 'zone') return 'Too far from your base!';
+    if (!pl.valid) return "Can't place here!";
     p.money -= d.cost;
     this.spawnBuilding(type, tx, ty, playerIdx);
     return null;
@@ -240,11 +268,11 @@ export class Game {
 
     if (!mine && p.money >= 200) {
       const tx = dir > 0 ? hq.tx + hq.wt + 1 : hq.tx - 3;
-      if (this.map.canPlace(tx, groundY, 2, 2, 'mine')) { p.money -= 200; this.spawnBuilding('mine', tx, groundY, i); }
+      if (this.placementAt('mine', tx, groundY, i).valid) { p.money -= 200; this.spawnBuilding('mine', tx, groundY, i); }
     }
     if (!barracks && p.money >= 150) {
       const tx = dir > 0 ? hq.tx + hq.wt + 4 : hq.tx - 8;
-      if (this.map.canPlace(tx, groundY, 3, 2, 'barracks')) {
+      if (this.placementAt('barracks', tx, groundY, i).valid) {
         p.money -= 150;
         barracks = this.spawnBuilding('barracks', tx, groundY, i);
       }
@@ -253,7 +281,7 @@ export class Game {
     let workshop = this.buildings.find((b) => b.faction === i && b.type === 'workshop');
     if (!workshop && barracks && this.time > 90 && p.money >= 200) {
       const tx = dir > 0 ? hq.tx + hq.wt + 8 : hq.tx - 12;
-      if (this.map.canPlace(tx, groundY, 3, 2, 'workshop')) {
+      if (this.placementAt('workshop', tx, groundY, i).valid) {
         p.money -= 200;
         workshop = this.spawnBuilding('workshop', tx, groundY, i);
       }
@@ -262,7 +290,7 @@ export class Game {
     let airbase = this.buildings.find((b) => b.faction === i && b.type === 'airbase');
     if (!airbase && workshop && !workshop.constructing && this.time > 180 && p.money >= 300) {
       const tx = dir > 0 ? hq.tx + hq.wt + 12 : hq.tx - 17;
-      if (this.map.canPlace(tx, groundY, 4, 2, 'airbase')) {
+      if (this.placementAt('airbase', tx, groundY, i).valid) {
         p.money -= 300;
         airbase = this.spawnBuilding('airbase', tx, groundY, i);
       }

@@ -10,7 +10,7 @@ import {
   hostRoom, joinRoom, makeRoomCode, connectionRoute, encodeSnapshot, createMirror, applySnapshot, SNAPSHOT_INTERVAL,
 } from './net.js';
 import {
-  drawSky, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap,
+  drawSky, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
 } from './render.js';
 
 const $ = (id) => document.getElementById(id);
@@ -159,10 +159,11 @@ function handleTap(sx, sy) {
   const enemy = (e) => e.faction !== active;
 
   if (pendingBuild) {
-    const pl = game.placementFor(pendingBuild, wx, wy);
+    const pl = game.placementFor(pendingBuild, wx, wy, active);
     const sameSpot = ghost && ghost.tx === pl.tx && ghost.ty === pl.ty;
     ghost = pl;
     if (sameSpot && pl.valid) confirmPlacement();
+    else if (pl.reason === 'zone') setStatus('Too far from your base — build inside the green zone');
     else if (!pl.valid) setStatus("Can't build there — try another spot");
     else setStatus('Tap again or press Place to build');
     return;
@@ -223,14 +224,16 @@ function handleTap(sx, sy) {
 function confirmPlacement() {
   if (!ghost || !pendingBuild) return;
   if (game.players[active].money < BUILDING_TYPES[pendingBuild].cost) { toast('Not enough credits!'); return; }
-  if (!game.placementAt(pendingBuild, ghost.tx, ghost.ty).valid) { toast("Can't place here!"); return; }
+  const check = game.placementAt(pendingBuild, ghost.tx, ghost.ty, active);
+  if (check.reason === 'zone') { toast('Too far from your base!'); return; }
+  if (!check.valid) { toast("Can't place here!"); return; }
   const err = issue({ c: 'place', type: pendingBuild, tx: ghost.tx, ty: ghost.ty });
   if (err) { toast(err); return; }
   toast(`${capitalize(pendingBuild)} placed`, 'info');
   // Bridges and ramps are usually laid in runs — stay in placement mode,
   // previewing the next tile along.
   if (pendingBuild === 'bridge' || pendingBuild === 'ramp') {
-    ghost = game.placementAt(pendingBuild, ghost.tx + 1, ghost.ty);
+    ghost = game.placementAt(pendingBuild, ghost.tx + 1, ghost.ty, active);
     // Online guests see their spend a moment later, so count it now.
     const spent = net.role === 'guest' ? BUILDING_TYPES[pendingBuild].cost : 0;
     if (game.players[active].money - spent < BUILDING_TYPES[pendingBuild].cost) cancelPlacement();
@@ -366,10 +369,11 @@ function renderPanel() {
     const tip = pendingBuild === 'bridge' ? 'Extend sideways from a platform or another bridge.'
       : pendingBuild === 'ramp' ? 'Needs support underneath. Stack ramps into stairs.'
         : 'Must sit on solid ground or a platform.';
+    const zoneTip = ' Build inside the green zone near your base.';
     panel.innerHTML = `
       <div class="panel-head"><div class="panel-title">${BUILD_ICONS[pendingBuild]} Place ${capitalize(pendingBuild)}</div>
         <div class="panel-sub">💰 ${d.cost} · ${d.buildTime}s</div></div>
-      <div class="hint">Tap the battlefield to position it, then tap the same spot again or press Place. ${tip}</div>
+      <div class="hint">Tap the battlefield to position it, then tap the same spot again or press Place. ${tip}${zoneTip}</div>
       <div class="row" style="margin-top:auto">
         <button class="act-btn" data-act="cancel">Cancel</button>
         <button class="act-btn primary" data-act="place" ${ghost?.valid ? '' : 'disabled'}>Place</button>
@@ -881,6 +885,7 @@ function draw(dt) {
   for (const b of game.buildings) if (onScreen(b)) drawBuilding(ctx, b);
   for (const u of game.units) if (onScreen(u)) drawUnit(ctx, u);
   for (const p of game.projectiles) drawProjectile(ctx, p);
+  if (pendingBuild) drawBuildZones(ctx, game.buildZones(active), v);
   if (pendingBuild && ghost) drawGhost(ctx, ghost);
 
   markers = markers.filter((m) => (m.t -= dt) > 0);
@@ -895,7 +900,7 @@ function draw(dt) {
   }
 
   mctx.setTransform(1, 0, 0, 1, 0, 0);
-  drawMinimap(mctx, game, mini.width, mini.height, v, minimapCache);
+  drawMinimap(mctx, game, mini.width, mini.height, v, minimapCache, pendingBuild ? game.buildZones(active) : null);
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────
