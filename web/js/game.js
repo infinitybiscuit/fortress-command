@@ -8,9 +8,9 @@ import { Unit, Building, Projectile, State, canReach, distTo } from './entities.
 const MAX_PROJECTILES = 100;
 
 export class Game {
-  constructor(modeKey, events = {}) {
-    this.modeKey = modeKey;
-    this.mode = MODES[modeKey];
+  // mode: a MODES key, or a mode object (online games build their own).
+  constructor(mode, events = {}) {
+    this.mode = typeof mode === 'string' ? MODES[mode] : mode;
     this.events = events; // { onGameOver(winnerIdx), onMessage(text) }
     this.map = new TileMap();
     // Looping map (Free-for-All): x wraps around and distances take the short way.
@@ -263,8 +263,8 @@ export class Game {
     const alive = this.players.map((p, i) => (p.alive ? i : -1)).filter((i) => i >= 0);
     const humansAlive = alive.filter((i) => !this.players[i].isAi);
     if (alive.length <= 1) return this.finish(alive.length ? alive[0] : -1);
-    // Single-human modes: losing your HQ ends the game immediately.
-    if (this.humanCount === 1 && humansAlive.length === 0) return this.finish(alive[0]);
+    // Once the last human HQ falls there's nobody left to play for.
+    if (this.humanCount > 0 && humansAlive.length === 0) return this.finish(alive[0]);
   }
 
   finish(winner) {
