@@ -4,7 +4,7 @@
 // broker is only used to introduce the two devices.
 import { UNIT_TYPES, BUILDING_TYPES, RELAY_URL } from './config.js';
 import { Game } from './game.js';
-import { Unit, Building } from './entities.js';
+import { Unit, Building, deathEffect } from './entities.js';
 
 const ID_PREFIX = 'fortress-command-v1-';
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O or 1/I/L mix-ups
@@ -265,6 +265,8 @@ export function applySnapshot(g, s) {
   });
 
   const units = new Map(g.units.map((u) => [u.id, u]));
+  const alive = new Set(s.u.map((r) => r[0]));
+  for (const u of g.units) if (!alive.has(u.id)) g.effects.push(deathEffect(u));
   g.units = s.u.map(([id, ti, f, x, y, hp, facing, flash, cd]) => {
     let u = units.get(id);
     if (!u) {

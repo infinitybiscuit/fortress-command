@@ -19,6 +19,15 @@ web manifest and service worker, so the game launches without browser chrome and
 offline after the first load. When served over HTTPS (e.g. GitHub Pages, see
 `.github/workflows/pages.yml`), the service worker caches the assets.
 
+## Look and feel
+
+The art style is a homage to early-90s home-computer war games: bright, saturated colours and chunky pixels.
+- **Pixel rendering:** the battlefield is drawn at low resolution and scaled up with hard pixel edges.
+- **Scenery:** a banded blue sky with blocky clouds, parallax hills and jungle palms, and grass-topped dirt and rock.
+- **Soldiers:** little big-headed figures with team-coloured helmets and role-specific gear (the engineer's hard hat, the sniper's boonie hat and rifle).
+- **Buildings and effects:** buildings sit behind sandbags. Fallen soldiers, burning wrecks and flying dirt add to the battle.
+- **UI:** the olive/khaki interface uses the bundled [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) pixel font (SIL Open Font License, see `vendor/fonts/`).
+
 ## Free-for-All: looping map
 
 In **Free-for-All (3)** and **(4)**, the battlefield is a loop. Walk, drive or fly off one edge and you come back on the other, and the camera pans endlessly. HQs are spaced evenly around the loop, so every player has a neighbour on each side and nobody gets a safe corner. Units, shots, artillery, aircraft, the minimap and build zones all work across the seam. Orders take the short way round. In 1 vs 1 modes the map still has edges.

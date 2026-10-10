@@ -42,6 +42,18 @@ export function canHitAir(u) {
   return u.kind === 'unit' && u.repairRate === 0 && (u.def.shot ?? 'bullet') === 'bullet';
 }
 
+// Visual-only effects (rendered by render.js drawEffects).
+export function deathEffect(u) {
+  return { kind: u.vehicle || u.air ? 'wreck' : 'fall', x: u.x, y: u.y, facing: u.facing, f: u.faction, t: 0, life: u.vehicle || u.air ? 5 : 6 };
+}
+export function debrisEffect(x, y, size) {
+  const parts = [];
+  for (let i = 0; i < 8; i++) {
+    parts.push({ vx: (Math.random() - 0.5) * size * 5, vy: -80 - Math.random() * size * 3, c: Math.random() < 0.5 ? '#7a4a24' : '#5c361a' });
+  }
+  return { kind: 'debris', x, y, parts, t: 0, life: 0.9 };
+}
+
 export class Unit {
   constructor(game, type, x, y, faction) {
     const s = UNIT_TYPES[type];
@@ -412,6 +424,7 @@ export class Unit {
       this.hp = 0;
       this.dead = true;
       this.state = State.DEAD;
+      this.game.effects?.push(deathEffect(this));
       return;
     }
     this.onAttacked(source);
@@ -674,6 +687,7 @@ export class Projectile {
         this.hit(e, (this.kind === 'lob' || this.kind === 'bomb') && d < 8 ? this.damage : this.damage * 0.5);
       }
       this.exploded = 0.3;
+      this.game.effects?.push(debrisEffect(this.x, this.y, this.splash));
       return;
     }
     this.done = true;
