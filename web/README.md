@@ -55,10 +55,18 @@ Colours follow seat order: Blue, Red, Green, Yellow. Everyone uses the normal co
 
 **How it works.** The phones connect directly to each other (WebRTC, via the bundled [PeerJS](https://peerjs.com) library). PeerJS's free public server only introduces them. The host's phone runs the game, and each guest connects to the host. Guests send their orders and receive the battlefield state about 12 times a second, smoothed between updates. Both players must be on the same app version; the menu shows it.
 
+**Dropped connections.** Phones lose signal, switch between Wi-Fi and mobile data, and lock their screens, so a guest who drops mid-battle keeps their seat:
+- Their phone reconnects by itself, for up to a minute, and puts them back where they were. Everyone sees "… lost connection — reconnecting…" and then "… reconnected".
+- If they're gone for more than 45 seconds, the CPU looks after their army until they're back, then hands it over again.
+- If iOS reloads the page (it does this to apps left in the background), **Rejoin game** on the online menu gets them back in.
+- Both ends send a heartbeat every 2 seconds, so a dead link is noticed within about 8 seconds instead of hanging. A phone that was briefly in the background gets a few seconds' grace.
+- The screen is kept awake during online battles, because auto-lock is a common cause of drops.
+- If a guest's connection is slow, the host skips updates for them rather than piling up a backlog.
+
 **Limits.**
-- If a guest leaves mid-battle, the CPU takes over their army and the game carries on. If the host leaves, the game ends for everyone.
+- If a guest leaves on purpose mid-battle, the CPU takes over their army and the game carries on. If the host leaves, the game ends for everyone.
 - Players can only join from the lobby, not once a battle has started.
-- If the host switches away from the app, the game freezes until they come back.
+- The host's phone runs the battle, so if the host switches away from the app, the game freezes until they come back. The best phone to host on is one on steady Wi-Fi.
 - Some mobile carriers and strict networks block direct connections. With the optional Cloudflare relay set up (see [`../relay`](../relay/README.md)), those games are routed through Cloudflare instead. Without it, put one or both phones on Wi-Fi. The label under your name shows whether a match is `direct` or going through the `relay`.
 - Several tabs on one device can play each other without the internet by adding `?net=local` to the URL, which is handy for testing.
 
