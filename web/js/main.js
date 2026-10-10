@@ -1072,6 +1072,7 @@ async function reconnect() {
   old?.close();
   setStatus(RECONNECTING);
   const until = performance.now() + REJOIN_WINDOW;
+  let wait = 2000;
   while (net.role === 'guest' && net.reconnecting && performance.now() < until) {
     try {
       const transport = await joinRoom(net.code);
@@ -1080,7 +1081,9 @@ async function reconnect() {
       transport.send({ t: 'hello', v: VERSION, name: net.myName, rejoin: net.token });
       return; // the host's 'start' completes it
     } catch {
-      await new Promise((r) => setTimeout(r, 2000));
+      // Back off: every attempt is a request to the matchmaking server.
+      await new Promise((r) => setTimeout(r, wait));
+      wait = Math.min(wait * 2, 10000);
     }
   }
   if (net.role === 'guest' && net.reconnecting) hostGone("Couldn't reconnect to the host.");

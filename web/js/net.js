@@ -187,15 +187,28 @@ export async function hostRoom(code, onConnect) {
     const peer = new Peer(ID_PREFIX + code, { config });
     let open = false;
     let closed = false;
+    let retries = 0;
+    let retryTimer = null;
     peer.on('open', () => {
+      retries = 0;
+      if (open) return; // back after a reconnect
       open = true;
-      resolve({ cancel: () => { closed = true; peer.destroy(); } });
+      resolve({ cancel: () => { closed = true; clearTimeout(retryTimer); peer.destroy(); } });
     });
     peer.on('connection', (conn) => {
       conn.on('open', () => onConnect(wrapConnection(conn, null)));
     });
-    // Stay reachable for late joiners if the matchmaking socket drops.
-    peer.on('disconnected', () => { if (!closed && !peer.destroyed) peer.reconnect(); });
+    // Stay reachable for late joiners if the matchmaking socket drops. A failed
+    // reconnect reports another disconnect, so always wait (longer each time):
+    // retrying instantly floods the free server, which then blocks this IP.
+    peer.on('disconnected', () => {
+      if (closed || peer.destroyed || retryTimer) return;
+      const delay = Math.min(60000, 3000 * 2 ** retries++);
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        if (!closed && !peer.destroyed && peer.disconnected) peer.reconnect();
+      }, delay);
+    });
     peer.on('error', (err) => { if (!open) { peer.destroy(); reject(new Error(friendlyPeerError(err))); } });
   });
 }
