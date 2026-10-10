@@ -4,7 +4,7 @@
 // selection, build zones, minimap).
 import {
   TILE_SIZE, MAP_W, MAP_H, WORLD_W, WORLD_H, UNIT_H, BUILDING_TYPES,
-  TILE_EMPTY, TILE_GROUND, TILE_PLATFORM, TILE_BRIDGE, TILE_RAMP,
+  TILE_EMPTY, TILE_GROUND, TILE_PLATFORM, TILE_BRIDGE, TILE_RAMP, UNIT_TYPES,
 } from './config.js';
 import { G, T, A, C, canvas, flip, rect, disc, hash, team, setPalette } from './pixel.js';
 import classic from './themes/classic.js';
@@ -45,6 +45,18 @@ function buildingSprite(b) {
     theme.buildings[b.type](g, team(b.faction));
     return { c, ax: 0, ay: 0 };
   });
+}
+
+// A unit's sprite as an image URL, for menus in themes that use sprite icons.
+const iconCache = new Map();
+export function unitIcon(type, faction) {
+  const key = `${theme.id}:${type}:${faction}`;
+  if (!iconCache.has(key)) {
+    const d = UNIT_TYPES[type];
+    const s = d.air ? theme.aircraft[type](faction) : d.vehicle ? theme.vehicle[type](faction, 0) : theme.soldier(type, faction, 0);
+    iconCache.set(key, s.c.toDataURL());
+  }
+  return iconCache.get(key);
 }
 
 // ── Terrain ────────────────────────────────────────────────────────────────

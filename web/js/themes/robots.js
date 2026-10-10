@@ -94,92 +94,104 @@ function buildEndo(t, c, g, frame) {
 }
 
 // ── Vehicles & aircraft ────────────────────────────────────────────────────
-function wheels(g, xs, y, r, frame) {
-  for (const x of xs) {
-    g.fillStyle = C.O; g.fillRect(x - 1, y - 1, r + 2, r + 2);
-    g.fillStyle = '#16171b'; g.fillRect(x, y, r, r);
-    g.fillStyle = C.metalLight; g.fillRect(x + 1, y + 1, r - 2, r - 2);
-    g.fillStyle = C.metalDark; g.fillRect(x + (frame ? 1 : r - 2), y + 1, 1, 1);
-  }
+// Glowing hover pad under a machine (frame flickers the glow).
+function hoverGlow(g, x, y, w, frame) {
+  g.fillStyle = C.metal; g.fillRect(x, y, w, 1);
+  g.fillStyle = C.cyan; g.fillRect(x, y + 1, w, 1);
+  g.fillStyle = C.cyanDark; g.fillRect(x + 1, y + 2, w - 2, frame ? 1 : 0);
 }
 
-// Cruiser: a black-and-team police interceptor with a flashing light bar.
+// Cruiser: a black police spinner that hovers over the rubble, light bar flashing.
 function buildCruiser(f, frame) {
   const t = team(f);
-  const [c, g] = canvas(22, 13);
+  const [c, g] = canvas(26, 15);
   outlined(g, [
-    [1, 5, 19, 4, '#1c1f26'], [6, 3, 9, 3, '#1c1f26'], [8, 2, 5, 1, C.metalDark],
+    [3, 6, 19, 4, '#1a1d24'], [22, 7, 3, 3, '#1a1d24'], [1, 4, 3, 5, '#1a1d24'], [8, 3, 10, 4, '#1a1d24'],
+    [11, 2, 5, 1, C.metalDark],
   ], [
-    [1, 5, 19, 1, C.metal], [7, 3, 3, 2, C.cyanDark], [11, 3, 3, 2, C.cyanDark], [7, 3, 1, 1, C.cyan],
-    [2, 7, 17, 1, t.main], [19, 6, 1, 1, C.white], [1, 6, 1, 1, C.red],
-    [8, 2, 2, 1, frame ? t.light : C.red], [11, 2, 2, 1, frame ? C.red : t.light],
+    [3, 6, 19, 1, C.metal], [22, 7, 2, 1, C.metal], [9, 3, 8, 3, C.cyanDark], [10, 3, 3, 1, C.cyan], [16, 4, 1, 2, C.cyan],
+    [4, 8, 20, 1, t.main], [4, 9, 18, 1, '#0f1116'], [24, 8, 1, 1, C.white], [1, 5, 1, 2, C.red],
+    [11, 2, 2, 1, frame ? t.light : C.red], [14, 2, 2, 1, frame ? C.red : t.light], [6, 7, 1, 1, C.yellow],
   ]);
-  wheels(g, [3, 14], 8, 4, frame);
-  return { c, ax: 11, ay: 12 };
+  hoverGlow(g, 5, 11, 5, frame);
+  hoverGlow(g, 16, 11, 5, frame);
+  return { c, ax: 13, ay: 14 };
 }
 
-// Hunter: a treaded robot tank with twin plasma cannons and a row of red eyes.
+// Hunter: a hulking tracked killing machine — sensor head with a row of red
+// eyes, twin plasma cannons, toothed treads.
 function buildHunter(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(34, 20);
+  outlined(g, [
+    [1, 13, 26, 6, '#121419'], [3, 9, 23, 5, C.metalDark], [26, 10, 3, 4, C.metalDark],
+    [8, 4, 13, 6, C.metal], [10, 1, 1, 3, C.metalDark],
+    [20, 5, 12, 2, C.gun], [21, 8, 11, 2, C.gun], [19, 4, 3, 7, C.metalDark],
+  ], [
+    [3, 9, 23, 1, C.metal], [8, 4, 13, 1, C.metalLight], [9, 6, 11, 2, '#0b0c10'],
+    [10, 6, 1, 1, C.red], [12, 6, 1, 1, C.red], [14, 6, 1, 1, C.red], [16, 6, 1, 1, C.red], [18, 6, 1, 1, C.redDark],
+    [10, 1, 1, 1, C.red], [4, 11, 21, 1, t.main], [23, 5, 1, 2, t.main], [24, 8, 1, 2, t.main],
+    [31, 5, 1, 2, C.cyan], [31, 8, 1, 2, C.cyan], [20, 9, 1, 1, C.cyan],
+  ]);
+  // Road wheels and moving track teeth
+  g.fillStyle = C.metal;
+  for (let i = 0; i < 6; i++) g.fillRect(3 + i * 4, 15, 2, 2);
+  g.fillStyle = C.metalLight;
+  for (let x = 1 + frame * 2; x < 27; x += 4) { g.fillRect(x, 13, 2, 1); g.fillRect(x, 18, 2, 1); }
+  return { c, ax: 14, ay: 19 };
+}
+
+// Walker: a squat two-legged enforcement mech — visor slit, arm cannons and a
+// missile pod on its back. Legs stride between frames.
+function buildWalker(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(30, 22);
+  const legs = frame
+    ? [[10, 13, 3, 3], [7, 16, 3, 4], [17, 13, 3, 3], [19, 16, 3, 4]]
+    : [[10, 13, 3, 3], [11, 16, 3, 4], [17, 13, 3, 3], [15, 16, 3, 4]];
+  const feet = frame ? [[5, 20, 6, 1], [18, 20, 6, 1]] : [[9, 20, 6, 1], [14, 20, 6, 1]];
+  outlined(g, [
+    ...legs.map((l) => [...l, C.metalDark]), ...feet.map((p) => [...p, C.metal]),
+    [11, 11, 8, 3, C.metalDark],
+    [2, 7, 6, 3, C.metalDark], [7, 2, 15, 10, C.metal], [5, 0, 7, 3, C.metalDark],
+    [21, 7, 6, 3, C.metalDark], [26, 7, 3, 1, C.gun], [26, 9, 3, 1, C.gun],
+  ], [
+    [7, 2, 15, 1, C.metalLight], [7, 3, 1, 8, C.metalLight], [16, 5, 6, 2, '#0b0c10'], [17, 5, 4, 1, C.red],
+    [8, 9, 13, 1, t.main], [8, 10, 13, 1, C.metalDark], [6, 0, 1, 1, C.red], [8, 0, 1, 1, C.red], [10, 0, 1, 1, C.red],
+    [28, 7, 1, 1, C.cyan], [28, 9, 1, 1, C.cyan], [3, 8, 1, 1, C.yellow], [12, 12, 6, 1, C.metal],
+  ]);
+  return { c, ax: 14, ay: 21 };
+}
+
+// Drone: an aerial hunter-killer — wedge body, twin downward turbines, a
+// cluster of red eyes (thruster glow and searchlight are drawn live).
+function buildDrone(f) {
   const t = team(f);
   const [c, g] = canvas(30, 16);
   outlined(g, [
-    [1, 9, 23, 5, '#15171c'], [3, 5, 20, 5, C.metalDark], [7, 2, 11, 4, C.metal], [17, 3, 11, 1, C.gun], [17, 5, 9, 1, C.gun],
-    [21, 6, 3, 3, C.metalDark],
+    [4, 5, 20, 4, C.metalDark], [24, 6, 4, 3, C.metalDark], [10, 2, 8, 3, C.metal], [1, 4, 4, 2, C.metalDark],
+    [3, 9, 7, 3, C.metal], [17, 9, 7, 3, C.metal], [20, 12, 7, 1, C.gun],
   ], [
-    [3, 5, 20, 1, C.metal], [7, 2, 11, 1, C.metalLight], [9, 3, 1, 1, C.red], [11, 3, 1, 1, C.red], [13, 3, 1, 1, C.red],
-    [4, 7, 17, 1, t.main], [27, 3, 1, 1, C.cyan], [25, 5, 1, 1, C.cyan], [3, 9, 20, 1, C.metal],
+    [4, 5, 20, 1, C.metal], [10, 2, 8, 1, C.metalLight], [23, 6, 4, 2, '#0b0c10'],
+    [24, 6, 1, 1, C.red], [26, 6, 1, 1, C.red], [25, 7, 1, 1, C.red], [5, 7, 18, 1, t.main],
+    [4, 11, 5, 1, C.cyanDark], [18, 11, 5, 1, C.cyanDark], [26, 12, 1, 1, C.cyan],
   ]);
-  g.fillStyle = C.metalDark;
-  for (let i = 0; i < 6; i++) g.fillRect(3 + i * 4, 11, 2, 2);
-  g.fillStyle = '#3a3e46';
-  for (let x = 2 + frame * 2; x < 24; x += 4) g.fillRect(x, 13, 1, 1);
-  return { c, ax: 12, ay: 15 };
+  return { c, ax: 15, ay: 13 };
 }
 
-// Walker: a two-legged machine with an angled missile launcher.
-function buildWalker(f, frame) {
-  const t = team(f);
-  const [c, g] = canvas(26, 15);
-  const legs = frame
-    ? [[8, 8, 2, 3], [7, 11, 2, 3], [15, 8, 2, 3], [16, 11, 2, 3]]
-    : [[8, 8, 2, 3], [9, 11, 2, 3], [15, 8, 2, 3], [14, 11, 2, 3]];
-  const feet = frame ? [[6, 14, 4, 1], [15, 14, 4, 1]] : [[8, 14, 4, 1], [13, 14, 4, 1]];
-  outlined(g, [
-    ...legs.map((l) => [...l, C.metalDark]), ...feet.map((p) => [...p, C.metal]),
-    [5, 3, 15, 6, C.metal], [9, 1, 7, 3, C.metalDark],
-    [16, 2, 3, 1, C.gun], [18, 1, 3, 1, C.gun], [20, 0, 3, 2, C.gun],
-  ], [
-    [5, 3, 15, 1, C.metalLight], [16, 5, 3, 1, C.red], [6, 7, 13, 1, t.main], [10, 2, 5, 1, C.metal],
-    [6, 4, 3, 2, C.metalDark], [22, 0, 1, 1, C.cyan],
-  ]);
-  return { c, ax: 12, ay: 14 };
-}
-
-// Drone: a hovering hunter machine (thrusters and searchlight drawn live).
-function buildDrone(f) {
-  const t = team(f);
-  const [c, g] = canvas(26, 13);
-  outlined(g, [
-    [3, 4, 16, 4, C.metalDark], [19, 5, 4, 2, C.metalDark], [6, 2, 9, 2, C.metal], [4, 8, 6, 3, C.metal], [14, 8, 6, 3, C.metal],
-    [18, 8, 5, 1, C.gun],
-  ], [
-    [6, 2, 9, 1, C.metalLight], [19, 5, 2, 1, C.red], [22, 6, 1, 1, C.red], [4, 6, 14, 1, t.main], [3, 4, 16, 1, C.metal],
-    [5, 10, 4, 1, C.cyanDark], [15, 10, 4, 1, C.cyanDark],
-  ]);
-  return { c, ax: 13, ay: 12 };
-}
-
-// Dropship: a heavy VTOL gunship with downward engines.
+// Dropship: a heavy VTOL troop carrier with twin engine pods.
 function buildDropship(f) {
   const t = team(f);
-  const [c, g] = canvas(34, 13);
+  const [c, g] = canvas(38, 16);
   outlined(g, [
-    [1, 1, 4, 5, C.metalDark], [1, 5, 29, 4, C.metalDark], [29, 6, 3, 2, C.metal], [8, 8, 6, 3, C.metal], [19, 8, 6, 3, C.metal],
+    [1, 1, 5, 5, C.metalDark], [2, 5, 31, 6, C.metalDark], [33, 7, 3, 3, C.metalDark], [12, 3, 14, 3, C.metal],
+    [8, 10, 7, 4, C.metal], [22, 10, 7, 4, C.metal],
   ], [
-    [2, 5, 27, 1, C.metal], [24, 6, 4, 1, C.cyan], [5, 7, 22, 1, t.main], [9, 10, 4, 1, C.cyanDark], [20, 10, 4, 1, C.cyanDark],
-    [2, 1, 2, 1, C.red],
+    [2, 5, 31, 1, C.metal], [12, 3, 14, 1, C.metalLight], [29, 6, 5, 2, C.cyanDark], [30, 6, 2, 1, C.cyan],
+    [4, 8, 28, 1, t.main], [15, 9, 6, 1, '#0b0c10'], [2, 1, 2, 1, C.red], [35, 8, 1, 1, C.white],
+    [9, 13, 5, 1, C.cyanDark], [23, 13, 5, 1, C.cyanDark],
   ]);
-  return { c, ax: 17, ay: 11 };
+  return { c, ax: 19, ay: 13 };
 }
 
 // ── Buildings ──────────────────────────────────────────────────────────────
@@ -574,24 +586,30 @@ function weather(ctx, bw, bh, camAX, camAY) {
   ctx.globalAlpha = 1;
 }
 
-// Hover thrusters (and a searchlight on drones) instead of rotor blades.
+// Turbine glow under the engine pods (and a searchlight on drones) instead of
+// rotor blades. Offsets are from the sprite's anchor; the art faces right.
 function rotor(ctx, u, x, y) {
   const flick = Math.floor(performance.now() / 60) % 2;
+  const heli = u.type === 'helicopter';
+  for (const dx of heli ? [-11, 3] : [-10, 4]) {
+    const px = u.facing > 0 ? x + dx : x - dx - 5;
+    const py = heli ? y - 1 : y + 1;
+    rect(ctx, px, py, 5, 1 + flick, C.cyan);
+    ctx.globalAlpha = 0.35;
+    rect(ctx, px + 1, py + 2 + flick, 3, 2, C.cyan);
+    ctx.globalAlpha = 1;
+  }
   if (u.type === 'helicopter') {
-    rect(ctx, x - 8 * u.facing - 2, y - 1, 4, 1 + flick, C.cyan);
-    rect(ctx, x + 2 * u.facing - 2, y - 1, 4, 1 + flick, C.cyan);
     ctx.globalAlpha = 0.09;
     ctx.fillStyle = '#d8f4ff';
     ctx.beginPath();
-    const nx = x + 9 * u.facing;
-    ctx.moveTo(nx, y - 4);
-    ctx.lineTo(nx + 24 * u.facing, y + 60);
+    const nx = x + 11 * u.facing;
+    ctx.moveTo(nx, y - 5);
+    ctx.lineTo(nx + 26 * u.facing, y + 60);
     ctx.lineTo(nx + 4 * u.facing, y + 60);
     ctx.closePath();
     ctx.fill();
     ctx.globalAlpha = 1;
-  } else {
-    for (const dx of [-6, 5]) rect(ctx, x + dx * u.facing - 2, y + 1, 4, 1 + flick, C.cyan);
   }
 }
 
@@ -713,8 +731,9 @@ export default {
     hq: 'HQ', barracks: 'Bunker', turret: 'Pulse Gun', wall: 'Barrier', mine: 'Reactor', workshop: 'Factory',
     airbase: 'Skyport', bridge: 'Girder', ramp: 'Ramp',
   },
+  // Units are shown with their own sprites in menus (see unitIcon in render.js).
+  spriteIcons: true,
   icons: {
-    heavy: '🤖', sniper: '🦾', engineer: '🔧', helicopter: '🛸', bomber: '🚀',
     turret: '⚡', wall: '🚧', mine: '☢️', workshop: '🏭', airbase: '🛰️', barracks: '🛡️',
   },
 };
