@@ -1,6 +1,6 @@
 // Fortress Command (web) — app shell: camera, touch input, UI panels and main loop.
 import {
-  WORLD_W, WORLD_H, TILE_SIZE, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
+  WORLD_W, WORLD_H, MAP_W, TILE_SIZE, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
   UNIT_ICONS, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize,
 } from './config.js';
 import { Game } from './game.js';
@@ -51,7 +51,9 @@ function view() { return { x: cam.x, y: cam.y, w: viewW / cam.scale, h: viewH / 
 function clampCam() {
   cam.scale = Math.min(MAX_SCALE, Math.max(minScale(), cam.scale));
   const v = view();
-  cam.x = Math.min(Math.max(0, cam.x), WORLD_W - v.w);
+  // Looping maps pan forever; otherwise stop at the map edges.
+  if (game?.wrap) cam.x = ((cam.x % WORLD_W) + WORLD_W) % WORLD_W;
+  else cam.x = Math.min(Math.max(0, cam.x), WORLD_W - v.w);
   cam.y = Math.min(Math.max(0, cam.y), WORLD_H - v.h);
 }
 
@@ -140,7 +142,7 @@ function pickUnit(wx, wy, pred) {
   for (const u of game.units) {
     if (u.dead || !pred(u) || !u.containsPoint(wx, wy, HIT_PAD)) continue;
     const [cx, cy] = u.centre();
-    const d = Math.hypot(cx - wx, cy - wy);
+    const d = Math.hypot(game.dx(wx, cx), cy - wy);
     if (d < bestD) { bestD = d; best = u; }
   }
   return best;
@@ -154,7 +156,8 @@ let lastTap = { t: 0, unit: null };
 
 function handleTap(sx, sy) {
   if (!game || paused || game.over) return;
-  const [wx, wy] = screenToWorld(sx, sy);
+  const [rawX, wy] = screenToWorld(sx, sy);
+  const wx = game.normX(rawX);
   const mine = (e) => e.faction === active;
   const enemy = (e) => e.faction !== active;
 
@@ -193,7 +196,7 @@ function handleTap(sx, sy) {
       // Double-tap: every unit of the same type that's on screen.
       const v = view();
       selectUnits(game.units.filter((u) => mine(u) && u.type === ownUnit.type
-        && u.x >= v.x && u.x <= v.x + v.w));
+        && Math.abs(game.dx(v.x + v.w / 2, u.x)) <= v.w / 2));
     } else {
       selectUnits([ownUnit]);
     }
@@ -510,7 +513,8 @@ panel.addEventListener('click', (e) => {
         break;
       case 'find': {
         if (!sel.length) break;
-        const ax = sel.reduce((s, u) => s + u.x, 0) / sel.length;
+        // Average relative to the first unit so groups straddling a looping seam centre correctly.
+        const ax = sel[0].x + sel.reduce((s, u) => s + game.dx(sel[0].x, u.x), 0) / sel.length;
         const ay = sel.reduce((s, u) => s + u.y, 0) / sel.length;
         centreOn(ax, ay - 20);
         break;
@@ -579,7 +583,7 @@ function focusHq() {
   const hq = game.players[active].hq;
   if (!hq) return;
   // Look out from the HQ toward the middle of the map.
-  const towardRight = hq.x < WORLD_W / 2;
+  const towardRight = game.wrap || hq.x < WORLD_W / 2;
   centreOn(hq.x + hq.w / 2 + (towardRight ? 1 : -1) * view().w * 0.25, null);
 }
 
@@ -880,15 +884,41 @@ function draw(dt) {
   const s = cam.scale * dpr;
   ctx.setTransform(s, 0, 0, s, -cam.x * s, -cam.y * s);
   const v = view();
-  drawTerrain(ctx, game.map, v);
-  const onScreen = (e) => e.x + (e.w || 30) > v.x - 40 && e.x - 30 < v.x + v.w + 40;
-  for (const b of game.buildings) if (onScreen(b)) drawBuilding(ctx, b);
-  for (const u of game.units) if (onScreen(u)) drawUnit(ctx, u);
-  for (const p of game.projectiles) drawProjectile(ctx, p);
-  if (pendingBuild) drawBuildZones(ctx, game.buildZones(active), v);
-  if (pendingBuild && ghost) drawGhost(ctx, ghost);
+  // On looping maps the view can straddle the seam: draw the world again one
+  // map-width over so both sides show.
+  const offsets = game.wrap ? [0, WORLD_W, -WORLD_W].filter((o) => o + WORLD_W > v.x && o < v.x + v.w) : [0];
+  const eachCopy = (fn) => {
+    for (const o of offsets) {
+      ctx.save();
+      ctx.translate(o, 0);
+      fn({ ...v, x: v.x - o });
+      ctx.restore();
+    }
+  };
+  eachCopy((vv) => {
+    drawTerrain(ctx, game.map, vv);
+    const onScreen = (e) => e.x + (e.w || 30) > vv.x - 40 && e.x - 30 < vv.x + vv.w + 40;
+    for (const b of game.buildings) if (onScreen(b)) drawBuilding(ctx, b);
+    for (const u of game.units) if (onScreen(u)) drawUnit(ctx, u);
+    for (const p of game.projectiles) drawProjectile(ctx, p);
+  });
+  if (pendingBuild) {
+    let zones = game.buildZones(active);
+    if (game.wrap) zones = [-1, 0, 1].flatMap((k) => zones.map(([a, b]) => [a + k * MAP_W, b + k * MAP_W]));
+    drawBuildZones(ctx, zones.sort((a, b) => a[0] - b[0]), v);
+  }
 
   markers = markers.filter((m) => (m.t -= dt) > 0);
+  eachCopy(() => {
+    if (pendingBuild && ghost) drawGhost(ctx, ghost);
+    drawMarkers();
+  });
+
+  mctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawMinimap(mctx, game, mini.width, mini.height, v, minimapCache, pendingBuild ? game.buildZones(active) : null);
+}
+
+function drawMarkers() {
   for (const m of markers) {
     ctx.strokeStyle = m.color;
     ctx.globalAlpha = Math.min(1, m.t * 2);
@@ -898,14 +928,11 @@ function draw(dt) {
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
-
-  mctx.setTransform(1, 0, 0, 1, 0, 0);
-  drawMinimap(mctx, game, mini.width, mini.height, v, minimapCache, pendingBuild ? game.buildZones(active) : null);
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 // Read-only handle for automated browser tests.
-window.__fortress = { get game() { return game; } };
+window.__fortress = { get game() { return game; }, cam };
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 buildModeButtons();

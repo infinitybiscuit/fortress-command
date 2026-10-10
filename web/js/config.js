@@ -4,7 +4,7 @@
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v11 · Build zone';
+export const VERSION = 'v12 · Looping FFA';
 
 // Cloudflare Worker (see /relay) that hands out TURN relay credentials, used
 // when two phones can't connect directly. Leave empty to connect direct-only.
@@ -105,12 +105,14 @@ export const PLAYER_NAMES = ['Blue', 'Red', 'Green', 'Yellow'];
 
 // Game modes. Each entry lists one player per HQ: [hq tile x, is AI].
 export const MODES = {
-  cpu:  { label: '1 vs CPU',         players: [[2, false], [193, true]], startSoldiers: true },
-  local:{ label: '1 vs 1 Local',     players: [[2, false], [193, false]], startSoldiers: true },
+  cpu:  { label: '1 vs CPU',         players: [[2, false], [193, true]] },
+  local:{ label: '1 vs 1 Local',     players: [[2, false], [193, false]] },
   // Two phones over the internet: the host plays Blue, the guest plays Red.
-  online: { label: '🌐 Online 1 vs 1', players: [[2, false], [193, false]], startSoldiers: true, online: true },
-  ffa3: { label: 'Free-for-All (3)', players: [[2, false], [97, true], [193, true]] },
-  ffa4: { label: 'Free-for-All (4)', players: [[2, false], [60, true], [130, true], [193, true]] },
+  online: { label: '🌐 Online 1 vs 1', players: [[2, false], [193, false]], online: true },
+  // Free-for-All maps loop: walk off one edge and you come back on the other,
+  // so HQs are spaced evenly around the loop and nobody gets a safe edge.
+  ffa3: { label: 'Free-for-All (3)', players: [[12, false], [79, true], [146, true]], wrap: true },
+  ffa4: { label: 'Free-for-All (4)', players: [[12, false], [62, true], [112, true], [162, true]], wrap: true },
 };
 
 export const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);

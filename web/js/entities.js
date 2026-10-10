@@ -19,6 +19,8 @@ const ENGINEER_REPAIR_RADIUS = 260;
 // wide building works from either side.
 export function distTo(x, y, e) {
   const r = e.bounds();
+  // Looping maps: measure to the nearest copy of the target.
+  if (e.game?.wrap) { const cx = r.x + r.w / 2; x = cx + e.game.dx(cx, x); }
   const cx = Math.max(r.x, Math.min(x, r.x + r.w));
   const cy = Math.max(r.y, Math.min(y, r.y + r.h));
   return Math.hypot(cx - x, cy - y);
@@ -82,6 +84,7 @@ export class Unit {
 
   containsPoint(px, py, pad = 6) {
     const b = this.bounds();
+    if (this.game.wrap) px = this.x + this.game.dx(this.x, px);
     return px >= b.x - pad && px <= b.x + b.w + pad && py >= b.y - pad && py <= b.y + b.h + pad;
   }
 
@@ -129,7 +132,7 @@ export class Unit {
     this.resume = null;
     if (r?.target && !r.target.dead && !this.isIgnoring(r.target)) this.attack(r.target);
     else if (r?.moveX != null) this.moveTo(r.moveX);
-    else if (home != null && Math.abs(home - this.x) > 24 && !this.hold) this.moveTo(home);
+    else if (home != null && Math.abs(this.game.dx(this.x, home)) > 24 && !this.hold) this.moveTo(home);
   }
 
   giveUp(t) {
@@ -151,7 +154,7 @@ export class Unit {
         if (scan) this.autoEngage();
         break;
       case State.MOVING: {
-        const dx = this.moveX - this.x;
+        const dx = this.game.dx(this.x, this.moveX);
         if (Math.abs(dx) < 6) { this.vx = 0; this.state = State.IDLE; this.forced = false; break; }
         this.vx = Math.sign(dx) * this.speed;
         // Attack-move: fight anything that comes into weapon range, then carry on.
@@ -177,16 +180,16 @@ export class Unit {
         if (distTo(cx, cy, t) > this.range) {
           // Out of range: hold position, leash back to post, or chase.
           if (this.hold) { this.vx = 0; if (scan) this.finishTarget(); break; }
-          if (this.home != null && Math.abs(this.x - this.home) > LEASH) { this.giveUp(t); break; }
+          if (this.home != null && Math.abs(this.game.dx(this.home, this.x)) > LEASH) { this.giveUp(t); break; }
           const [tx] = t.centre();
-          this.vx = Math.sign(tx - this.x) * this.speed;
-          if (Math.abs(this.x - this.stuckX) > 6) { this.stuckX = this.x; this.stuckT = 0; }
+          this.vx = Math.sign(this.game.dx(this.x, tx)) * this.speed;
+          if (Math.abs(this.game.dx(this.stuckX, this.x)) > 6) { this.stuckX = this.x; this.stuckT = 0; }
           else if ((this.stuckT += dt) > STUCK_SECONDS) { this.giveUp(t); break; }
         } else {
           this.vx = 0;
           this.stuckT = 0;
           this.stuckX = this.x;
-          this.facing = Math.sign(t.centre()[0] - this.x) || this.facing;
+          this.facing = Math.sign(this.game.dx(this.x, t.centre()[0])) || this.facing;
           if (this.cooldownTimer <= 0) {
             this.cooldownTimer = this.cooldown;
             this.game.fireProjectile(this, t, this.damage);
@@ -199,7 +202,7 @@ export class Unit {
         if (!t || t.dead || t.hp >= t.maxHp) { this.finishTarget(); break; }
         const [cx, cy] = this.centre();
         if (distTo(cx, cy, t) > this.range) {
-          this.vx = Math.sign(t.centre()[0] - this.x) * this.speed;
+          this.vx = Math.sign(this.game.dx(this.x, t.centre()[0])) * this.speed;
         } else {
           this.vx = 0;
           t.repair(this.repairRate * dt);
@@ -295,7 +298,7 @@ export class Unit {
   // time they pass overhead with the bay reloaded.
   bombingRun(t) {
     const [tx] = t.centre();
-    const dx = tx - this.x;
+    const dx = this.game.dx(this.x, tx);
     if (Math.abs(dx) < 16 && this.cooldownTimer <= 0) {
       this.cooldownTimer = this.cooldown;
       this.game.dropBomb(this);
@@ -320,7 +323,8 @@ export class Unit {
   // Aircraft ignore gravity and terrain: slide horizontally, climb/descend
   // toward cruise height. Freshly built aircraft take off from the pad.
   fly(dt) {
-    this.x = Math.min(WORLD_W - this.w / 2, Math.max(this.w / 2, this.x + this.vx * dt));
+    this.x = this.game.wrap ? this.game.normX(this.x + this.vx * dt)
+      : Math.min(WORLD_W - this.w / 2, Math.max(this.w / 2, this.x + this.vx * dt));
     if (this.cruise == null) this.cruise = this.def.altitude ?? Math.max(this.h + 40, this.y - 160);
     const want = Math.max(this.h + 24, Math.min(this.cruiseY(), WORLD_H - 64));
     const climb = 140 * dt;
@@ -372,7 +376,7 @@ export class Unit {
         if (this.state === State.MOVING) this.state = State.IDLE;
       }
     }
-    this.x = newX;
+    this.x = this.game.normX(newX);
 
     let newY = this.y + this.vy * dt;
     const txL = Math.floor((this.x - halfW + 2) / ts);
@@ -454,6 +458,7 @@ export class Building {
   bounds() { return { x: this.x, y: this.y, w: this.w, h: this.h }; }
   centre() { return [this.x + this.w / 2, this.y + this.h / 2]; }
   containsPoint(px, py, pad = 0) {
+    if (this.game.wrap) { const cx = this.x + this.w / 2; px = cx + this.game.dx(cx, px); }
     return px >= this.x - pad && px <= this.x + this.w + pad && py >= this.y - pad && py <= this.y + this.h + pad;
   }
 
@@ -481,7 +486,7 @@ export class Building {
     for (const u of this.game.units) {
       if (u.dead || u.faction === this.faction) continue;
       const [ux, uy] = u.centre();
-      const d = Math.hypot(ux - cx, uy - cy);
+      const d = Math.hypot(this.game.dx(cx, ux), uy - cy);
       const range = u.air ? this.def.airRange ?? this.def.range : this.def.range;
       if (d > range) continue;
       // Ground targets in range first; aircraft are engaged at long range.
@@ -560,6 +565,7 @@ export class Projectile {
       // Aim at the ground under the target and fly a fixed parabola.
       this.sx = this.x;
       this.sy = this.y;
+      this.tx = this.sx + game.dx(this.sx, this.tx); // unwrapped endpoint (short way round)
       this.ty = target.kind === 'unit' ? target.y : target.y + target.h;
       const dist = Math.hypot(this.tx - this.sx, this.ty - this.sy);
       this.flight = Math.max(0.6, dist / 260);
@@ -579,13 +585,13 @@ export class Projectile {
 
     if (this.kind === 'bomb') {
       this.vy = Math.min(this.vy + GRAVITY * dt, 700);
-      this.x += this.vx * dt;
+      this.x = this.game.normX(this.x + this.vx * dt);
       this.y += this.vy * dt;
       this.vx *= 1 - dt * 0.8;
       this.angle = Math.atan2(this.vy, this.vx);
       const g = this.game;
       const hitThing = [...g.units, ...g.buildings].find((e) => !e.dead && !e.air
-        && e.faction !== this.faction && e.containsPoint(this.x, this.y, 2));
+        && e.faction !== this.faction && distTo(this.x, this.y, e) <= 2);
       // Bombs drop through floating platforms; ground and bridges stop them.
       const [tx, ty] = g.map.worldToTile(this.x, this.y);
       const tile = g.map.get(tx, ty);
@@ -595,17 +601,18 @@ export class Projectile {
 
     if (this.kind === 'lob') {
       this.t = Math.min(1, this.t + dt / this.flight);
-      const px = this.x;
+      const px = this.lx ?? this.sx;
       const py = this.y;
-      this.x = this.sx + (this.tx - this.sx) * this.t;
+      this.lx = this.sx + (this.tx - this.sx) * this.t;
+      this.x = this.game.normX(this.lx);
       this.y = this.sy + (this.ty - this.sy) * this.t - Math.sin(Math.PI * this.t) * this.arc;
-      this.angle = Math.atan2(this.y - py, this.x - px);
+      this.angle = Math.atan2(this.y - py, this.lx - px);
       if (this.t >= 1) this.impact(null);
       return;
     }
 
     if (!this.target.dead) [this.tx, this.ty] = this.target.centre();
-    const dx = this.tx - this.x;
+    const dx = this.game.dx(this.x, this.tx);
     const dy = this.ty - this.y;
     const dist = Math.hypot(dx, dy);
     this.angle = Math.atan2(dy, dx);
@@ -621,12 +628,12 @@ export class Projectile {
     // Enemy walls stop direct fire (lobbed artillery arcs over them).
     const wall = this.wallOnPath(this.x, this.y, nx, ny);
     if (wall && wall !== this.target) {
-      this.x = Math.max(wall.x, Math.min(nx, wall.x + wall.w));
+      this.x = this.game.normX(nx);
       this.y = ny;
       this.impact(wall);
       return;
     }
-    this.x = nx;
+    this.x = this.game.normX(nx);
     this.y = ny;
   }
 
@@ -662,10 +669,7 @@ export class Projectile {
       for (const e of [...g.units, ...g.buildings]) {
         if (e === direct || e.dead || e.faction === this.faction) continue;
         if (e.air) continue; // ground blasts don't reach aircraft
-        const r = e.bounds();
-        const cx = Math.max(r.x, Math.min(this.x, r.x + r.w));
-        const cy = Math.max(r.y, Math.min(this.y, r.y + r.h));
-        const d = Math.hypot(cx - this.x, cy - this.y);
+        const d = distTo(this.x, this.y, e);
         if (d > this.splash) continue;
         this.hit(e, (this.kind === 'lob' || this.kind === 'bomb') && d < 8 ? this.damage : this.damage * 0.5);
       }

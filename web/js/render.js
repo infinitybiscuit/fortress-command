@@ -562,8 +562,8 @@ const VEHICLE = {
 export function drawBuildZones(ctx, zones, view) {
   const top = view.y;
   const h = view.h;
-  let x = Math.max(0, view.x);
-  const right = Math.min(WORLD_W, view.x + view.w);
+  let x = view.x;
+  const right = view.x + view.w;
   ctx.fillStyle = 'rgba(0,0,0,0.38)';
   for (const [from, to] of zones) {
     const zx0 = from * TILE_SIZE;
@@ -625,7 +625,9 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache, zones = null)
   if (zones) {
     // Placement mode: highlight where the player is allowed to build.
     ctx.fillStyle = 'rgba(0,255,102,0.28)';
-    for (const [from, to] of zones) ctx.fillRect(from * TILE_SIZE * sx, 0, (to - from) * TILE_SIZE * sx, ch);
+    for (const shift of game.wrap ? [-WORLD_W, 0, WORLD_W] : [0]) {
+      for (const [from, to] of zones) ctx.fillRect((from * TILE_SIZE + shift) * sx, 0, (to - from) * TILE_SIZE * sx, ch);
+    }
   }
   for (const b of game.buildings) {
     if (b.type === 'bridge' || b.type === 'ramp') continue;
@@ -639,6 +641,8 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache, zones = null)
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 1.5;
   ctx.strokeRect(view.x * sx + 0.75, view.y * sy + 0.75, view.w * sx - 1.5, view.h * sy - 1.5);
+  // Looping map: a view straddling the seam also shows at the start.
+  if (game.wrap && view.x + view.w > WORLD_W) ctx.strokeRect((view.x - WORLD_W) * sx + 0.75, view.y * sy + 0.75, view.w * sx - 1.5, view.h * sy - 1.5);
 }
 
 export { BUILDING_TYPES };

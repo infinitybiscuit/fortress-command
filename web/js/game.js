@@ -1,6 +1,6 @@
 // Game state, economy, AI and win conditions. Ported from godot/scripts/game/game_scene.gd.
 import {
-  TILE_SIZE, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
+  TILE_SIZE, WORLD_W, MAP_W, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
 } from './config.js';
 import { TileMap } from './tilemap.js';
 import { Unit, Building, Projectile, State, canReach, distTo } from './entities.js';
@@ -13,6 +13,9 @@ export class Game {
     this.mode = MODES[modeKey];
     this.events = events; // { onGameOver(winnerIdx), onMessage(text) }
     this.map = new TileMap();
+    // Looping map (Free-for-All): x wraps around and distances take the short way.
+    this.wrap = !!this.mode.wrap;
+    this.map.wrap = this.wrap;
     this.units = [];
     this.buildings = [];
     this.projectiles = [];
@@ -28,16 +31,27 @@ export class Game {
       this.players.push(p);
       p.hq = this.spawnBuilding('hq', hqX, hqY, i);
     });
-    if (this.mode.startSoldiers) {
-      const y = this.map.groundTop * TILE_SIZE;
-      this.spawnUnit('soldier', 250, y, 0);
-      this.spawnUnit('soldier', 290, y, 0);
-      const last = this.players.length - 1;
-      this.spawnUnit('soldier', 6140, y, last);
-      this.spawnUnit('soldier', 6100, y, last);
-    }
+    // Everyone starts with two soldiers posted in front of their HQ.
+    const y = this.map.groundTop * TILE_SIZE;
+    this.players.forEach((p, i) => {
+      const [hx] = p.hq.centre();
+      const dir = this.wrap || hx < WORLD_W / 2 ? 1 : -1;
+      for (const off of [122, 162]) this.spawnUnit('soldier', this.normX(hx + dir * off), y, i);
+    });
     this.players.forEach((p, i) => { p.income = this.incomeFor(i); });
   }
+
+  // Signed horizontal offset from a to b (shortest way round on looping maps).
+  dx(a, b) {
+    let d = b - a;
+    if (this.wrap) {
+      d = ((d % WORLD_W) + WORLD_W) % WORLD_W;
+      if (d > WORLD_W / 2) d -= WORLD_W;
+    }
+    return d;
+  }
+
+  normX(x) { return this.wrap ? ((x % WORLD_W) + WORLD_W) % WORLD_W : x; }
 
   get humanCount() { return this.players.filter((p) => !p.isAi).length; }
 
@@ -96,9 +110,11 @@ export class Game {
     return merged;
   }
 
-  // A footprint is in the zone if it overlaps any zone span.
+  // A footprint is in the zone if it overlaps any zone span (or, on looping
+  // maps, a span's copy one map-width either side).
   inBuildZone(playerIdx, tx, w) {
-    return this.buildZones(playerIdx).some(([from, to]) => tx < to && tx + w > from);
+    const shifts = this.wrap ? [-MAP_W, 0, MAP_W] : [0];
+    return this.buildZones(playerIdx).some(([from, to]) => shifts.some((s) => tx < to + s && tx + w > from + s));
   }
 
   tryPlaceAt(playerIdx, type, tx, ty) {
@@ -144,8 +160,8 @@ export class Game {
 
   onUnitTrained(b, type) {
     // Spawn beside the building on whichever side faces the map centre.
-    const towardRight = b.x + b.w / 2 < 3200;
-    const x = towardRight ? b.x + b.w + 8 : b.x - 8;
+    const towardRight = this.wrap || b.x + b.w / 2 < WORLD_W / 2;
+    const x = this.normX(towardRight ? b.x + b.w + 8 : b.x - 8);
     const u = this.spawnUnit(type, x, b.y + b.h, b.faction);
     u.facing = towardRight ? 1 : -1;
   }
@@ -263,7 +279,7 @@ export class Game {
     const mine = this.buildings.find((b) => b.faction === i && b.type === 'mine');
     let barracks = this.buildings.find((b) => b.faction === i && b.type === 'barracks');
     // Build toward the map centre so structures don't fall off the edge.
-    const dir = hq.x < 3200 ? 1 : -1;
+    const dir = this.wrap || hq.x < WORLD_W / 2 ? 1 : -1;
     const groundY = this.map.groundTop - 2;
 
     if (!mine && p.money >= 200) {
@@ -353,7 +369,7 @@ export class Game {
       };
 
       // Defence: units near home turn back on raiders.
-      if (threats.length && Math.abs(u.x - hx) < 1500) {
+      if (threats.length && Math.abs(this.dx(hx, u.x)) < 1500) {
         if (busy && threats.includes(u.target)) continue;
         const t = nearest(threats);
         if (t) { u.attack(t); continue; }
