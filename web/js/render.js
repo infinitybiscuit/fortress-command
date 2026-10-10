@@ -1,65 +1,109 @@
-// Canvas 2D renderer. Ported from godot/scripts/autoload/game_renderer.gd.
+// Pixel-art renderer (style homage to early-90s home-computer war games).
+//
+// The world is drawn into a low-resolution buffer where one "art pixel" is
+// G world units. Every sprite is pre-rendered pixel art, and everything is
+// placed on whole art pixels, so the image stays razor sharp when the buffer
+// is scaled up by a whole number of screen pixels (see main.js).
 import {
-  TILE_SIZE, MAP_W, MAP_H, WORLD_W, WORLD_H, UNIT_W, UNIT_H, PLAYER_COLORS, BUILDING_TYPES,
+  TILE_SIZE, MAP_W, MAP_H, WORLD_W, WORLD_H, UNIT_H, PLAYER_COLORS, BUILDING_TYPES,
   TILE_EMPTY, TILE_GROUND, TILE_PLATFORM, TILE_BRIDGE, TILE_RAMP,
 } from './config.js';
 
-const css = (c, a = 1) => `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
-const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-const WHITE = [1, 1, 1];
-const BLACK = [0, 0, 0];
-const tint = (f, t) => lerp(PLAYER_COLORS[f % 4], WHITE, t);
-const shade = (f, t) => lerp(PLAYER_COLORS[f % 4], BLACK, t);
+export const G = 2;              // world units per art pixel
+const T = TILE_SIZE / G;         // tile size in art pixels (16)
+const A = (v) => Math.round(v / G);
 
-
-function hpColor(r) { return r > 0.5 ? '#5ee03a' : r > 0.25 ? '#f2c230' : '#e8402a'; }
-
-function line(ctx, x1, y1, x2, y2, color, w) {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = w;
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
-}
-
-function poly(ctx, pts, color) {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(pts[0][0], pts[0][1]);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function circle(ctx, x, y, r, color) {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function rect(ctx, x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); }
-
-function hpBar(ctx, x, y, w, ratio) {
-  rect(ctx, x - 1, y - 1, w + 2, 5, '#1b1a12');
-  rect(ctx, x, y, w * ratio, 3, hpColor(ratio));
-}
-
-// ── Palette (90s home-computer war game: bright, saturated, chunky) ────────
-export const PAL = {
-  sky: ['#4f9fe8', '#68b2ef', '#83c3f3', '#9fd3f6', '#bde3f8'],
-  cloud: '#f4f8ff', cloudShade: '#cfdcef',
-  hillFar: '#5a9a4a', hillNear: '#3f7d34',
-  jungle: '#2c6528', jungleDark: '#1f4a1d', trunk: '#5b3a1f',
+// ── Palette ────────────────────────────────────────────────────────────────
+const C = {
+  O: '#1b1a12',                       // outline
+  skin: '#f2c08a', skinDark: '#c98f5a',
+  boot: '#2a2418', gun: '#2b2b2b', gunLight: '#6a6a6a',
+  yellow: '#f2c230', yellowDark: '#c99a1c', red: '#e8402a', redDark: '#a3261a', white: '#f4f8ff',
+  sky: ['#4f9fe8', '#62acee', '#78bbf2', '#8fc9f5', '#a9d8f8'],
+  cloud: '#f4f8ff', cloudShade: '#cbdcf0',
+  hillFar: '#5f9e4c', hillNear: '#468a39',
+  leaf: '#2f7a2a', leafLight: '#45a03a', leafDark: '#1f5a1d', trunk: '#6e4824', trunkDark: '#4e321a',
   grass: '#4cb83a', grassLight: '#86df4f', grassDark: '#2d7a24',
-  dirt: '#9a6232', dirtDark: '#7a4a24', dirtDeep: '#5c361a', pebble: '#b98a55',
-  rock: '#8f7f62', rockDark: '#66583f', rockLight: '#ad9c7a',
-  outline: '#1b1a12', skin: '#f2c08a', skinDark: '#c98f5a', olive: [0.36, 0.43, 0.2],
-  sand: '#d6b77a', sandDark: '#a88a52',
+  dirt: '#9a6232', dirtMid: '#82502a', dirtDeep: '#663c1e', pebble: '#c09060', pebbleDark: '#55321a',
+  rock: '#948466', rockLight: '#b4a482', rockDark: '#6a5c44',
+  sand: '#d8bb7e', sandDark: '#a88a52', sandLight: '#ecd7a2',
+  concrete: '#b7aa82', concreteLight: '#d4c8a0', concreteDark: '#857a5a',
+  wood: '#9a6a3a', woodLight: '#be8a52', woodDark: '#6e4824',
+  metal: '#7f8b8f', metalLight: '#a8b4b8', metalDark: '#4f5a5e',
+  glass: '#8fd0f0', shadow: 'rgba(0,0,0,0.28)',
+  olive: [0.36, 0.43, 0.2],
 };
 
-// Cheap deterministic hash for per-tile / per-index decoration.
+const hex = (c) => `#${c.map((v) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0')).join('')}`;
+const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+
+// Per-team colours: helmets, flags and roofs in the team colour; uniforms are
+// olive with a hint of it, so armies read as soldiers first, teams second.
+const teamCache = [];
+function team(f) {
+  if (teamCache[f]) return teamCache[f];
+  const c = PLAYER_COLORS[f % PLAYER_COLORS.length];
+  const uni = mix(C.olive, c, 0.35);
+  const roof = mix(c, [0.6, 0.55, 0.4], 0.25);
+  teamCache[f] = {
+    main: hex(c), light: hex(mix(c, [1, 1, 1], 0.4)), dark: hex(mix(c, [0, 0, 0], 0.35)),
+    uni: hex(uni), uniDark: hex(mix(uni, [0, 0, 0], 0.35)), uniLight: hex(mix(uni, [1, 1, 1], 0.2)),
+    roof: hex(roof), roofDark: hex(mix(roof, [0, 0, 0], 0.35)),
+  };
+  return teamCache[f];
+}
+
+// ── Sprite toolkit ─────────────────────────────────────────────────────────
+function canvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  return [c, g];
+}
+
+// Draw parts as one silhouette with a 1px dark outline: an outline pass for
+// every part first, then the fills, so only the outer edge is outlined.
+// A part is [x, y, w, h, colour]; `details` are drawn on top without outline.
+function outlined(g, parts, details = []) {
+  g.fillStyle = C.O;
+  for (const [x, y, w, h] of parts) g.fillRect(x - 1, y - 1, w + 2, h + 2);
+  for (const [x, y, w, h, col] of parts) { g.fillStyle = col; g.fillRect(x, y, w, h); }
+  for (const [x, y, w, h, col] of details) { g.fillStyle = col; g.fillRect(x, y, w, h); }
+}
+
+function flip(src) {
+  const [c, g] = canvas(src.width, src.height);
+  g.translate(src.width, 0);
+  g.scale(-1, 1);
+  g.drawImage(src, 0, 0);
+  return c;
+}
+
+const sprites = new Map();
+// Cached sprite + its mirror. `build` returns { c, ax, ay } (anchor in art px).
+function sprite(key, facing, build) {
+  let s = sprites.get(key);
+  if (!s) {
+    const r = build();
+    s = { right: r, left: { c: flip(r.c), ax: r.c.width - r.ax, ay: r.ay } };
+    sprites.set(key, s);
+  }
+  return facing < 0 ? s.left : s.right;
+}
+
+function rect(ctx, x, y, w, h, col) { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); }
+
+// Filled pixel disc (no anti-aliasing).
+function disc(ctx, cx, cy, r, col) {
+  ctx.fillStyle = col;
+  for (let dy = -r; dy <= r; dy++) {
+    const half = Math.floor(Math.sqrt(r * r - dy * dy + r * 0.8));
+    ctx.fillRect(cx - half, cy + dy, half * 2 + 1, 1);
+  }
+}
+
 function hash(n) {
   let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
   x ^= x >>> 13;
@@ -67,459 +111,612 @@ function hash(n) {
   return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
 }
 
-// ── Background (drawn in screen space, behind the world) ──────────────────
-// Parallax layers repeat with periods that divide WORLD_W × factor, so the
-// scenery lines up seamlessly when a looping map wraps.
-export function drawBackground(ctx, w, h, cam, scale) {
-  // Banded sky — flat colour steps instead of a smooth gradient.
-  const bands = PAL.sky.length;
-  const groundScreen = (WORLD_H - 3 * TILE_SIZE - cam.y) * scale;
-  for (let i = 0; i < bands; i++) {
-    ctx.fillStyle = PAL.sky[i];
-    const y0 = Math.floor((groundScreen * i) / bands);
-    ctx.fillRect(0, y0, w, Math.ceil(groundScreen / bands) + 1);
+// ── Soldiers ───────────────────────────────────────────────────────────────
+function buildSoldier(type, f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(20, 17);
+  const heavy = type === 'heavy';
+  const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
+  const boots = frame ? [[5, 15, 3, 1], [9, 15, 3, 1]] : [[4, 15, 3, 1], [10, 15, 3, 1]];
+  const torso = heavy ? [4, 8, 9, 4] : [5, 8, 7, 4];
+  const parts = [
+    ...legs.map((l) => [...l, t.uniDark]),
+    ...boots.map((b) => [...b, C.boot]),
+    [...torso, t.uni],
+    [6, 3, 6, 5, C.skin], // big head
+  ];
+  const details = [
+    [torso[0], 11, torso[2], 1, t.uniDark], // belt
+    [10, 5, 1, 1, C.O],                    // eye
+    [7, 7, 4, 1, C.skinDark],              // jaw shadow
+    [9, 9, 3, 2, t.uniLight],              // arm
+  ];
+  // Weapon by role
+  if (type === 'sniper') parts.push([10, 9, 9, 1, C.gun]);
+  else if (type === 'engineer') {
+    parts.push([11, 9, 4, 1, C.gunLight], [14, 8, 1, 3, C.gunLight]);
+    details.push([torso[0], 10, torso[2], 1, C.yellow]);
+  } else if (heavy) {
+    parts.push([11, 9, 7, 2, C.gun]);
+    details.push([5, 8, 6, 2, '#3b3b2a']);
+  } else parts.push([11, 9, 6, 1, C.gun]);
+  // Headgear by role
+  if (type === 'scout') {
+    parts.push([6, 2, 6, 2, t.main]);
+    details.push([4, 3, 2, 1, t.main], [6, 2, 6, 1, t.light]);
+  } else if (type === 'engineer') {
+    parts.push([5, 1, 8, 3, C.yellow]);
+    details.push([4, 3, 10, 1, C.yellowDark], [6, 1, 5, 1, '#ffe27a']);
+  } else if (type === 'sniper') {
+    parts.push([5, 1, 8, 3, '#4f6b2a']);
+    details.push([4, 3, 10, 1, '#3c5420']);
+  } else {
+    parts.push([5, 1, 8, 3, t.main]);
+    details.push([4, 3, 10, 1, t.dark], [6, 1, 5, 1, t.light]);
   }
-  ctx.fillStyle = PAL.sky[bands - 1];
-  ctx.fillRect(0, groundScreen, w, h);
+  outlined(g, parts, details);
+  return { c, ax: 8, ay: 16 };
+}
 
-  // Clouds (very slow)
-  const cp = 0.15;
-  const cPeriod = (WORLD_W * cp) / 8;
-  const cOff = cam.x * cp * scale;
-  for (let i = Math.floor(cOff / (cPeriod * scale)) - 1; i * cPeriod * scale - cOff < w + 80; i++) {
-    const k = ((i % 8) + 8) % 8;
-    const cx = i * cPeriod * scale - cOff + hash(k) * 60;
-    const cy = (20 + hash(k + 11) * 70) * scale - cam.y * 0.1 * scale;
-    const cw = (50 + hash(k + 5) * 50) * scale;
-    ctx.fillStyle = PAL.cloudShade;
-    ctx.fillRect(cx, cy + 6 * scale, cw, 8 * scale);
-    ctx.fillStyle = PAL.cloud;
-    ctx.fillRect(cx + 6 * scale, cy, cw - 12 * scale, 10 * scale);
-    ctx.fillRect(cx + cw * 0.3, cy - 6 * scale, cw * 0.35, 8 * scale);
+// ── Vehicles & aircraft ────────────────────────────────────────────────────
+function wheels(g, xs, y, r, frame) {
+  for (const x of xs) {
+    g.fillStyle = C.O; g.fillRect(x - 1, y - 1, r + 2, r + 2);
+    g.fillStyle = '#262626'; g.fillRect(x, y, r, r);
+    g.fillStyle = C.metal; g.fillRect(x + 1, y + 1, r - 2, r - 2);
+    g.fillStyle = C.metalDark; g.fillRect(x + (frame ? 1 : r - 2), y + 1, 1, 1);
   }
+}
 
-  // Rolling hills (two layers)
-  const hillLayer = (p, color, amp, base, periods) => {
-    const period = (WORLD_W * p) / periods;
-    ctx.fillStyle = color;
-    const step = 3;
-    for (let sx = 0; sx < w + step; sx += step) {
-      const wx = sx / scale + cam.x * p;
-      const t = (wx / period) * Math.PI * 2;
-      const hh = amp * (0.55 + 0.3 * Math.sin(t) + 0.15 * Math.sin(t * 3 + 1.3));
-      const top = groundScreen - (base + hh) * scale;
-      ctx.fillRect(sx, top, step, h - top);
-    }
-  };
-  hillLayer(0.25, PAL.hillFar, 90, 30, 5);
-  hillLayer(0.4, PAL.hillNear, 60, 10, 8);
+function buildJeep(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(22, 13);
+  outlined(g, [
+    [2, 5, 17, 4, t.uni], [12, 4, 7, 2, t.uni], [8, 2, 2, 3, C.metalDark], [8, 1, 9, 1, C.gun],
+  ], [
+    [2, 5, 17, 1, t.uniLight], [2, 8, 17, 1, t.uniDark], [13, 3, 3, 1, C.glass], [18, 6, 1, 1, C.yellow],
+    [4, 6, 2, 1, t.main],
+  ]);
+  wheels(g, [3, 14], 8, 4, frame);
+  return { c, ax: 11, ay: 12 };
+}
 
-  // Jungle treeline (palms and broadleaf trees)
-  const jp = 0.6;
-  const count = 64;
-  const spacing = (WORLD_W * jp) / count;
-  const jOff = cam.x * jp;
-  const first = Math.floor((jOff - 60) / spacing);
-  for (let i = first; (i * spacing - jOff) * scale < w + 60; i++) {
-    const k = ((i % count) + count) % count;
-    const bx = (i * spacing - jOff + hash(k) * spacing * 0.6) * scale;
-    const th = (40 + hash(k + 3) * 50) * scale;
-    const baseY = groundScreen + 2;
-    ctx.fillStyle = PAL.trunk;
-    ctx.fillRect(bx - 2 * scale, baseY - th, 4 * scale, th);
-    if (hash(k + 7) < 0.5) {
-      // Palm: fronds as chunky slabs
-      ctx.fillStyle = PAL.jungle;
-      for (const [dx, dy, fw] of [[-18, 0, 18], [2, 0, 18], [-12, -6, 24], [-10, 4, 8], [4, 4, 8]]) {
-        ctx.fillRect(bx + dx * scale, baseY - th + dy * scale, fw * scale, 5 * scale);
-      }
-      ctx.fillStyle = PAL.jungleDark;
-      ctx.fillRect(bx - 18 * scale, baseY - th + 4 * scale, 6 * scale, 4 * scale);
-      ctx.fillRect(bx + 14 * scale, baseY - th + 4 * scale, 6 * scale, 4 * scale);
-    } else {
-      // Broadleaf: stacked blobs
-      const r = (16 + hash(k + 9) * 10) * scale;
-      ctx.fillStyle = PAL.jungleDark;
-      ctx.fillRect(bx - r, baseY - th - r * 0.2, r * 2, r * 1.2);
-      ctx.fillStyle = PAL.jungle;
-      ctx.fillRect(bx - r * 0.8, baseY - th - r * 0.6, r * 1.6, r * 1.1);
-      ctx.fillRect(bx - r * 0.4, baseY - th - r, r * 0.9, r * 0.6);
+function buildTank(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(30, 16);
+  outlined(g, [
+    [2, 9, 21, 5, '#2e2e2a'], [3, 6, 19, 4, t.uni], [8, 3, 9, 4, t.uni], [16, 4, 10, 2, C.gun],
+  ], [
+    [3, 6, 19, 1, t.uniLight], [8, 3, 9, 1, t.uniLight], [10, 4, 3, 1, t.main], [3, 9, 19, 1, t.uniDark],
+  ]);
+  // Road wheels, and track links that shift between frames
+  for (let i = 0; i < 5; i++) { g.fillStyle = C.metal; g.fillRect(4 + i * 4, 11, 2, 2); }
+  g.fillStyle = '#4a4a44';
+  for (let x = 3 + frame * 2; x < 23; x += 4) g.fillRect(x, 13, 1, 1);
+  return { c, ax: 12, ay: 15 };
+}
+
+function buildArtillery(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(26, 15);
+  outlined(g, [
+    [10, 6, 3, 1, C.gun], [12, 5, 3, 1, C.gun], [14, 4, 3, 1, C.gun], [16, 3, 3, 1, C.gun], [18, 2, 3, 1, C.gun], [20, 1, 3, 2, C.gun],
+    [2, 7, 16, 4, t.uni], [8, 5, 6, 3, t.uniDark],
+  ], [
+    [2, 7, 16, 1, t.uniLight], [4, 8, 2, 1, t.main],
+  ]);
+  g.fillStyle = C.metalDark; g.fillRect(0, 10, 3, 1); g.fillRect(0, 11, 2, 2);
+  wheels(g, [3, 12], 10, 4, frame);
+  return { c, ax: 11, ay: 14 };
+}
+
+function buildHeli(f) {
+  const t = team(f);
+  const [c, g] = canvas(26, 13);
+  outlined(g, [
+    [1, 5, 10, 2, t.uniDark], [1, 3, 2, 3, t.uniDark], [10, 4, 11, 6, t.uni], [12, 11, 9, 1, C.metalDark], [15, 2, 1, 2, C.metalDark],
+  ], [
+    [10, 4, 11, 1, t.uniLight], [17, 5, 3, 2, C.glass], [12, 7, 3, 1, t.main], [14, 10, 1, 1, C.metalDark], [19, 10, 1, 1, C.metalDark],
+    [19, 8, 4, 1, C.gun],
+  ]);
+  return { c, ax: 13, ay: 12 };
+}
+
+function buildBomber(f) {
+  const t = team(f);
+  const [c, g] = canvas(34, 13);
+  outlined(g, [
+    [1, 1, 5, 5, t.uniDark], [1, 5, 29, 4, t.uni], [30, 6, 2, 2, t.uniDark], [12, 8, 11, 3, t.uniDark], [17, 8, 4, 2, C.metalDark],
+  ], [
+    [2, 5, 27, 1, t.uniLight], [26, 6, 3, 1, C.glass], [8, 6, 3, 2, t.main], [12, 8, 11, 1, t.uni],
+  ]);
+  return { c, ax: 17, ay: 11 };
+}
+
+const VEHICLE_BUILD = { jeep: buildJeep, tank: buildTank, artillery: buildArtillery };
+
+// ── Buildings ──────────────────────────────────────────────────────────────
+function sandbags(g, x, y, w, rows = 2) {
+  for (let r = 0; r < rows; r++) {
+    const off = r % 2 ? 3 : 0;
+    for (let bx = x - off; bx < x + w; bx += 6) {
+      const by = y - (r + 1) * 3;
+      const x0 = Math.max(x, bx);
+      const ww = Math.min(bx + 6, x + w) - x0;
+      if (ww <= 1) continue;
+      g.fillStyle = C.O; g.fillRect(x0, by, ww, 3);
+      g.fillStyle = C.sand; g.fillRect(x0 + 1, by, ww - 2, 2);
+      g.fillStyle = C.sandLight; g.fillRect(x0 + 1, by, ww - 3, 1);
     }
   }
 }
 
+function camo(g, x, y, w, h, t, seed) {
+  for (let i = 0; i < 6; i++) {
+    g.fillStyle = i % 2 ? t.dark : '#6b6a3c';
+    g.fillRect(x + Math.floor(hash(seed + i) * (w - 6)), y + Math.floor(hash(seed + i + 9) * (h - 3)), 4 + Math.floor(hash(seed + i + 3) * 5), 2);
+  }
+}
+
+const BUILD = {
+  hq(g, t) {
+    // Sandbagged command bunker with radio mast and team flag
+    outlined(g, [
+      [4, 16, 56, 26, C.concrete], [2, 12, 60, 5, t.roof], [52, 0, 1, 12, C.metalDark], [9, 0, 1, 12, C.woodDark],
+      [10, 1, 9, 5, t.main], [26, 8, 12, 4, C.concreteDark],
+    ], [
+      [4, 16, 56, 1, C.concreteLight], [2, 12, 60, 1, t.light], [2, 16, 60, 1, t.roofDark],
+      [10, 1, 9, 1, t.light], [10, 4, 9, 1, t.dark], [49, 3, 7, 1, C.metalDark], [50, 6, 5, 1, C.metalDark],
+      [28, 9, 8, 2, C.yellow],
+    ]);
+    camo(g, 6, 18, 52, 20, t, 11);
+    outlined(g, [], [
+      [10, 22, 12, 3, C.O], [42, 22, 12, 3, C.O], [11, 23, 10, 1, '#3b3a2a'], [43, 23, 10, 1, '#3b3a2a'],
+      [27, 28, 10, 14, C.O], [28, 29, 8, 13, '#3a3326'], [34, 35, 1, 1, C.yellow],
+    ]);
+    sandbags(g, 0, 48, 64, 2);
+  },
+  barracks(g, t) {
+    // Corrugated army hut
+    outlined(g, [
+      [3, 12, 42, 20, t.roof], [7, 8, 34, 5, t.roof], [13, 5, 22, 4, t.roof],
+    ], [
+      [7, 8, 34, 1, t.light], [13, 5, 22, 1, t.light], [3, 12, 4, 1, t.light], [41, 12, 4, 1, t.light],
+    ]);
+    g.fillStyle = t.roofDark;
+    for (let x = 5; x < 45; x += 4) g.fillRect(x, 13, 1, 18);
+    outlined(g, [[20, 20, 8, 12, '#3a3326']], [
+      [25, 26, 1, 1, C.yellow], [7, 17, 7, 4, C.O], [34, 17, 7, 4, C.O], [8, 18, 5, 2, C.glass], [35, 18, 5, 2, C.glass],
+    ]);
+    sandbags(g, 0, 32, 18, 1);
+    sandbags(g, 30, 32, 18, 1);
+  },
+  turret(g, t) {
+    // Sandbag gun nest with a shielded gun
+    outlined(g, [
+      [8, 10, 14, 10, C.metal], [21, 13, 11, 2, C.gun], [11, 7, 8, 4, C.metalDark],
+    ], [
+      [8, 10, 14, 1, C.metalLight], [9, 14, 12, 2, t.main], [12, 8, 4, 1, C.metalLight], [30, 13, 2, 1, C.gunLight],
+    ]);
+    sandbags(g, 1, 32, 30, 4);
+  },
+  wall(g, t) {
+    // Sandbag wall topped with barbed wire
+    sandbags(g, 0, 32, 16, 9);
+    g.fillStyle = C.woodDark; g.fillRect(2, 2, 1, 4); g.fillRect(13, 2, 1, 4);
+    g.fillStyle = C.metalDark;
+    for (let x = 0; x < 16; x++) g.fillRect(x, 2 + ((x % 4) < 2 ? 0 : 1), 1, 1);
+    g.fillStyle = t.main; g.fillRect(6, 25, 4, 2);
+  },
+  mine(g, t) {
+    // Wooden pithead (wheel animated live), mine entrance and ore cart
+    outlined(g, [
+      [6, 10, 2, 22, C.wood], [24, 10, 2, 22, C.wood], [6, 9, 20, 2, C.wood], [10, 20, 12, 12, C.woodDark],
+    ], [
+      [11, 21, 10, 11, '#241a10'], [6, 9, 20, 1, C.woodLight], [27, 4, 4, 3, t.main], [26, 4, 1, 10, C.woodDark],
+    ]);
+    outlined(g, [[22, 26, 9, 4, C.metal]], [[23, 25, 2, 1, C.yellow], [26, 25, 3, 1, C.yellow], [22, 26, 9, 1, C.metalLight]]);
+    g.fillStyle = C.O; g.fillRect(23, 30, 2, 2); g.fillRect(28, 30, 2, 2);
+  },
+  workshop(g, t) {
+    // Garage with sawtooth roof, roller door and oil drums
+    outlined(g, [
+      [2, 10, 44, 22, C.concrete], [2, 6, 14, 5, t.roof], [16, 6, 14, 5, t.roof], [30, 6, 14, 5, t.roof], [37, 0, 5, 7, C.metalDark],
+    ], [
+      [2, 10, 44, 1, C.concreteLight], [2, 6, 3, 1, t.light], [16, 6, 3, 1, t.light], [30, 6, 3, 1, t.light],
+      [14, 15, 20, 17, C.O], [15, 16, 18, 16, C.metal], [36, 0, 7, 1, C.metal],
+    ]);
+    g.fillStyle = C.metalDark;
+    for (let y = 18; y < 32; y += 3) g.fillRect(15, y, 18, 1);
+    g.fillStyle = C.yellow; g.fillRect(15, 16, 18, 1);
+    outlined(g, [[4, 24, 4, 7, C.red], [9, 24, 4, 7, t.main]], [[4, 26, 4, 1, C.redDark], [9, 26, 4, 1, t.dark]]);
+  },
+  airbase(g, t) {
+    // Arched hangar, control tower, windsock and apron
+    outlined(g, [
+      [2, 12, 40, 18, t.roof], [6, 8, 32, 5, t.roof], [12, 5, 20, 4, t.roof], [48, 8, 6, 22, C.concrete], [45, 2, 12, 7, C.concreteDark],
+      [60, 12, 1, 18, C.woodDark],
+    ], [
+      [6, 8, 32, 1, t.light], [12, 5, 20, 1, t.light], [10, 16, 24, 14, '#2a2620'],
+      [46, 3, 10, 4, C.glass], [48, 8, 6, 1, C.concreteLight], [61, 12, 2, 2, '#f28a30'], [63, 12, 1, 2, C.white],
+    ]);
+    g.fillStyle = t.roofDark;
+    for (let x = 4; x < 42; x += 4) if (x < 10 || x > 33) g.fillRect(x, 13, 1, 16);
+    g.fillStyle = '#3a3a34'; g.fillRect(0, 30, 64, 2);
+    g.fillStyle = C.yellow;
+    for (let x = 2; x < 64; x += 8) g.fillRect(x, 30, 4, 1);
+  },
+  bridge(g, t) {
+    outlined(g, [[1, 1, 14, 4, C.wood], [2, 5, 2, 10, C.woodDark], [12, 5, 2, 10, C.woodDark]], [[1, 1, 14, 1, C.woodLight], [13, 2, 2, 2, t.main]]);
+    g.fillStyle = C.wood; g.fillRect(0, 1, 16, 4);
+    g.fillStyle = C.woodLight; g.fillRect(0, 1, 16, 1);
+    g.fillStyle = C.woodDark;
+    for (let x = 3; x < 16; x += 4) g.fillRect(x, 2, 1, 3);
+    g.fillStyle = C.O; g.fillRect(0, 0, 16, 1); g.fillRect(0, 5, 16, 1);
+  },
+  ramp(g, t) {
+    g.fillStyle = C.wood; g.fillRect(0, 0, 16, 16);
+    g.fillStyle = C.woodLight; g.fillRect(1, 1, 14, 1);
+    g.fillStyle = C.woodDark;
+    g.fillRect(0, 0, 16, 1); g.fillRect(0, 15, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(15, 0, 1, 16);
+    for (let i = 2; i < 14; i++) { g.fillRect(i, i, 1, 1); g.fillRect(15 - i, i, 1, 1); }
+    g.fillStyle = t.main; g.fillRect(2, 2, 3, 2);
+  },
+};
+
+function buildingSprite(b) {
+  return sprite(`b:${b.type}:${b.faction}`, 1, () => {
+    const [c, g] = canvas(b.wt * T, b.ht * T);
+    BUILD[b.type](g, team(b.faction));
+    return { c, ax: 0, ay: 0 };
+  });
+}
+
 // ── Terrain tiles ──────────────────────────────────────────────────────────
+const tiles = {};
+function tile(kind, variant) {
+  const key = `${kind}${variant}`;
+  if (tiles[key]) return tiles[key];
+  const [c, g] = canvas(T, T);
+  const seed = variant * 97 + kind.length * 13;
+  const speckle = (n, a, b, y0 = 0) => {
+    for (let i = 0; i < n; i++) {
+      g.fillStyle = hash(seed + i + 40) < 0.5 ? a : b;
+      g.fillRect(Math.floor(hash(seed + i) * (T - 2)), y0 + Math.floor(hash(seed + i + 20) * (T - y0 - 1)), 2, 1);
+    }
+  };
+  const grassTop = () => {
+    g.fillStyle = C.grass; g.fillRect(0, 0, T, 4);
+    g.fillStyle = C.grassLight; g.fillRect(0, 0, T, 1);
+    g.fillStyle = C.grassDark; g.fillRect(0, 4, T, 1);
+    for (let x = 0; x < T; x += 3) if (hash(seed + x) < 0.6) g.fillRect(x, 5, 1, 1);
+  };
+  if (kind.startsWith('dirt')) {
+    g.fillStyle = kind === 'dirtDeep' ? C.dirtDeep : kind === 'dirtMid' ? C.dirtMid : C.dirt;
+    g.fillRect(0, 0, T, T);
+    speckle(6, C.pebble, C.pebbleDark, kind === 'dirtTop' ? 5 : 0);
+    if (kind === 'dirtTop') grassTop();
+  } else {
+    // Floating rock ledge with a grass top; L/R variants round off the ends.
+    const L = kind === 'rockL' || kind === 'rockLR';
+    const R = kind === 'rockR' || kind === 'rockLR';
+    g.fillStyle = C.rock; g.fillRect(0, 0, T, T);
+    g.fillStyle = C.rockDark; g.fillRect(0, T - 4, T, 3);
+    speckle(4, C.rockLight, C.rockDark, 6);
+    grassTop();
+    g.fillStyle = C.O;
+    g.fillRect(L ? 2 : 0, T - 1, T - (L ? 2 : 0) - (R ? 2 : 0), 1);
+    if (L) { g.fillRect(0, 0, 1, T - 2); g.clearRect(0, T - 2, 2, 2); g.fillRect(1, T - 2, 1, 1); }
+    if (R) { g.fillRect(T - 1, 0, 1, T - 2); g.clearRect(T - 2, T - 2, 2, 2); g.fillRect(T - 2, T - 2, 1, 1); }
+  }
+  tiles[key] = c;
+  return c;
+}
+
 export function drawTerrain(ctx, map, view) {
-  const l = Math.floor(view.x / TILE_SIZE);
+  const l = Math.floor(view.x / TILE_SIZE) - 1;
   const r = Math.ceil((view.x + view.w) / TILE_SIZE) + 1;
-  const t = Math.max(0, Math.floor(view.y / TILE_SIZE));
-  const b = Math.min(MAP_H, Math.ceil((view.y + view.h) / TILE_SIZE) + 1);
-  const T = TILE_SIZE;
-  for (let tx = Math.max(map.wrap ? l : 0, l); tx < (map.wrap ? r : Math.min(MAP_W, r)); tx++) {
-    for (let ty = t; ty < b; ty++) {
-      const tile = map.get(tx, ty);
-      if (tile === TILE_EMPTY || tile === TILE_RAMP || tile === TILE_BRIDGE) continue;
+  const t0 = Math.max(0, Math.floor(view.y / TILE_SIZE));
+  const t1 = Math.min(MAP_H, Math.ceil((view.y + view.h) / TILE_SIZE) + 1);
+  const from = map.wrap ? l : Math.max(0, l);
+  const to = map.wrap ? r : Math.min(MAP_W, r);
+  for (let tx = from; tx < to; tx++) {
+    const col = ((tx % MAP_W) + MAP_W) % MAP_W;
+    for (let ty = t0; ty < t1; ty++) {
+      const k = map.get(tx, ty);
+      if (k === TILE_EMPTY || k === TILE_RAMP || k === TILE_BRIDGE) continue;
       const x = tx * T;
       const y = ty * T;
-      const seed = (((tx % MAP_W) + MAP_W) % MAP_W) * 131 + ty * 7;
+      const v = Math.floor(hash(col * 31 + ty) * 4);
       const surface = map.get(tx, ty - 1) === TILE_EMPTY;
-      if (tile === TILE_GROUND) {
+      let img;
+      if (k === TILE_GROUND) {
         const depth = ty - map.groundTop;
-        rect(ctx, x, y, T + 0.6, T + 0.6, depth >= 2 ? PAL.dirtDeep : depth === 1 ? PAL.dirtDark : PAL.dirt);
-        for (let i = 0; i < 5; i++) {
-          rect(ctx, x + hash(seed + i) * (T - 4), y + 6 + hash(seed + i + 20) * (T - 10), 3, 2,
-            hash(seed + i + 40) < 0.5 ? PAL.pebble : PAL.dirtDeep);
-        }
+        img = surface ? tile('dirtTop', v) : tile(depth >= 2 ? 'dirtDeep' : depth === 1 ? 'dirtMid' : 'dirt', v);
       } else {
-        // Floating rock ledge
-        rect(ctx, x, y, T + 0.6, T, PAL.rock);
-        rect(ctx, x, y + T - 6, T + 0.6, 6, PAL.rockDark);
-        rect(ctx, x + hash(seed) * 20, y + 12, 8, 3, PAL.rockLight);
-        rect(ctx, x + hash(seed + 1) * 22, y + 19, 6, 2, PAL.rockDark);
-        if (map.get(tx - 1, ty) !== TILE_PLATFORM) rect(ctx, x, y, 3, T, PAL.rockDark);
-        if (map.get(tx + 1, ty) !== TILE_PLATFORM) rect(ctx, x + T - 3, y, 3, T, PAL.rockDark);
+        const L = map.get(tx - 1, ty) !== TILE_PLATFORM;
+        const R = map.get(tx + 1, ty) !== TILE_PLATFORM;
+        img = tile(L && R ? 'rockLR' : L ? 'rockL' : R ? 'rockR' : 'rock', v);
       }
+      ctx.drawImage(img, x, y);
       if (surface) {
-        // Grass top with tufts
-        rect(ctx, x, y, T + 0.6, 7, PAL.grass);
-        rect(ctx, x, y, T + 0.6, 2, PAL.grassLight);
-        rect(ctx, x, y + 7, T + 0.6, 2, PAL.grassDark);
-        for (let i = 0; i < 3; i++) {
-          const gx = x + hash(seed + 60 + i) * (T - 3);
-          rect(ctx, gx, y - 3, 2, 3, PAL.grass);
-          rect(ctx, gx + 2, y - 2, 1, 2, PAL.grassLight);
-        }
-        if (tile === TILE_GROUND && hash(seed + 90) < 0.12) {
-          // The odd red flower in the grass
-          rect(ctx, x + 10, y - 5, 3, 3, '#e8402a');
-          rect(ctx, x + 11, y - 2, 1, 2, PAL.grassDark);
+        // Grass tufts and the odd red flower poking up above the surface
+        const h = hash(col * 7 + ty * 3);
+        ctx.fillStyle = C.grass;
+        ctx.fillRect(x + Math.floor(h * 12), y - 2, 1, 2);
+        ctx.fillRect(x + Math.floor(h * 12) + 2, y - 1, 1, 1);
+        if (k === TILE_GROUND && h > 0.88) {
+          ctx.fillStyle = C.red; ctx.fillRect(x + 8, y - 3, 2, 2);
+          ctx.fillStyle = C.grassDark; ctx.fillRect(x + 8, y - 1, 1, 1);
         }
       }
     }
+  }
+}
+
+// ── Background (screen space in the art buffer) ────────────────────────────
+// Parallax repeat periods divide WORLD_W × factor so looping maps line up.
+const scenery = {};
+function cloudSprite(k) {
+  const key = `cloud${k}`;
+  if (scenery[key]) return scenery[key];
+  const w = 18 + Math.floor(hash(k + 5) * 16);
+  const [c, g] = canvas(w + 2, 10);
+  g.fillStyle = C.cloudShade; g.fillRect(1, 5, w, 4);
+  g.fillStyle = C.cloud; g.fillRect(3, 3, w - 4, 4); g.fillRect(Math.floor(w * 0.3), 0, Math.floor(w * 0.35), 4);
+  scenery[key] = c;
+  return c;
+}
+
+function treeSprite(k) {
+  const key = `tree${k}`;
+  if (scenery[key]) return scenery[key];
+  const palm = hash(k + 7) < 0.5;
+  const th = 18 + Math.floor(hash(k + 3) * 20);
+  const [c, g] = canvas(30, th + 12);
+  const cx = 15;
+  g.fillStyle = C.trunkDark; g.fillRect(cx - 1, 10, 3, th + 2);
+  g.fillStyle = C.trunk; g.fillRect(cx - 1, 10, 2, th + 2);
+  if (palm) {
+    for (const [dx, dy, w] of [[-11, 4, 10], [2, 4, 10], [-7, 1, 14], [-12, 7, 4], [9, 7, 4], [-2, 0, 5]]) {
+      g.fillStyle = C.leafDark; g.fillRect(cx + dx, dy + 1, w, 2);
+      g.fillStyle = C.leaf; g.fillRect(cx + dx, dy, w, 2);
+    }
+    g.fillStyle = C.leafLight; g.fillRect(cx - 6, 1, 6, 1);
+  } else {
+    const r = 9 + Math.floor(hash(k + 9) * 4);
+    disc(g, cx, 8, r, C.leafDark);
+    disc(g, cx - 1, 7, r - 2, C.leaf);
+    g.fillStyle = C.leafLight; g.fillRect(cx - 4, 2, 5, 2);
+  }
+  scenery[key] = c;
+  return c;
+}
+
+export function drawBackground(ctx, bw, bh, camAX, camAY) {
+  const groundY = (WORLD_H - 3 * TILE_SIZE) / G - camAY;
+  const bands = C.sky.length;
+  for (let i = 0; i < bands; i++) {
+    const y0 = Math.floor((groundY * i) / bands);
+    rect(ctx, 0, y0, bw, Math.ceil(groundY / bands) + 1, C.sky[i]);
+  }
+  rect(ctx, 0, groundY, bw, bh, C.sky[bands - 1]);
+
+  // Clouds
+  const cPer = ((WORLD_W / G) * 0.15) / 8;
+  const cOff = Math.round(camAX * 0.15);
+  for (let i = Math.floor(cOff / cPer) - 1; i * cPer - cOff < bw + 40; i++) {
+    const k = ((i % 8) + 8) % 8;
+    ctx.drawImage(cloudSprite(k), Math.round(i * cPer - cOff + hash(k) * 30), Math.round(10 + hash(k + 11) * 36 - camAY * 0.1));
+  }
+
+  // Hills: columns of flat colour
+  const hills = (p, col, amp, base, periods) => {
+    const per = ((WORLD_W / G) * p) / periods;
+    const off = Math.round(camAX * p);
+    ctx.fillStyle = col;
+    for (let x = 0; x < bw; x += 2) {
+      const tt = ((x + off) / per) * Math.PI * 2;
+      const hh = Math.round(amp * (0.55 + 0.3 * Math.sin(tt) + 0.15 * Math.sin(tt * 3 + 1.3)));
+      ctx.fillRect(x, groundY - base - hh, 2, base + hh + 2);
+    }
+  };
+  hills(0.25, C.hillFar, 45, 15, 5);
+  hills(0.4, C.hillNear, 30, 5, 8);
+
+  // Jungle treeline
+  const count = 64;
+  const spacing = ((WORLD_W / G) * 0.6) / count;
+  const jOff = Math.round(camAX * 0.6);
+  for (let i = Math.floor((jOff - 30) / spacing); i * spacing - jOff < bw + 30; i++) {
+    const k = ((i % count) + count) % count;
+    const img = treeSprite(k);
+    ctx.drawImage(img, Math.round(i * spacing - jOff + hash(k) * spacing * 0.6) - 15, groundY - img.height + 2);
   }
 }
 
 // ── Units ──────────────────────────────────────────────────────────────────
 export function drawUnit(ctx, u) {
-  if (u.air) { drawAircraft(ctx, u); return; }
-  if (u.vehicle) { drawVehicle(ctx, u); return; }
-  drawSoldier(ctx, u);
-  if (u.flash > 0) rect(ctx, u.x - 8, u.y - UNIT_H, 16, UNIT_H, 'rgba(255,255,255,0.6)');
-  if (u.selected) selectBrackets(ctx, u.x - UNIT_W / 2 - 3, u.y - UNIT_H - 3, UNIT_W + 6, UNIT_H + 6);
-  if (u.hp < u.maxHp || u.selected) hpBar(ctx, u.x - UNIT_W / 2, u.y - UNIT_H - 9, UNIT_W, u.hp / u.maxHp);
-}
-
-// Little big-headed soldier with dark outlines, drawn facing right and mirrored.
-function drawSoldier(ctx, u) {
-  const f = u.faction;
-  const team = PLAYER_COLORS[f];
-  const uniform = css(lerp(PAL.olive, team, 0.35));
-  const uniformDark = css(lerp(lerp(PAL.olive, team, 0.35), BLACK, 0.35));
-  const helmet = css(lerp(team, BLACK, 0.1));
-  const helmetLight = css(lerp(team, WHITE, 0.35));
-  const heavy = u.type === 'heavy';
-
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.fillRect(u.x - 8, u.y - 1, 16, 3);
-
-  ctx.save();
-  ctx.translate(u.x, u.y);
-  ctx.scale(u.facing, 1);
-  // Walking cycle: legs alternate as the soldier moves.
-  const step = (Math.floor(u.x / 5) & 1) ? 1 : -1;
-  const O = PAL.outline;
-  const box = (x, y, w, h, fill) => { rect(ctx, x - 1, y - 1, w + 2, h + 2, O); rect(ctx, x, y, w, h, fill); };
-
-  // Legs + boots
-  box(-5 + step, -9, 4, 8, uniformDark);
-  box(1 - step, -9, 4, 8, uniformDark);
-  rect(ctx, -6 + step, -2, 6, 2, O);
-  rect(ctx, 0 - step, -2, 6, 2, O);
-  // Body
-  const bw = heavy ? 14 : 11;
-  box(-bw / 2, -18, bw, 10, uniform);
-  rect(ctx, -bw / 2, -10, bw, 2, uniformDark); // belt
-  if (heavy) rect(ctx, -5, -17, 10, 6, '#3b3b2a'); // flak vest
-  if (u.type === 'engineer') rect(ctx, -bw / 2, -14, bw, 2, '#f2c230'); // hi-vis stripe
-  // Weapon
-  if (u.type === 'sniper') { rect(ctx, -2, -15, 18, 2, O); rect(ctx, 6, -17, 4, 2, O); }
-  else if (u.type === 'engineer') { rect(ctx, 3, -14, 7, 2, '#9a9a9a'); rect(ctx, 9, -16, 2, 5, '#9a9a9a'); }
-  else if (heavy) { rect(ctx, 0, -15, 13, 4, O); rect(ctx, 11, -14, 3, 2, '#555'); }
-  else rect(ctx, 0, -15, 12, 2, O);
-  // Arm
-  box(1, -16, 4, 3, uniform);
-  // Big round head
-  ctx.fillStyle = O;
-  ctx.beginPath(); ctx.arc(0, -23, 6.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = PAL.skin;
-  ctx.beginPath(); ctx.arc(0, -23, 5.5, 0, Math.PI * 2); ctx.fill();
-  rect(ctx, 2, -24, 2, 2, O); // eye
-  rect(ctx, -3, -20, 4, 1, PAL.skinDark);
-  // Headgear by role
-  if (u.type === 'scout') {
-    rect(ctx, -6, -28, 11, 3, helmet); // bandana
-    rect(ctx, -9, -27, 4, 2, helmet);
-  } else if (u.type === 'engineer') {
-    rect(ctx, -6, -30, 12, 5, '#f2c230'); // hard hat
-    rect(ctx, -7, -26, 14, 2, '#c99a1c');
-  } else if (u.type === 'sniper') {
-    rect(ctx, -6, -30, 12, 5, '#4f6b2a'); // boonie hat
-    rect(ctx, -8, -26, 16, 2, '#3c5420');
+  const x = A(u.x);
+  const y = A(u.y);
+  const frame = Math.floor(u.x / 6) & 1;
+  let s;
+  if (u.air) {
+    s = sprite(`a:${u.type}:${u.faction}`, u.facing, () => (u.type === 'bomber' ? buildBomber : buildHeli)(u.faction));
+    drawAirShadow(ctx, u);
+  } else if (u.vehicle) {
+    s = sprite(`v:${u.type}:${u.faction}:${frame}`, u.facing, () => VEHICLE_BUILD[u.type](u.faction, frame));
+    rect(ctx, x - Math.floor(s.c.width / 2) + 1, y, s.c.width - 2, 1, C.shadow);
   } else {
-    rect(ctx, -7, -31, 14, 2, O);
-    rect(ctx, -6, -30, 12, 5, helmet);
-    rect(ctx, -6, -30, 12, 2, helmetLight);
-    rect(ctx, -8, -26, 16, 2, O);
+    s = sprite(`s:${u.type}:${u.faction}:${frame}`, u.facing, () => buildSoldier(u.type, u.faction, frame));
+    rect(ctx, x - 5, y, 10, 1, C.shadow);
   }
-  ctx.restore();
+  ctx.drawImage(s.c, x - s.ax, y - s.ay);
+  if (u.air) drawRotor(ctx, u, x, y);
+  if (u.flash > 0) flashSprite(ctx, s.c, x - s.ax, y - s.ay);
+  const w = Math.min(s.c.width, 16);
+  const top = y - s.ay;
+  if (u.selected) brackets(ctx, x - s.ax - 1, top - 1, s.c.width + 2, s.c.height + 2);
+  if (u.hp < u.maxHp || u.selected) hpBar(ctx, x - Math.floor(w / 2), top - 4, w, u.hp / u.maxHp);
 }
 
-// Chunky corner brackets for selected things (an old-school cursor look).
-function selectBrackets(ctx, x, y, w, h) {
-  const l = Math.min(7, w / 3);
-  ctx.fillStyle = '#ffffff';
-  for (const [cx, cy, sx, sy] of [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]]) {
-    ctx.fillRect(sx > 0 ? cx : cx - l, sy > 0 ? cy : cy - 2, l, 2);
-    ctx.fillRect(sx > 0 ? cx : cx - 2, sy > 0 ? cy : cy - l, 2, l);
+// Hit flash: redraw the sprite brightened.
+function flashSprite(ctx, img, x, y) {
+  ctx.globalAlpha = 0.6;
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.drawImage(img, x, y);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+}
+
+function drawAirShadow(ctx, u) {
+  const map = u.game.map;
+  const tx = Math.floor(u.x / TILE_SIZE);
+  let gy = Math.floor(u.y / TILE_SIZE);
+  while (gy < MAP_H && !map.isSolid(tx, gy)) gy++;
+  const sy = A(gy * TILE_SIZE);
+  ctx.globalAlpha = Math.max(0.12, 0.3 - (sy - A(u.y)) / 400);
+  rect(ctx, A(u.x) - 8, sy, 16, 1, '#000');
+  ctx.globalAlpha = 1;
+}
+
+function drawRotor(ctx, u, x, y) {
+  const tick = Math.floor(performance.now() / 50);
+  if (u.type === 'helicopter') {
+    const half = tick % 2 ? 12 : 5;
+    rect(ctx, x + 2 * u.facing - half, y - 12, half * 2, 1, '#e8e8e8');
+    rect(ctx, x - 13 * u.facing - (u.facing > 0 ? 0 : 1), y - 9 + (tick % 2 ? -1 : 1), 1, 2, '#d8d8d8');
+  } else {
+    const fx = x + (u.facing > 0 ? 4 : -5);
+    rect(ctx, fx, y - 5 - (tick % 2 ? 2 : 0), 1, tick % 2 ? 5 : 2, '#d8d8d8');
   }
+}
+
+function brackets(ctx, x, y, w, h) {
+  ctx.fillStyle = C.white;
+  const l = 3;
+  ctx.fillRect(x, y, l, 1); ctx.fillRect(x, y, 1, l);
+  ctx.fillRect(x + w - l, y, l, 1); ctx.fillRect(x + w - 1, y, 1, l);
+  ctx.fillRect(x, y + h - 1, l, 1); ctx.fillRect(x, y + h - l, 1, l);
+  ctx.fillRect(x + w - l, y + h - 1, l, 1); ctx.fillRect(x + w - 1, y + h - l, 1, l);
+}
+
+function hpBar(ctx, x, y, w, ratio) {
+  rect(ctx, x - 1, y - 1, w + 2, 3, C.O);
+  rect(ctx, x, y, Math.max(1, Math.round(w * ratio)), 1, ratio > 0.5 ? '#5ee03a' : ratio > 0.25 ? C.yellow : C.red);
 }
 
 // ── Buildings ──────────────────────────────────────────────────────────────
 export function drawBuilding(ctx, b) {
-  const f = b.faction;
-  const { x, y, w, h } = b;
-  const pc = PLAYER_COLORS[f];
-
-  if (b.type === 'bridge' || b.type === 'ramp') {
-    if (b.type === 'bridge') drawBridge(ctx, b);
-    else drawRamp(ctx, b);
-  } else {
-    rect(ctx, x + 4, y + h, w, 4, 'rgba(0,0,0,0.3)');
-    const a = b.constructing ? 0.7 : 1;
-    // Military khaki tinted with the team colour, flat-shaded, dark outline.
-    const wall = lerp(KHAKI, pc, 0.68);
-    rect(ctx, x - 2, y - 2, w + 4, h + 2, PAL.outline);
-    rect(ctx, x, y, w, h, css(wall, a));
-    rect(ctx, x, y, w, 4, css(lerp(wall, WHITE, 0.3), a));
-    rect(ctx, x, y + h * 0.62, w, h * 0.38, css(lerp(wall, BLACK, 0.22), a));
-    rect(ctx, x, y, 3, h, css(lerp(wall, WHITE, 0.18), a));
-    if (!b.constructing) DETAIL[b.type]?.(ctx, b, pc, f);
-    if (b.type !== 'wall' && b.type !== 'mine') sandbags(ctx, x - 4, y + h, w + 8);
-  }
-
+  const s = buildingSprite(b);
+  const x = A(b.x);
+  const y = A(b.y);
+  const w = s.c.width;
+  const h = s.c.height;
   if (b.constructing) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x, y, w, h);
-    ctx.clip();
-    // Hazard stripes while under construction
-    ctx.fillStyle = 'rgba(242,194,48,0.55)';
-    for (let i = -h; i < w; i += 16) {
-      ctx.beginPath();
-      ctx.moveTo(x + i, y + h); ctx.lineTo(x + i + 8, y + h); ctx.lineTo(x + i + 8 + h, y); ctx.lineTo(x + i + h, y);
-      ctx.fill();
-    }
-    ctx.restore();
-    rect(ctx, x - 1, y + h + 5, w + 2, 6, PAL.outline);
-    rect(ctx, x, y + h + 6, w * b.progress, 4, '#f2c230');
+    // Rises from the ground behind wooden scaffolding and hazard tape
+    ctx.globalAlpha = 0.35;
+    ctx.drawImage(s.c, x, y);
+    ctx.globalAlpha = 1;
+    const built = Math.round(h * b.progress);
+    if (built > 0) ctx.drawImage(s.c, 0, h - built, w, built, x, y + h - built, w, built);
+    ctx.fillStyle = C.woodDark;
+    for (let sx = x + 1; sx < x + w; sx += 8) ctx.fillRect(sx, y, 1, h);
+    for (let sy = y + 3; sy < y + h; sy += 8) ctx.fillRect(x, sy, w, 1);
+    for (let i = 0; i < w; i++) { ctx.fillStyle = Math.floor(i / 3) % 2 ? C.O : C.yellow; ctx.fillRect(x + i, y + h - 3, 1, 2); }
+    progressBar(ctx, x, y + h + 2, w, b.progress, C.yellow);
+  } else {
+    ctx.drawImage(s.c, x, y);
+    animateBuilding(ctx, b, x, y, w);
   }
-
-  if (b.trainCurrent) {
-    rect(ctx, x - 1, y + h + 5, w + 2, 6, PAL.outline);
-    rect(ctx, x, y + h + 6, w * (1 - b.trainTimer / b.trainTotal), 4, '#5ee03a');
+  if (b.trainCurrent) progressBar(ctx, x, y + h + 2, w, 1 - b.trainTimer / b.trainTotal, '#5ee03a');
+  if (b.flash > 0) flashSprite(ctx, s.c, x, y);
+  // Damage: smoke, then fire
+  const r = b.hp / b.maxHp;
+  if (r < 0.5 && b.type !== 'bridge' && b.type !== 'ramp') {
+    const tt = performance.now() / 1000;
+    for (let i = 0; i < 3; i++) {
+      const k = (tt * 0.6 + i / 3) % 1;
+      const sz = 2 + Math.round(k * 3);
+      ctx.globalAlpha = 0.7 * (1 - k);
+      rect(ctx, x + Math.floor(w * (0.3 + 0.2 * i)) + Math.round(Math.sin(tt * 2 + i) * 2), y + 2 - Math.round(k * 16), sz, sz, '#4a4740');
+      ctx.globalAlpha = 1;
+    }
+    if (r < 0.25) {
+      const fl = Math.floor(tt * 10) % 2;
+      rect(ctx, x + Math.floor(w * 0.4), y + 1 - fl, 3, 2 + fl, '#f28a30');
+      rect(ctx, x + Math.floor(w * 0.4) + 1, y - fl, 1, 1, C.yellow);
+    }
   }
-
-  if (b.flash > 0) rect(ctx, x, y, w, h, 'rgba(255,255,255,0.45)');
-
-  if (b.selected) selectBrackets(ctx, x - 5, y - 5, w + 10, h + 10);
-  if (b.hp < b.maxHp) hpBar(ctx, x, y - 10, w, b.hp / b.maxHp);
+  if (b.selected) brackets(ctx, x - 2, y - 2, w + 4, h + 4);
+  if (b.hp < b.maxHp) hpBar(ctx, x, y - 4, w, r);
 }
 
-const KHAKI = [0.62, 0.56, 0.38];
+function progressBar(ctx, x, y, w, ratio, col) {
+  rect(ctx, x - 1, y - 1, w + 2, 4, C.O);
+  rect(ctx, x, y, Math.round(w * Math.max(0, Math.min(1, ratio))), 2, col);
+}
 
-function sandbags(ctx, x, y, w) {
-  for (let i = 0; i * 9 < w; i++) {
-    const bx = x + i * 9;
-    rect(ctx, bx - 1, y - 7, 10, 8, PAL.outline);
-    rect(ctx, bx, y - 6, 8, 6, PAL.sand);
-    rect(ctx, bx, y - 2, 8, 2, PAL.sandDark);
+function animateBuilding(ctx, b, x, y, w) {
+  const tick = Math.floor(performance.now() / 160);
+  if (b.type === 'hq') {
+    // Flag flutter
+    rect(ctx, x + 19, y + 1 + (tick % 2), 1, 4, team(b.faction).main);
+  } else if (b.type === 'mine') {
+    // Spinning pithead wheel
+    const cx = x + 16;
+    const cy = y + 5;
+    ctx.fillStyle = C.O;
+    for (let a = 0; a < 16; a++) ctx.fillRect(cx + Math.round(Math.cos((a / 16) * Math.PI * 2) * 5), cy + Math.round(Math.sin((a / 16) * Math.PI * 2) * 5), 1, 1);
+    ctx.fillStyle = C.metalLight;
+    const ang = tick * 0.4;
+    for (let r = 1; r < 5; r++) {
+      ctx.fillRect(cx + Math.round(Math.cos(ang) * r), cy + Math.round(Math.sin(ang) * r), 1, 1);
+      ctx.fillRect(cx - Math.round(Math.cos(ang) * r), cy - Math.round(Math.sin(ang) * r), 1, 1);
+    }
+  } else if (b.type === 'workshop') {
+    // Chimney smoke
+    for (let i = 0; i < 2; i++) {
+      const k = (performance.now() / 1500 + i / 2) % 1;
+      ctx.globalAlpha = 0.6 * (1 - k);
+      rect(ctx, x + 38 + Math.round(Math.sin(k * 6) * 2), y - 2 - Math.round(k * 12), 3, 3, '#6b675d');
+      ctx.globalAlpha = 1;
+    }
+  } else if (b.type === 'airbase') {
+    if (tick % 4 < 2) rect(ctx, x + 50, y + 1, 2, 1, C.red); // tower beacon
+  }
+  void w;
+}
+
+// ── Projectiles ────────────────────────────────────────────────────────────
+export function drawProjectile(ctx, p) {
+  const x = A(p.x);
+  const y = A(p.y);
+  if (p.exploded > 0) {
+    // Pixel explosion: hot core, orange body, red rim, then smoke
+    const k = 1 - p.exploded / 0.3;
+    const r = Math.max(2, Math.round((p.splash / G) * (0.35 + 0.5 * k)));
+    disc(ctx, x, y - 1, r, k < 0.6 ? C.red : '#5a5148');
+    disc(ctx, x, y - 1, Math.max(1, r - 2), k < 0.6 ? '#f28a30' : '#7a7266');
+    if (k < 0.5) disc(ctx, x, y - 1, Math.max(1, r - 4), C.yellow);
+    return;
+  }
+  const dx = Math.round(Math.cos(p.angle) * 3);
+  const dy = Math.round(Math.sin(p.angle) * 3);
+  if (p.kind === 'bullet') {
+    rect(ctx, x - dx, y - dy, 1, 1, '#f2a630');
+    rect(ctx, x, y, 2, 1, '#fff6a0');
+  } else if (p.kind === 'bomb') {
+    rect(ctx, x - 1, y - 2, 3, 4, C.O);
+    rect(ctx, x - 1, y - 3, 3, 1, C.metalDark);
+  } else {
+    rect(ctx, x - dx, y - dy, 1, 1, 'rgba(200,200,200,0.7)');
+    rect(ctx, x - 1, y - 1, 2, 2, C.O);
+    rect(ctx, x - 1, y - 1, 1, 1, '#f28a30');
   }
 }
 
-const DETAIL = {
-  hq(ctx, b, pc) {
-    const { x, y, w, h } = b;
-    const px = x + w * 0.72;
-    line(ctx, px, y + 4, px, y + h * 0.55, 'rgba(255,255,255,0.72)', 2);
-    poly(ctx, [[px, y + 4], [px + 18, y + 9], [px, y + 14]], css(pc));
-    const ww = 12, wh = 10, gap = 6;
-    const sx = x + (w - (ww * 3 + gap * 2)) / 2;
-    const wy = y + h * 0.36;
-    for (let i = 0; i < 3; i++) {
-      const wx = sx + i * (ww + gap);
-      rect(ctx, wx + 1, wy + 1, ww, wh, 'rgba(0,0,0,0.44)');
-      rect(ctx, wx, wy, ww, wh, '#6699e6');
-      line(ctx, wx + ww / 2, wy + 1, wx + ww / 2, wy + wh - 1, 'rgba(255,255,255,0.28)', 1);
-      line(ctx, wx + 1, wy + wh / 2, wx + ww - 1, wy + wh / 2, 'rgba(255,255,255,0.28)', 1);
-    }
-    const dw = 18, dh = 22;
-    const dx = x + (w - dw) / 2;
-    const dy = y + h - dh - 4;
-    rect(ctx, dx, dy, dw, dh, 'rgba(0,0,0,0.52)');
-    circle(ctx, dx + dw - 5, dy + dh / 2, 2, '#ffd700');
-  },
-  barracks(ctx, b, pc, f) {
-    const { x, y, w, h } = b;
-    const rh = 16;
-    poly(ctx, [[x - 4, y + rh], [x + w / 2, y], [x + w + 4, y + rh]], css(shade(f, 0.32)));
-    line(ctx, x - 4, y + rh, x + w / 2, y, css(tint(f, 0.28)), 1.5);
-    line(ctx, x + w / 2, y, x + w + 4, y + rh, css(tint(f, 0.28)), 1.5);
-    const ww = 13, wh = 10, gap = 7;
-    const sx = x + (w - (ww * 3 + gap * 2)) / 2;
-    const wy = y + rh + 6;
-    for (let i = 0; i < 3; i++) {
-      const wx = sx + i * (ww + gap);
-      rect(ctx, wx + 1, wy + 1, ww, wh, 'rgba(0,0,0,0.46)');
-      rect(ctx, wx, wy, ww, wh, '#87baed');
-    }
-    const dw = 16, dh = 18;
-    const dx = x + (w - dw) / 2;
-    const dy = y + h - dh - 4;
-    rect(ctx, dx, dy, dw, dh, 'rgba(0,0,0,0.5)');
-    circle(ctx, dx + dw - 4, dy + dh / 2, 1.5, '#ffd700');
-  },
-  turret(ctx, b, pc, f) {
-    const { x, y, w, h } = b;
-    const cx = x + w / 2;
-    circle(ctx, cx, y + h * 0.44, w * 0.38, css(tint(f, 0.32)));
-    const dir = f === 0 || b.x < 3200 ? 1 : -1;
-    const bw = w * 0.52;
-    const bx = dir > 0 ? cx + 4 : cx - 4 - bw;
-    rect(ctx, bx, y + h * 0.34, bw, 6, css(tint(f, 0.6)));
-    rect(ctx, bx, y + h * 0.34 + 5, bw, 2, 'rgba(0,0,0,0.28)');
-    circle(ctx, cx + 4 * dir, y + h * 0.37, 5, css(shade(f, 0.22)));
-  },
-  wall(ctx, b, pc, f) {
-    const { x, y, w, h } = b;
-    const rowH = 10;
-    const sw = w / 2;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x, y, w, h);
-    ctx.clip();
-    ctx.lineWidth = 0.8;
-    for (let row = 0; row < Math.floor(h / rowH); row++) {
-      const off = (row % 2) * (sw / 2);
-      for (let col = 0; col < 3; col++) {
-        ctx.strokeStyle = (row + col) % 2 ? 'rgba(200,200,200,0.12)' : 'rgba(255,255,255,0.16)';
-        ctx.strokeRect(x + col * sw + off - sw / 2 + 1, y + row * rowH + 1, sw - 2, rowH - 2);
-      }
-    }
-    ctx.restore();
-    const mw = w / 3;
-    for (let i = 0; i < 3; i++) {
-      const mx = x + i * mw + mw * 0.1;
-      rect(ctx, mx, y - 8, mw * 0.8, 8, css(shade(f, 0.28)));
-      rect(ctx, mx, y - 8, mw * 0.8, 2, css(tint(f, 0.22)));
-    }
-  },
-  mine(ctx, b, pc, f) {
-    const { x, y, w, h } = b;
-    const cx = x + w / 2;
-    const c = css(tint(f, 0.55));
-    line(ctx, cx - 14, y + h - 6, cx, y + 8, c, 3);
-    line(ctx, cx + 14, y + h - 6, cx, y + 8, c, 3);
-    line(ctx, cx - 8, y + h * 0.52, cx + 8, y + h * 0.52, c, 1.5);
-    ctx.strokeStyle = 'rgba(255,255,255,0.72)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, y + 8, 9, 0, Math.PI * 2);
-    ctx.stroke();
-    // Spinning wheel
-    const spin = performance.now() / 400;
-    for (let a = 0; a < 4; a++) {
-      const ang = spin + (Math.PI * a) / 2;
-      line(ctx, cx, y + 8, cx + Math.cos(ang) * 8, y + 8 + Math.sin(ang) * 8, 'rgba(255,255,255,0.72)', 2);
-    }
-    line(ctx, cx, y + 8, cx, y + h - 18, 'rgba(255,255,255,0.5)', 1);
-    rect(ctx, cx - 6, y + h - 18, 12, 10, 'rgba(199,161,0,0.82)');
-    rect(ctx, cx - 6, y + h - 18, 12, 3, 'rgba(255,255,255,0.2)');
-  },
-  airbase(ctx, b, pc, f) {
-    const { x, y, w, h } = b;
-    // Hangar with a curved roof and open bay
-    const hw = w * 0.58;
-    ctx.fillStyle = css(shade(f, 0.3));
-    ctx.beginPath();
-    ctx.moveTo(x, y + h * 0.55);
-    ctx.quadraticCurveTo(x + hw / 2, y - h * 0.25, x + hw, y + h * 0.55);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = css(tint(f, 0.35));
-    ctx.lineWidth = 1.5;
-    for (let i = 1; i < 4; i++) {
-      const rx = x + (hw * i) / 4;
-      line(ctx, rx, y + h * 0.15, rx, y + h * 0.55, css(tint(f, 0.2), 0.6), 1);
-    }
-    rect(ctx, x + hw * 0.18, y + h * 0.5, hw * 0.64, h * 0.42, 'rgba(0,0,0,0.5)');
-    // Control tower with a blinking beacon
-    const tx = x + w * 0.76;
-    rect(ctx, tx - 5, y - 18, 10, h * 0.6 + 18, css(shade(f, 0.38)));
-    rect(ctx, tx - 11, y - 28, 22, 12, '#9cc8ff');
-    rect(ctx, tx - 12, y - 30, 24, 3, css(tint(f, 0.3)));
-    if (Math.floor(performance.now() / 500) % 2) circle(ctx, tx, y - 33, 2.5, '#ff4d4d');
-    // Runway markings along the apron
-    rect(ctx, x, y + h - 7, w, 5, '#2a2a2a');
-    for (let i = 0; i < 6; i++) rect(ctx, x + 6 + i * (w / 6), y + h - 5, w / 12, 1.5, '#ffe28a');
-  },
-  workshop(ctx, b, pc, f) {
-    const { x, y, w, h } = b;
-    const rh = 18;
-    const tw = w / 3;
-    for (let i = 0; i < 3; i++) {
-      const tx = x + i * tw;
-      poly(ctx, [[tx, y + rh], [tx + tw / 2, y], [tx + tw, y + rh]], css(shade(f, 0.36)));
-    }
-    const chx = x + w * 0.78;
-    rect(ctx, chx - 5, y - 14, 10, 20, css(shade(f, 0.38)));
-    rect(ctx, chx - 7, y - 16, 14, 4, css(tint(f, 0.18)));
-    const bw = w * 0.44, bh = 22;
-    const bx = x + (w - bw) / 2;
-    const by = y + h - bh - 4;
-    rect(ctx, bx, by, bw, bh, 'rgba(0,0,0,0.5)');
-    line(ctx, bx + 3, by + 3, bx + bw - 3, by + bh - 3, 'rgba(255,255,255,0.18)', 1.2);
-    line(ctx, bx + bw - 3, by + 3, bx + 3, by + bh - 3, 'rgba(255,255,255,0.18)', 1.2);
-    for (let i = 0; i < 2; i++) rect(ctx, x + w * 0.18 + i * w * 0.62 - 4, y + rh + 8, 8, 14, '#abbacc');
-  },
-};
-
-function drawBridge(ctx, b) {
-  const { x, y, w } = b;
-  ctx.globalAlpha = b.constructing ? 0.55 : 1;
-  // Wooden plank deck with rope rails and a team-coloured pennant post
-  rect(ctx, x, y - 1, w, 12, PAL.outline);
-  rect(ctx, x, y, w, 10, '#9a6a3a');
-  for (let px = x; px < x + w; px += 8) { rect(ctx, px, y, 1, 10, '#6e4824'); rect(ctx, px + 1, y, 6, 2, '#b98552'); }
-  rect(ctx, x, y - 9, w, 2, '#c8a46a');
-  rect(ctx, x + w / 2 - 1, y - 12, 3, 12, '#6e4824');
-  rect(ctx, x + w / 2 + 2, y - 12, 6, 4, css(PLAYER_COLORS[b.faction]));
-  ctx.globalAlpha = 1;
-}
-
-function drawRamp(ctx, b) {
-  const { x, y, w, h } = b;
-  ctx.globalAlpha = b.constructing ? 0.55 : 1;
-  // Stacked wooden crates read as climbable steps
-  rect(ctx, x, y, w, h, PAL.outline);
-  rect(ctx, x + 1, y + 1, w - 2, h - 2, '#a8763e');
-  rect(ctx, x + 1, y + 1, w - 2, 3, '#c99556');
-  line(ctx, x + 3, y + 4, x + w - 3, y + h - 3, '#6e4824', 2);
-  line(ctx, x + w - 3, y + 4, x + 3, y + h - 3, '#6e4824', 2);
-  rect(ctx, x + 1, y + 1, 4, 4, css(PLAYER_COLORS[b.faction]));
-  ctx.globalAlpha = 1;
-}
-
-// ── Effects ─────────────────────────────────────────────────────────────────
+// ── Effects (visual only) ──────────────────────────────────────────────────
 export function updateEffects(effects, dt) {
   for (const e of effects) e.t += dt;
   return effects.filter((e) => e.t < e.life);
@@ -527,272 +724,91 @@ export function updateEffects(effects, dt) {
 
 export function drawEffects(ctx, effects) {
   for (const e of effects) {
-    const fade = Math.min(1, (e.life - e.t) / 1.2);
-    ctx.globalAlpha = Math.max(0, fade);
+    const x = A(e.x);
+    const y = A(e.y);
+    const fade = Math.max(0, Math.min(1, (e.life - e.t) / 1.2));
+    ctx.globalAlpha = fade;
     if (e.kind === 'fall') {
-      // Fallen soldier lying on the ground, with a small splat.
-      rect(ctx, e.x - 7, e.y - 2, 14, 3, '#8a1a12');
-      rect(ctx, e.x - 4, e.y - 1, 9, 2, '#b3241a');
-      const dir = e.facing;
-      const helmet = css(lerp(PLAYER_COLORS[e.f], BLACK, 0.1));
-      rect(ctx, e.x - 9 * dir - (dir < 0 ? 5 : 0), e.y - 6, 5, 4, PAL.skin);
-      rect(ctx, e.x - 10 * dir - (dir < 0 ? 4 : 0), e.y - 7, 4, 3, helmet);
-      rect(ctx, e.x - 4, e.y - 5, 12, 4, css(lerp(PAL.olive, PLAYER_COLORS[e.f], 0.35)));
+      const s = sprite(`dead:${e.f}`, e.facing, () => {
+        const t = team(e.f);
+        const [c, g] = canvas(14, 6);
+        outlined(g, [[1, 2, 3, 3, C.skin], [4, 2, 7, 3, t.uni], [11, 3, 2, 2, C.boot]], [[0, 1, 3, 2, t.main]]);
+        return { c, ax: 7, ay: 5 };
+      });
+      rect(ctx, x - 5, y - 1, 9, 1, C.redDark);
+      rect(ctx, x - 3, y - 1, 5, 1, C.red);
+      ctx.drawImage(s.c, x - s.ax, y - s.ay);
     } else if (e.kind === 'wreck') {
-      // Burnt-out wreck with rising smoke puffs.
-      rect(ctx, e.x - 14, e.y - 8, 28, 8, '#2a2620');
-      rect(ctx, e.x - 10, e.y - 12, 14, 5, '#3a352c');
-      if (e.t < 0.4) circle(ctx, e.x, e.y - 10, 18 * (1 - e.t / 0.4) + 6, 'rgba(255,170,40,0.85)');
+      ctx.fillStyle = C.O; ctx.fillRect(x - 9, y - 5, 18, 5); ctx.fillRect(x - 6, y - 7, 10, 3);
+      ctx.fillStyle = '#2c2924'; ctx.fillRect(x - 8, y - 4, 16, 4);
+      ctx.fillStyle = '#3a3630'; ctx.fillRect(x - 5, y - 6, 8, 2);
+      if (e.t < 0.35) disc(ctx, x, y - 4, Math.round(10 * (1 - e.t / 0.35)) + 2, '#f28a30');
       for (let i = 0; i < 4; i++) {
-        const k = (e.t * 0.8 + i * 0.25) % 1;
-        rect(ctx, e.x - 4 + Math.sin(i * 2 + e.t) * 6, e.y - 14 - k * 50, 8 + k * 8, 8 + k * 8, `rgba(60,58,52,${0.6 * (1 - k)})`);
+        const k = (e.t * 0.7 + i * 0.25) % 1;
+        const sz = 2 + Math.round(k * 4);
+        ctx.globalAlpha = Math.min(fade, 0.65 * (1 - k));
+        rect(ctx, x - 2 + Math.round(Math.sin(i * 2 + e.t) * 3), y - 7 - Math.round(k * 24), sz, sz, '#4a4740');
       }
+      ctx.globalAlpha = fade;
+      if (Math.floor(e.t * 10) % 2 && e.t < 3) rect(ctx, x - 1, y - 7, 2, 2, '#f28a30');
     } else if (e.kind === 'debris') {
       for (const p of e.parts) {
-        const px = e.x + p.vx * e.t;
-        const py = e.y + p.vy * e.t + 450 * e.t * e.t;
-        rect(ctx, px - 2, py - 2, 4, 4, p.c);
+        rect(ctx, x + Math.round((p.vx * e.t) / G), y + Math.round((p.vy * e.t + 450 * e.t * e.t) / G), 2, 2, p.c);
       }
     }
   }
   ctx.globalAlpha = 1;
 }
 
-// ── Projectiles + placement ghost ──────────────────────────────────────────
-export function drawProjectile(ctx, p) {
-  if (p.exploded > 0) {
-    // Blast: expanding ring + hot core, sized to the splash radius.
-    const k = 1 - p.exploded / 0.3;
-    const r = p.splash * (0.4 + 0.6 * k);
-    ctx.globalAlpha = 1 - k;
-    circle(ctx, p.x, p.y, r, 'rgba(255,140,40,0.35)');
-    circle(ctx, p.x, p.y, r * 0.45, 'rgba(255,230,140,0.9)');
-    ctx.strokeStyle = 'rgba(255,200,90,0.9)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-    return;
-  }
-  const trail = p.kind === 'bullet' ? 14 : 20;
-  const tx = p.x - Math.cos(p.angle) * trail;
-  const ty = p.y - Math.sin(p.angle) * trail;
-  ctx.lineCap = 'round';
-  line(ctx, tx, ty, p.x, p.y, p.kind === 'bullet' ? 'rgba(255,219,79,0.4)' : 'rgba(200,200,200,0.35)', p.radius * 1.2);
-  ctx.lineCap = 'butt';
-  circle(ctx, p.x, p.y, p.radius, p.kind === 'bullet' ? '#ffff80' : '#2b2b2b');
-  if (p.kind !== 'bullet') circle(ctx, p.x - 1, p.y - 1, p.radius * 0.4, '#ffb347');
-}
-
-// ── Vehicles (bottom-centre origin, mirrored to face their direction) ─────
-function drawVehicle(ctx, u) {
-  const f = u.faction;
-  const { w, h } = u;
-  const x = u.x - w / 2;
-  const y = u.y - h;
-
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.beginPath();
-  ctx.ellipse(u.x, u.y + 2, w / 2 + 3, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.save();
-  ctx.translate(u.x, 0);
-  ctx.scale(u.facing, 1);
-  ctx.translate(-u.x, 0);
-  VEHICLE[u.type](ctx, u, x, y, w, h, f);
-  ctx.restore();
-
-  if (u.flash > 0) rect(ctx, x, y, w, h, 'rgba(255,255,255,0.6)');
-  if (u.selected) selectBrackets(ctx, x - 4, y - 4, w + 8, h + 8);
-  if (u.hp < u.maxHp || u.selected) hpBar(ctx, x, y - 8, w, u.hp / u.maxHp);
-}
-
-// ── Aircraft ──────────────────────────────────────────────────────────────
-function drawAircraft(ctx, u) {
-  const f = u.faction;
-  const { w, h } = u;
-  const x = u.x - w / 2;
-  const y = u.y - h;
-
-  // Ground shadow so altitude reads at a glance.
-  const map = u.game.map;
-  const tx = Math.floor(u.x / TILE_SIZE);
-  let gy = Math.floor(u.y / TILE_SIZE);
-  while (gy < MAP_H && !map.isSolid(tx, gy)) gy++;
-  const groundY = gy * TILE_SIZE;
-  const fade = Math.max(0.08, 0.3 - (groundY - u.y) / 1500);
-  ctx.fillStyle = `rgba(0,0,0,${fade})`;
-  ctx.beginPath();
-  ctx.ellipse(u.x, groundY, w * 0.4, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.save();
-  ctx.translate(u.x, 0);
-  ctx.scale(u.facing, 1);
-  ctx.translate(-u.x, 0);
-  AIRCRAFT[u.type](ctx, u, x, y, w, h, f);
-  ctx.restore();
-
-  if (u.flash > 0) rect(ctx, x, y, w, h, 'rgba(255,255,255,0.6)');
-  if (u.selected) selectBrackets(ctx, x - 4, y - 4, w + 8, h + 8);
-  if (u.hp < u.maxHp || u.selected) hpBar(ctx, x, y - 8, w, u.hp / u.maxHp);
-}
-
-const AIRCRAFT = {
-  // Drawn facing right; drawAircraft mirrors for left-facing units.
-  helicopter(ctx, u, x, y, w, h, f) {
-    const t = performance.now() / 1000;
-    // Tail boom + tail rotor
-    rect(ctx, x, y + h * 0.3, w * 0.45, 4, css(shade(f, 0.25)));
-    poly(ctx, [[x, y + h * 0.05], [x + 6, y + h * 0.3], [x, y + h * 0.5]], css(shade(f, 0.35)));
-    const tr = Math.sin(t * 40) * 5;
-    line(ctx, x + 2, y + h * 0.27 - tr, x + 2, y + h * 0.27 + tr, 'rgba(220,220,220,0.8)', 1.5);
-    // Cabin
-    ctx.fillStyle = css(PLAYER_COLORS[f]);
-    ctx.beginPath();
-    ctx.ellipse(x + w * 0.66, y + h * 0.5, w * 0.3, h * 0.42, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(160,210,255,0.85)';
-    ctx.beginPath();
-    ctx.ellipse(x + w * 0.82, y + h * 0.42, w * 0.11, h * 0.22, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Skids and gun pod
-    line(ctx, x + w * 0.45, y + h + 1, x + w * 0.9, y + h + 1, '#333', 2);
-    line(ctx, x + w * 0.55, y + h * 0.85, x + w * 0.55, y + h + 1, '#333', 1.5);
-    line(ctx, x + w * 0.8, y + h * 0.85, x + w * 0.8, y + h + 1, '#333', 1.5);
-    rect(ctx, x + w * 0.8, y + h * 0.72, w * 0.25, 3, '#2a2a2a');
-    // Main rotor (blur)
-    const span = w * 0.62 * Math.abs(Math.cos(t * 30));
-    rect(ctx, x + w * 0.64 - 1, y - 3, 2, 4, '#444');
-    line(ctx, x + w * 0.64 - span, y - 3, x + w * 0.64 + span, y - 3, 'rgba(230,230,230,0.85)', 2);
-    line(ctx, x + w * 0.64 - w * 0.62, y - 3, x + w * 0.64 + w * 0.62, y - 3, 'rgba(230,230,230,0.18)', 2);
-  },
-  bomber(ctx, u, x, y, w, h, f) {
-    const t = performance.now() / 1000;
-    // Tail fin
-    poly(ctx, [[x + 2, y + h * 0.5], [x + 8, y - 4], [x + 16, y - 4], [x + 18, y + h * 0.5]], css(shade(f, 0.3)));
-    // Fuselage
-    ctx.fillStyle = css(PLAYER_COLORS[f]);
-    ctx.beginPath();
-    ctx.roundRect(x, y + h * 0.3, w, h * 0.5, h * 0.25);
-    ctx.fill();
-    rect(ctx, x + 6, y + h * 0.3, w - 12, 2.5, css(tint(f, 0.4)));
-    // Cockpit glass + nose
-    rect(ctx, x + w * 0.78, y + h * 0.32, w * 0.12, h * 0.2, 'rgba(160,210,255,0.85)');
-    // Wing (side view) with engine + spinning prop
-    poly(ctx, [[x + w * 0.35, y + h * 0.55], [x + w * 0.62, y + h * 0.55], [x + w * 0.5, y + h * 1.05], [x + w * 0.32, y + h * 1.05]], css(shade(f, 0.25)));
-    rect(ctx, x + w * 0.52, y + h * 0.6, 10, 6, '#3a3a3a');
-    const pr = Math.abs(Math.sin(t * 45)) * 7;
-    line(ctx, x + w * 0.52 + 11, y + h * 0.63 - pr, x + w * 0.52 + 11, y + h * 0.63 + pr, 'rgba(220,220,220,0.8)', 1.5);
-    // Open bomb bay while reloading
-    if (u.cooldownTimer > u.cooldown - 0.4) rect(ctx, x + w * 0.4, y + h * 0.78, w * 0.14, 2, '#111');
-  },
-};
-
-function wheel(ctx, cx, cy, r, spin) {
-  circle(ctx, cx, cy, r, '#1d1d1d');
-  circle(ctx, cx, cy, r * 0.45, '#8a8a8a');
-  line(ctx, cx, cy, cx + Math.cos(spin) * r * 0.8, cy + Math.sin(spin) * r * 0.8, '#555', 1.5);
-}
-
-const VEHICLE = {
-  // Drawn facing right; drawVehicle mirrors for left-facing units.
-  jeep(ctx, u, x, y, w, h, f) {
-    const spin = u.x / 7;
-    rect(ctx, x + 2, y + h * 0.4, w - 4, h * 0.38, css(PLAYER_COLORS[f]));
-    rect(ctx, x + 2, y + h * 0.4, w - 4, 3, css(tint(f, 0.4)));
-    poly(ctx, [[x + w * 0.3, y + h * 0.4], [x + w * 0.42, y + h * 0.1], [x + w * 0.62, y + h * 0.1], [x + w * 0.7, y + h * 0.4]], css(shade(f, 0.25)));
-    rect(ctx, x + w * 0.45, y + h * 0.16, w * 0.14, h * 0.2, 'rgba(160,210,255,0.8)');
-    // Mounted gun
-    rect(ctx, x + w * 0.62, y + h * 0.02, 3, h * 0.2, '#333');
-    rect(ctx, x + w * 0.62, y, w * 0.38, 3, '#2a2a2a');
-    rect(ctx, x + w - 4, y + h * 0.5, 4, 3, '#ffe28a'); // headlight
-    wheel(ctx, x + w * 0.22, y + h - 5, 5, spin);
-    wheel(ctx, x + w * 0.78, y + h - 5, 5, spin);
-  },
-  tank(ctx, u, x, y, w, h, f) {
-    // Treads
-    const ty = y + h * 0.6;
-    ctx.fillStyle = '#262626';
-    ctx.beginPath();
-    ctx.roundRect(x, ty, w, h * 0.4, h * 0.2);
-    ctx.fill();
-    const off = (u.x / 3) % 6;
-    for (let i = -1; i < w / 6; i++) rect(ctx, x + 3 + i * 6 + off, ty + 2, 2, h * 0.4 - 4, '#444');
-    for (let i = 0; i < 5; i++) circle(ctx, x + 5 + i * ((w - 10) / 4), ty + h * 0.2, 2.6, '#6d6d6d');
-    // Hull
-    poly(ctx, [[x + 2, ty], [x + 6, y + h * 0.36], [x + w - 4, y + h * 0.36], [x + w, ty]], css(PLAYER_COLORS[f]));
-    rect(ctx, x + 6, y + h * 0.36, w - 10, 3, css(tint(f, 0.35)));
-    // Turret + barrel
-    ctx.fillStyle = css(shade(f, 0.2));
-    ctx.beginPath();
-    ctx.roundRect(x + w * 0.28, y + h * 0.08, w * 0.4, h * 0.3, 4);
-    ctx.fill();
-    rect(ctx, x + w * 0.28, y + h * 0.08, w * 0.4, 2, css(tint(f, 0.4)));
-    const recoil = u.cooldownTimer > u.cooldown - 0.15 ? 3 : 0;
-    rect(ctx, x + w * 0.66 - recoil, y + h * 0.16, w * 0.44, 4, '#2f2f2f');
-    rect(ctx, x + w * 1.06 - recoil, y + h * 0.13, 4, 6, '#2f2f2f');
-  },
-  artillery(ctx, u, x, y, w, h, f) {
-    const spin = u.x / 7;
-    // Long barrel raised at ~35°
-    ctx.save();
-    ctx.translate(x + w * 0.45, y + h * 0.42);
-    ctx.rotate(-0.6);
-    rect(ctx, 0, -2.5, w * 0.75, 5, '#333');
-    rect(ctx, w * 0.68, -3.5, 6, 7, '#2a2a2a');
-    ctx.restore();
-    rect(ctx, x + 2, y + h * 0.42, w - 6, h * 0.36, css(PLAYER_COLORS[f]));
-    rect(ctx, x + 2, y + h * 0.42, w - 6, 3, css(tint(f, 0.4)));
-    rect(ctx, x + w * 0.32, y + h * 0.28, w * 0.26, h * 0.18, css(shade(f, 0.3)));
-    // Stabiliser leg at the back
-    line(ctx, x + 4, y + h * 0.7, x - 4, y + h, '#3a3a3a', 3);
-    wheel(ctx, x + w * 0.28, y + h - 5, 5, spin);
-    wheel(ctx, x + w * 0.72, y + h - 5, 5, spin);
-  },
-};
-
-// Placement mode: dim everything outside the player's build zone and mark its edges.
+// ── Placement overlays & markers ───────────────────────────────────────────
+// Dim everything outside the build zone and mark its edges (zones in tiles).
 export function drawBuildZones(ctx, zones, view) {
-  const top = view.y;
-  const h = view.h;
-  let x = view.x;
-  const right = view.x + view.w;
-  ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  const top = A(view.y) - 1;
+  const h = A(view.h) + 3;
+  let x = A(view.x) - 1;
+  const right = A(view.x + view.w) + 2;
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
   for (const [from, to] of zones) {
-    const zx0 = from * TILE_SIZE;
-    const zx1 = to * TILE_SIZE;
-    if (zx0 > x) ctx.fillRect(x, top, Math.min(zx0, right) - x, h);
-    x = Math.max(x, zx1);
+    const z0 = from * T;
+    const z1 = to * T;
+    if (z0 > x) ctx.fillRect(x, top, Math.min(z0, right) - x, h);
+    x = Math.max(x, z1);
   }
   if (x < right) ctx.fillRect(x, top, right - x, h);
-
-  ctx.strokeStyle = 'rgba(0,255,102,0.75)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 6]);
+  ctx.fillStyle = '#5ee03a';
   for (const [from, to] of zones) {
-    ctx.fillStyle = 'rgba(0,255,102,0.05)';
-    ctx.fillRect(from * TILE_SIZE, top, (to - from) * TILE_SIZE, h);
-    ctx.beginPath();
-    for (const ex of [from * TILE_SIZE, to * TILE_SIZE]) { ctx.moveTo(ex, top); ctx.lineTo(ex, top + h); }
-    ctx.stroke();
+    for (const ex of [from * T, to * T - 1]) {
+      for (let yy = top; yy < top + h; yy += 6) ctx.fillRect(ex, yy, 1, 3);
+    }
   }
-  ctx.setLineDash([]);
 }
 
 export function drawGhost(ctx, pl) {
-  const x = pl.tx * TILE_SIZE;
-  const y = pl.ty * TILE_SIZE;
-  const w = pl.w * TILE_SIZE;
-  const h = pl.h * TILE_SIZE;
-  rect(ctx, x, y, w, h, pl.valid ? 'rgba(0,255,102,0.22)' : 'rgba(255,51,51,0.22)');
-  ctx.strokeStyle = pl.valid ? 'rgba(0,255,102,0.9)' : 'rgba(255,51,51,0.9)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([5, 4]);
-  ctx.strokeRect(x, y, w, h);
-  ctx.setLineDash([]);
+  const x = pl.tx * T;
+  const y = pl.ty * T;
+  const w = pl.w * T;
+  const h = pl.h * T;
+  const col = pl.valid ? '#5ee03a' : C.red;
+  ctx.globalAlpha = 0.25;
+  rect(ctx, x, y, w, h, col);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = col;
+  for (let i = 0; i < w; i += 4) { ctx.fillRect(x + i, y, 2, 1); ctx.fillRect(x + i, y + h - 1, 2, 1); }
+  for (let i = 0; i < h; i += 4) { ctx.fillRect(x, y + i, 1, 2); ctx.fillRect(x + w - 1, y + i, 1, 2); }
+}
+
+// Order feedback: a pixel square ring that expands as it fades.
+export function drawMarker(ctx, m) {
+  const r = Math.round(3 + (1.2 - m.t) * 8);
+  const x = A(m.x);
+  const y = A(m.y);
+  ctx.globalAlpha = Math.min(1, m.t * 2);
+  ctx.fillStyle = m.color;
+  ctx.fillRect(x - r, y - r, r * 2, 1);
+  ctx.fillRect(x - r, y + r, r * 2 + 1, 1);
+  ctx.fillRect(x - r, y - r, 1, r * 2);
+  ctx.fillRect(x + r, y - r, 1, r * 2);
+  ctx.globalAlpha = 1;
 }
 
 // ── Minimap ────────────────────────────────────────────────────────────────
@@ -809,9 +825,9 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache, zones = null)
     const colors = { [TILE_GROUND]: '#7a4a24', [TILE_PLATFORM]: '#8f7f62', [TILE_BRIDGE]: '#b98552', [TILE_RAMP]: '#a8763e' };
     for (let tx = 0; tx < MAP_W; tx++) {
       for (let ty = 0; ty < MAP_H; ty++) {
-        const tile = game.map.get(tx, ty);
-        if (tile === TILE_EMPTY) continue;
-        t.fillStyle = colors[tile];
+        const k = game.map.get(tx, ty);
+        if (k === TILE_EMPTY) continue;
+        t.fillStyle = colors[k];
         t.fillRect(Math.floor(tx * TILE_SIZE * sx), Math.floor(ty * TILE_SIZE * sy), Math.ceil(TILE_SIZE * sx), Math.ceil(TILE_SIZE * sy));
       }
     }
@@ -827,7 +843,6 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache, zones = null)
   }
   ctx.drawImage(terrainCache.canvas, 0, 0);
   if (zones) {
-    // Placement mode: highlight where the player is allowed to build.
     ctx.fillStyle = 'rgba(0,255,102,0.28)';
     for (const shift of game.wrap ? [-WORLD_W, 0, WORLD_W] : [0]) {
       for (const [from, to] of zones) ctx.fillRect((from * TILE_SIZE + shift) * sx, 0, (to - from) * TILE_SIZE * sx, ch);
@@ -835,18 +850,18 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache, zones = null)
   }
   for (const b of game.buildings) {
     if (b.type === 'bridge' || b.type === 'ramp') continue;
-    ctx.fillStyle = css(PLAYER_COLORS[b.faction]);
-    ctx.fillRect(b.x * sx, b.y * sy, Math.max(3, b.w * sx), Math.max(3, b.h * sy));
+    ctx.fillStyle = team(b.faction).main;
+    ctx.fillRect(Math.floor(b.x * sx), Math.floor(b.y * sy), Math.max(3, Math.ceil(b.w * sx)), Math.max(3, Math.ceil(b.h * sy)));
   }
   for (const u of game.units) {
-    ctx.fillStyle = css(tint(u.faction, 0.3));
-    ctx.fillRect(u.x * sx - (u.vehicle ? 2.5 : 1.5), (u.y - u.h) * sy, u.vehicle ? 5 : 3, Math.max(3, u.h * sy));
+    ctx.fillStyle = team(u.faction).light;
+    ctx.fillRect(Math.floor(u.x * sx) - 1, Math.floor((u.y - UNIT_H) * sy), u.vehicle ? 5 : 3, Math.max(3, Math.ceil(UNIT_H * sy)));
   }
   ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(view.x * sx + 0.75, view.y * sy + 0.75, view.w * sx - 1.5, view.h * sy - 1.5);
-  // Looping map: a view straddling the seam also shows at the start.
-  if (game.wrap && view.x + view.w > WORLD_W) ctx.strokeRect((view.x - WORLD_W) * sx + 0.75, view.y * sy + 0.75, view.w * sx - 1.5, view.h * sy - 1.5);
+  ctx.lineWidth = 2;
+  const box = (vx) => ctx.strokeRect(Math.round(vx * sx) + 1, Math.round(view.y * sy) + 1, Math.round(view.w * sx) - 2, Math.round(view.h * sy) - 2);
+  box(view.x);
+  if (game.wrap && view.x + view.w > WORLD_W) box(view.x - WORLD_W);
 }
 
 export { BUILDING_TYPES };

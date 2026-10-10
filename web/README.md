@@ -21,11 +21,14 @@ offline after the first load. When served over HTTPS (e.g. GitHub Pages, see
 
 ## Look and feel
 
-The art style is a homage to early-90s home-computer war games: bright, saturated colours and chunky pixels.
-- **Pixel rendering:** the battlefield is drawn at low resolution and scaled up with hard pixel edges.
-- **Scenery:** a banded blue sky with blocky clouds, parallax hills and jungle palms, and grass-topped dirt and rock.
-- **Soldiers:** little big-headed figures with team-coloured helmets and role-specific gear (the engineer's hard hat, the sniper's boonie hat and rifle).
-- **Buildings and effects:** buildings sit behind sandbags. Fallen soldiers, burning wrecks and flying dirt add to the battle.
+The art style is a homage to early-90s home-computer war games: chunky, crisp pixel art in a bright palette.
+- **Sharp pixels:** the battlefield is drawn as real pixel art. One art pixel is 2 world units, and zoom snaps so each art pixel covers a whole number of screen pixels. Nothing is smoothed or blurred, and scrolling stays smooth.
+- **Sprites:** every sprite is pixel art built in code with a shared palette and dark outlines, and pre-rendered once per team:
+  - Big-headed soldiers with role-specific gear.
+  - Vehicles and aircraft.
+  - Buildings: a sandbagged HQ bunker, a corrugated barracks hut, a sandbag gun nest, a sandbag-and-barbed-wire wall, a mine pithead, a workshop garage, and an airbase hangar with a control tower.
+  - Grass, dirt and rock tiles, jungle trees and clouds.
+- **Life and damage:** buildings rise behind scaffolding while under construction, smoke and burn when damaged, and have small animations (flag, pithead wheel, chimney smoke, tower beacon).
 - **UI:** the olive/khaki interface uses the bundled [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) pixel font (SIL Open Font License, see `vendor/fonts/`).
 
 ## Free-for-All: looping map
