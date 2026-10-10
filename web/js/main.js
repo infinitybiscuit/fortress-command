@@ -7,7 +7,7 @@ import { Game } from './game.js';
 import { canReach } from './entities.js';
 import { applyCommand, ref } from './commands.js';
 import {
-  hostRoom, joinRoom, makeRoomCode, encodeSnapshot, createMirror, applySnapshot, SNAPSHOT_INTERVAL,
+  hostRoom, joinRoom, makeRoomCode, connectionRoute, encodeSnapshot, createMirror, applySnapshot, SNAPSHOT_INTERVAL,
 } from './net.js';
 import {
   drawSky, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap,
@@ -100,7 +100,7 @@ function setStatus(text) { statusText = text; $('status').textContent = text; }
 
 // ── Online session ─────────────────────────────────────────────────────────
 // role: null offline, 'host' (runs the game, plays Blue) or 'guest' (Red).
-const net = { role: null, transport: null, room: null, code: '', snapTimer: 0, mapVersion: -1, pingMs: null };
+const net = { role: null, transport: null, room: null, code: '', snapTimer: 0, mapVersion: -1, pingMs: null, route: null };
 const online = () => net.role !== null;
 
 // Every player order goes through here: applied locally, or sent to the host
@@ -754,7 +754,7 @@ function onDisconnect(reason) {
 
 function resetNet() {
   net.room?.cancel?.();
-  Object.assign(net, { role: null, transport: null, room: null, pingMs: null });
+  Object.assign(net, { role: null, transport: null, room: null, pingMs: null, route: null });
 }
 
 function leaveOnline() {
@@ -817,7 +817,10 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => {
   if (!net.transport || !game) return;
   net.transport.send({ t: 'ping', at: performance.now() });
-  if (online()) $('mode-label').textContent = `${MODES.online.label}${net.pingMs != null ? ` · ${net.pingMs} ms` : ''}`;
+  if (!net.route) connectionRoute(net.transport).then((r) => { if (net.transport) net.route = r; });
+  if (online()) {
+    $('mode-label').textContent = `${MODES.online.label}${net.pingMs != null ? ` · ${net.pingMs} ms` : ''}${net.route ? ` · ${net.route}` : ''}`;
+  }
 }, 2000);
 
 // ── Main loop ──────────────────────────────────────────────────────────────

@@ -4,7 +4,11 @@
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v8 · Online';
+export const VERSION = 'v9 · Relay';
+
+// Cloudflare Worker (see /relay) that hands out TURN relay credentials, used
+// when two phones can't connect directly. Leave empty to connect direct-only.
+export const RELAY_URL = '';
 
 export const TILE_SIZE = 32;
 export const MAP_W = 200;

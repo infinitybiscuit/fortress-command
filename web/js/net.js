@@ -2,7 +2,7 @@
 // room code, sends its orders as commands and renders snapshots of the host's
 // game. Phones connect peer-to-peer over WebRTC (PeerJS); PeerJS's free public
 // broker is only used to introduce the two devices.
-import { UNIT_TYPES, BUILDING_TYPES } from './config.js';
+import { UNIT_TYPES, BUILDING_TYPES, RELAY_URL } from './config.js';
 import { Game } from './game.js';
 import { Unit, Building } from './entities.js';
 
@@ -13,6 +13,51 @@ const ICE_SERVERS = [
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:global.stun.twilio.com:3478' },
 ];
+
+// Add Cloudflare TURN relay servers when a relay Worker is configured, so
+// phones that can't reach each other directly (e.g. on mobile data) still
+// connect. Falls back to direct-only if the Worker can't be reached.
+let relayCache = null;
+async function iceConfig() {
+  const params = new URLSearchParams(location.search);
+  const relayUrl = params.get('relayUrl') || RELAY_URL;
+  const relayOnly = params.get('relay') === 'only'; // testing: force the relay path
+  let relay = [];
+  if (relayUrl) {
+    if (!relayCache || Date.now() - relayCache.at > 60 * 60 * 1000) {
+      try {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 5000);
+        const res = await fetch(relayUrl, { signal: ctl.signal, cache: 'no-store' });
+        clearTimeout(timer);
+        if (res.ok) relayCache = { at: Date.now(), servers: (await res.json()).iceServers || [] };
+      } catch { /* relay unavailable — direct connections only */ }
+    }
+    relay = relayCache?.servers || [];
+  }
+  return {
+    iceServers: [...ICE_SERVERS, ...relay],
+    ...(relayOnly && relay.length ? { iceTransportPolicy: 'relay' } : {}),
+  };
+}
+
+// 'direct' or 'relay' once the connection is up (null if unknown).
+export async function connectionRoute(transport) {
+  const pc = transport.pc;
+  if (!pc?.getStats) return null;
+  try {
+    const stats = await pc.getStats();
+    let pair = null;
+    stats.forEach((s) => { if (s.type === 'transport' && s.selectedCandidatePairId) pair = stats.get(s.selectedCandidatePairId); });
+    if (!pair) stats.forEach((s) => { if (s.type === 'candidate-pair' && s.nominated && s.state === 'succeeded') pair = s; });
+    if (!pair) return null;
+    const local = stats.get(pair.localCandidateId);
+    const remote = stats.get(pair.remoteCandidateId);
+    return local?.candidateType === 'relay' || remote?.candidateType === 'relay' ? 'relay' : 'direct';
+  } catch {
+    return null;
+  }
+}
 
 export const SNAPSHOT_INTERVAL = 1 / 12; // seconds between host → guest updates
 
@@ -57,6 +102,7 @@ function wrapConnection(conn, peer) {
   conn.on('close', close);
   conn.on('error', close);
   t.send = (obj) => { if (conn.open) conn.send(obj); };
+  t.pc = conn.peerConnection;
   t.close = () => {
     closed = true;
     try { conn.close(); } catch { /* already closed */ }
@@ -121,8 +167,9 @@ const useLocal = () => new URLSearchParams(location.search).get('net') === 'loca
 export async function hostRoom(code, onConnect) {
   if (useLocal()) return localHost(code, onConnect);
   const Peer = await loadPeerJs();
+  const config = await iceConfig();
   return new Promise((resolve, reject) => {
-    const peer = new Peer(ID_PREFIX + code, { config: { iceServers: ICE_SERVERS } });
+    const peer = new Peer(ID_PREFIX + code, { config });
     let open = false;
     let joined = false;
     peer.on('open', () => { open = true; resolve({ cancel: () => { if (!joined) peer.destroy(); } }); });
@@ -138,8 +185,9 @@ export async function hostRoom(code, onConnect) {
 export async function joinRoom(code) {
   if (useLocal()) return localJoin(code);
   const Peer = await loadPeerJs();
+  const config = await iceConfig();
   return new Promise((resolve, reject) => {
-    const peer = new Peer({ config: { iceServers: ICE_SERVERS } });
+    const peer = new Peer({ config });
     let done = false;
     const fail = (msg) => { if (!done) { done = true; peer.destroy(); reject(new Error(msg)); } };
     const timer = setTimeout(() => fail("Couldn't connect. You may be on networks that block direct connections — try both phones on Wi-Fi."), 20000);

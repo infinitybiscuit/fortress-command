@@ -34,7 +34,7 @@ The host plays **Blue** (left) and the guest plays **Red** (right). Both use the
 **Limits.**
 - If either player leaves or closes the app, the game ends for both.
 - If the host switches away from the app, the game freezes until they come back.
-- Some mobile carriers and strict networks block direct connections. If joining keeps failing, put one or both phones on Wi-Fi.
+- Some mobile carriers and strict networks block direct connections. With the optional Cloudflare relay set up (see [`../relay`](../relay/README.md)), those games are routed through Cloudflare instead. Without it, put one or both phones on Wi-Fi. The label under your name shows whether a match is `direct` or going through the `relay`.
 - Two tabs on one device can play each other without the internet by adding `?net=local` to the URL, which is handy for testing.
 
 ## Controls (touch)
