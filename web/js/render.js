@@ -493,6 +493,8 @@ function treeSprite(k) {
   return c;
 }
 
+export const SKY_TOP = C.sky[0];
+
 export function drawBackground(ctx, bw, bh, camAX, camAY) {
   const groundY = (WORLD_H - 3 * TILE_SIZE) / G - camAY;
   const bands = C.sky.length;
@@ -859,7 +861,9 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache, zones = null)
   }
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 2;
-  const box = (vx) => ctx.strokeRect(Math.round(vx * sx) + 1, Math.round(view.y * sy) + 1, Math.round(view.w * sx) - 2, Math.round(view.h * sy) - 2);
+  const vy = Math.max(0, view.y);
+  const vh = Math.min(WORLD_H, view.y + view.h) - vy;
+  const box = (vx) => ctx.strokeRect(Math.round(vx * sx) + 1, Math.round(vy * sy) + 1, Math.round(view.w * sx) - 2, Math.round(vh * sy) - 2);
   box(view.x);
   if (game.wrap && view.x + view.w > WORLD_W) box(view.x - WORLD_W);
 }
