@@ -1,8 +1,8 @@
 // Online play. One phone hosts and runs the simulation; up to three others
 // join with a room code, send their orders as commands and render snapshots of
 // the host's game. Phones connect peer-to-peer over WebRTC (PeerJS) in a star
-// around the host; PeerJS's free public broker only introduces the devices.
-import { UNIT_TYPES, BUILDING_TYPES, RELAY_URL } from './config.js';
+// around the host; a matchmaking server only introduces the devices.
+import { UNIT_TYPES, BUILDING_TYPES, RELAY_URL, MATCHMAKER_URL } from './config.js';
 import { Game } from './game.js';
 import { Unit, Building, deathEffect } from './entities.js';
 
@@ -39,6 +39,35 @@ async function iceConfig() {
     iceServers: [...ICE_SERVERS, ...relay],
     ...(relayOnly && relay.length ? { iceTransportPolicy: 'relay' } : {}),
   };
+}
+
+// Which matchmaking server to use: ours (MATCHMAKER_URL) if it answers,
+// otherwise PeerJS's free public one. Both phones must pick the same, so a
+// working choice is kept for the rest of the session. Testing overrides:
+// ?broker=public, ?brokerUrl=http://localhost:8787/
+let broker = null;
+let brokerCheckedAt = 0;
+async function brokerOptions() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('broker') === 'public') return {};
+  const base = params.get('brokerUrl') || MATCHMAKER_URL;
+  if (!base) return {};
+  if (broker && (broker.host || Date.now() - brokerCheckedAt < 30000)) return broker.opts;
+  const url = new URL(base);
+  let ok = false;
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 4000);
+    const res = await fetch(new URL('peerjs/id', url), { signal: ctl.signal, cache: 'no-store' });
+    clearTimeout(timer);
+    ok = res.ok;
+  } catch { /* unreachable — use the public server */ }
+  brokerCheckedAt = Date.now();
+  const secure = url.protocol === 'https:';
+  broker = ok
+    ? { host: url.hostname, opts: { host: url.hostname, port: +url.port || (secure ? 443 : 80), path: url.pathname, secure, key: 'peerjs' } }
+    : { host: null, opts: {} };
+  return broker.opts;
 }
 
 // 'direct' or 'relay' once the connection is up (null if unknown).
@@ -182,9 +211,9 @@ const useLocal = () => new URLSearchParams(location.search).get('net') === 'loca
 export async function hostRoom(code, onConnect) {
   if (useLocal()) return localHost(code, onConnect);
   const Peer = await loadPeerJs();
-  const config = await iceConfig();
+  const [config, server] = await Promise.all([iceConfig(), brokerOptions()]);
   return new Promise((resolve, reject) => {
-    const peer = new Peer(ID_PREFIX + code, { config });
+    const peer = new Peer(ID_PREFIX + code, { ...server, config });
     let open = false;
     let closed = false;
     let retries = 0;
@@ -216,9 +245,9 @@ export async function hostRoom(code, onConnect) {
 export async function joinRoom(code) {
   if (useLocal()) return localJoin(code);
   const Peer = await loadPeerJs();
-  const config = await iceConfig();
+  const [config, server] = await Promise.all([iceConfig(), brokerOptions()]);
   return new Promise((resolve, reject) => {
-    const peer = new Peer({ config });
+    const peer = new Peer({ ...server, config });
     let done = false;
     const fail = (msg) => { if (!done) { done = true; peer.destroy(); reject(new Error(msg)); } };
     const timer = setTimeout(() => fail("Couldn't connect. You may be on networks that block direct connections — try both phones on Wi-Fi."), 20000);

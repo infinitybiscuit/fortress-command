@@ -4,11 +4,16 @@
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v19 · Matchmaking fix';
+export const VERSION = 'v20 · Own matchmaking';
 
 // Cloudflare Worker (see /relay) that hands out TURN relay credentials, used
 // when two phones can't connect directly. Leave empty to connect direct-only.
 export const RELAY_URL = 'https://fortress-relay.tj-coles.workers.dev/';
+
+// Our own matchmaking server (the same Worker, see /relay), used to introduce
+// phones to each other. If it doesn't answer, the game falls back to the free
+// public PeerJS server. Leave empty to always use the public one.
+export const MATCHMAKER_URL = 'https://fortress-relay.tj-coles.workers.dev/';
 
 export const TILE_SIZE = 32;
 export const MAP_W = 200;

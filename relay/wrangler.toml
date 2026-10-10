@@ -1,5 +1,17 @@
-# Only needed if you deploy from a computer with `npx wrangler deploy`.
-# Deploying by pasting src/index.js into the Cloudflare dashboard works too.
+# Deployed by .github/workflows/relay.yml whenever relay/ changes on main
+# (or by hand from a computer with `npx wrangler deploy`).
 name = "fortress-relay"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
+# Don't wipe plain variables set in the dashboard (secrets are always kept).
+keep_vars = true
+
+# Matchmaking keeps every connected phone's WebSocket in one Durable Object.
+[[durable_objects.bindings]]
+name = "MATCHMAKER"
+class_name = "Matchmaker"
+
+# SQLite-backed so it runs on the Workers Free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Matchmaker"]
