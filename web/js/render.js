@@ -9,11 +9,12 @@ import {
 import { G, T, A, C, canvas, flip, rect, disc, hash, team, setPalette } from './pixel.js';
 import classic from './themes/classic.js';
 import robots from './themes/robots.js';
+import medieval from './themes/medieval.js';
 
 export { G };
 
 // ── Themes ─────────────────────────────────────────────────────────────────
-export const THEMES = [classic, robots];
+export const THEMES = [classic, robots, medieval];
 let theme = null;
 const sprites = new Map();
 const tiles = {};

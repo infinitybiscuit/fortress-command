@@ -1390,7 +1390,11 @@ function draw(dt) {
 // A look for the battlefield and menus, chosen on the title screen and kept
 // on this device. Purely cosmetic: online opponents can use different themes.
 const THEME_KEY = 'fortress-theme';
-const TAGLINES = { classic: 'Build. Train. Conquer.', robots: 'Rise of the Robots. The machines are coming.' };
+const TAGLINES = {
+  classic: 'Build. Train. Conquer.',
+  robots: 'Rise of the Robots. The machines are coming.',
+  medieval: 'Raise your banners. Storm the castle.',
+};
 function applyTheme(id) {
   const t = setTheme(id);
   document.body.dataset.theme = t.id;
