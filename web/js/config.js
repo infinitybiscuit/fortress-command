@@ -46,26 +46,35 @@ export const UNIT_TYPES = {
                vehicle: true, w: 42, h: 26, shot: 'shell', splash: 40, vsBuildings: 1.25 },
   artillery: { hp: 140, speed: 55,  range: 340, damage: 60, cooldown: 3.5,  repair: 0, cost: 260, trainTime: 10.0,
                vehicle: true, w: 40, h: 24, shot: 'lob', splash: 60, vsBuildings: 1.75 },
+  // Airbase aircraft: fly over terrain and walls. Only bullets (infantry, jeeps,
+  // helicopters) and turrets can hit them; tanks and artillery can't.
+  // hover = how far above its target a helicopter holds; altitude = bomber cruise height (world y).
+  helicopter: { hp: 220, speed: 170, range: 105, damage: 14, cooldown: 0.35, repair: 0, cost: 260, trainTime: 10.0,
+                air: true, w: 42, h: 18, shot: 'bullet', hover: 60 },
+  bomber:     { hp: 320, speed: 150, range: 0,   damage: 110, cooldown: 2.2, repair: 0, cost: 400, trainTime: 15.0,
+                air: true, w: 58, h: 18, shot: 'bomb', splash: 55, vsBuildings: 1.6, altitude: 250 },
 };
 
 export const BUILDING_TYPES = {
   hq:       { hp: 500, w: 4, h: 3, cost: 0,   buildTime: 0,   income: 5 },
   barracks: { hp: 200, w: 3, h: 2, cost: 150, buildTime: 5.0, canTrain: ['soldier', 'heavy', 'scout', 'sniper'] },
-  turret:   { hp: 120, w: 2, h: 2, cost: 100, buildTime: 4.0, autoAttack: true, damage: 12, range: 150, rate: 1.2 },
+  // airRange: turrets double as anti-aircraft guns with a much longer reach upward.
+  turret:   { hp: 120, w: 2, h: 2, cost: 100, buildTime: 4.0, autoAttack: true, damage: 12, range: 150, rate: 1.2, airRange: 420, airDamage: 30 },
   // Walls take half damage from bullets (shells and artillery hit them fully).
   wall:     { hp: 1000, w: 1, h: 2, cost: 50, buildTime: 3.0, blocksUnits: true, bulletResist: 0.5 },
   mine:     { hp: 100, w: 2, h: 2, cost: 200, buildTime: 8.0, income: 15 },
   workshop: { hp: 180, w: 3, h: 2, cost: 200, buildTime: 6.0, canTrain: ['engineer', 'jeep', 'tank', 'artillery'] },
+  airbase:  { hp: 300, w: 4, h: 2, cost: 300, buildTime: 10.0, canTrain: ['helicopter', 'bomber'] },
   bridge:   { hp: 150, w: 1, h: 1, cost: 15,  buildTime: 3.0, isBridge: true },
   ramp:     { hp: 120, w: 1, h: 1, cost: 20,  buildTime: 4.0, isRamp: true },
 };
 
-export const BUILD_MENU = ['barracks', 'turret', 'wall', 'mine', 'workshop', 'bridge', 'ramp'];
+export const BUILD_MENU = ['barracks', 'turret', 'wall', 'mine', 'workshop', 'airbase', 'bridge', 'ramp'];
 export const BUILD_ICONS = {
-  barracks: '⚔️', turret: '🗼', wall: '🧱', mine: '⛏️', workshop: '🔧', bridge: '🌉', ramp: '🔼',
+  barracks: '⚔️', turret: '🗼', wall: '🧱', mine: '⛏️', workshop: '🔧', airbase: '🛫', bridge: '🌉', ramp: '🔼',
 };
 export const UNIT_ICONS = {
-  soldier: '🪖', heavy: '🛡️', scout: '🏃', engineer: '🔩', sniper: '🎯',
+  soldier: '🪖', heavy: '🛡️', scout: '🏃', engineer: '🔩', sniper: '🎯', helicopter: '🚁', bomber: '✈️',
   jeep: vehicleIcon('<rect x="3" y="9" width="18" height="6" rx="1.5"/><path d="M7 9l2-4h6l2 4z"/><rect x="14" y="3" width="8" height="2"/><circle cx="7" cy="17" r="2.6" fill="#222" stroke="#bbb"/><circle cx="17" cy="17" r="2.6" fill="#222" stroke="#bbb"/>'),
   tank: vehicleIcon('<rect x="2" y="13" width="20" height="6" rx="3" fill="#333" stroke="#999"/><rect x="4" y="9" width="16" height="5" rx="1"/><rect x="8" y="5" width="8" height="5" rx="1.5"/><rect x="15" y="6.5" width="8" height="2"/>'),
   artillery: vehicleIcon('<rect x="3" y="12" width="15" height="5" rx="1"/><path d="M8 12l12-9 1.5 1.8L11 12z"/><circle cx="6" cy="18.5" r="2.5" fill="#222" stroke="#bbb"/><circle cx="15" cy="18.5" r="2.5" fill="#222" stroke="#bbb"/>'),

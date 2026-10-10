@@ -65,6 +65,19 @@ Walls (💰50, 1000 HP) block enemy units, and your own troops walk straight thr
 
 Vehicles climb ramps just like infantry, and engineers can repair them. From about 90 seconds in, the CPU builds its own Workshop and mixes jeeps, tanks and artillery into its attacks.
 
+## Aircraft (Airbase)
+
+The Airbase costs 300, takes 10s to build and has 300 HP.
+
+| Aircraft | Cost | Build | Role |
+|---|---|---|---|
+| 🚁 Helicopter | 260 | 10s | Gunship, 220 HP. Flies over walls and terrain and hovers over its target. It can attack ground units and other aircraft. |
+| ✈️ Bomber | 400 | 15s | 320 HP. Cruises above the battlefield and makes bombing runs, dropping a splash bomb (110 damage, ×1.6 vs buildings) each time it passes over its target. It can only hit ground targets. |
+
+**Anti-air:** only bullets can hit aircraft, so use infantry, jeeps, helicopters and turrets. Tanks and artillery can't hit aircraft, and ground blasts don't reach them. Bombers fly too high for ground units, so you need turrets (420px anti-air range, 30 damage per shot against aircraft) or helicopters to bring them down. Aircraft take off from the airbase when they're built.
+
+After about 3 minutes the CPU builds an airbase and adds helicopters and bombers to its army.
+
 ## Layout
 
 ```

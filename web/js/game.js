@@ -140,6 +140,12 @@ export class Game {
     if (this.projectiles.length > MAX_PROJECTILES) this.projectiles.shift();
   }
 
+  dropBomb(bomber) {
+    const d = bomber.def;
+    this.projectiles.push(new Projectile(this, [bomber.x, bomber.y + 2], null, d.damage, bomber.faction,
+      { kind: 'bomb', splash: d.splash, vsBuildings: d.vsBuildings, shooter: bomber }));
+  }
+
   // Something of ours was hit: idle troops nearby rally to deal with the attacker.
   callForHelp(victim, source) {
     if (!source || source.dead || source.faction === victim.faction) return;
@@ -252,17 +258,37 @@ export class Game {
         workshop = this.spawnBuilding('workshop', tx, groundY, i);
       }
     }
-    const workshopIdle = workshop && !workshop.constructing && !workshop.trainCurrent && !workshop.queue.length;
-    if (workshopIdle) {
-      // Choose the next vehicle up front, then save for it.
-      p.nextVehicle ||= Math.random() < 0.45 ? 'tank' : Math.random() < 0.5 ? 'artillery' : 'jeep';
-      const cost = UNIT_TYPES[p.nextVehicle].cost;
-      if (p.money >= cost && workshop.queueTrain(p.nextVehicle)) {
-        p.money -= cost;
-        p.nextVehicle = null;
+    // Late game: an airbase for helicopters and bombers (built before spending on vehicles).
+    let airbase = this.buildings.find((b) => b.faction === i && b.type === 'airbase');
+    if (!airbase && workshop && !workshop.constructing && this.time > 180 && p.money >= 300) {
+      const tx = dir > 0 ? hq.tx + hq.wt + 12 : hq.tx - 17;
+      if (this.map.canPlace(tx, groundY, 4, 2, 'airbase')) {
+        p.money -= 300;
+        airbase = this.spawnBuilding('airbase', tx, groundY, i);
       }
     }
-    const saving = workshopIdle && Math.random() < 0.6;
+    const workshopIdle = workshop && !workshop.constructing && !workshop.trainCurrent && !workshop.queue.length;
+    const airbaseIdle = airbase && !airbase.constructing && !airbase.trainCurrent && !airbase.queue.length;
+    // Save for one big purchase at a time, alternating between factories.
+    if (!p.saveFor) {
+      const options = [workshopIdle && 'workshop', airbaseIdle && 'airbase'].filter(Boolean);
+      if (options.length) {
+        const which = options[Math.floor(Math.random() * options.length)];
+        p.saveFor = which === 'workshop'
+          ? { factory: workshop, unit: Math.random() < 0.45 ? 'tank' : Math.random() < 0.5 ? 'artillery' : 'jeep' }
+          : { factory: airbase, unit: Math.random() < 0.6 ? 'helicopter' : 'bomber' };
+      }
+    }
+    if (p.saveFor) {
+      const { factory, unit } = p.saveFor;
+      const cost = UNIT_TYPES[unit].cost;
+      if (factory.dead) p.saveFor = null;
+      else if (p.money >= cost && factory.queueTrain(unit)) {
+        p.money -= cost;
+        p.saveFor = null;
+      }
+    }
+    const saving = !!p.saveFor && Math.random() < 0.6;
 
     if (!saving && barracks && !barracks.constructing && barracks.queue.length < 2) {
       // Mix in heavier units as the match goes on.

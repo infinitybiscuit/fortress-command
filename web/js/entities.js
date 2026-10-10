@@ -1,6 +1,6 @@
 // Units, buildings and projectiles. Ported from godot/scripts/entities/*.gd.
 import {
-  TILE_SIZE, GRAVITY, TERMINAL_VELOCITY, UNIT_W, UNIT_H, UNIT_TYPES, BUILDING_TYPES,
+  WORLD_W, WORLD_H, MAP_H, TILE_SIZE, TILE_GROUND, TILE_BRIDGE, GRAVITY, TERMINAL_VELOCITY, UNIT_W, UNIT_H, UNIT_TYPES, BUILDING_TYPES,
   PROJECTILE_SPEED, PROJECTILE_RADIUS,
 } from './config.js';
 
@@ -27,10 +27,17 @@ export function distTo(x, y, e) {
 // Can `u` get a shot at `t`? Units can drop down to lower ground, but can't
 // climb to a target that's above their weapon range (e.g. a high platform).
 export function canReach(u, t) {
+  if (t.air && !canHitAir(u)) return false;
+  if (u.air) return !(u.def.shot === 'bomb' && t.air);
   const r = t.bounds();
   const [, cy] = u.centre();
   const gapAbove = cy - (r.y + r.h);
   return gapAbove <= u.range * 0.95;
+}
+
+// Only bullet-firing units (infantry, jeeps, helicopters) can shoot at aircraft.
+export function canHitAir(u) {
+  return u.kind === 'unit' && u.repairRate === 0 && (u.def.shot ?? 'bullet') === 'bullet';
 }
 
 export class Unit {
@@ -42,6 +49,8 @@ export class Unit {
     this.type = type;
     this.def = s;
     this.vehicle = !!s.vehicle;
+    this.air = !!s.air;
+    this.heading = faction === 0 ? 1 : -1; // bombers: direction of the current run
     this.w = s.w || UNIT_W;
     this.h = s.h || UNIT_H;
     this.faction = faction;
@@ -155,6 +164,7 @@ export class Unit {
       case State.ATTACKING: {
         const t = this.target;
         if (!t || t.dead) { this.finishTarget(); break; }
+        if (this.def.shot === 'bomb') { this.bombingRun(t); break; }
         const [cx, cy] = this.centre();
         if (scan) {
           if (!canReach(this, t)) { this.giveUp(t); break; }
@@ -202,7 +212,8 @@ export class Unit {
     if (this.vx !== 0) this.facing = Math.sign(this.vx);
     const wasMoving = this.state === State.MOVING;
     this.blockedBy = null;
-    this.applyPhysics(dt);
+    if (this.air) this.fly(dt);
+    else this.applyPhysics(dt);
 
     // Walked into an enemy wall: knock it down, then resume the order.
     const wall = this.blockedBy;
@@ -278,6 +289,45 @@ export class Unit {
     } else if (this.state === State.ATTACKING && this.target?.kind === 'building' && source.kind === 'unit') {
       this.engage(source, { target: this.target });
     }
+  }
+
+  // Bombers fly back-and-forth runs over the target, releasing a bomb each
+  // time they pass overhead with the bay reloaded.
+  bombingRun(t) {
+    const [tx] = t.centre();
+    const dx = tx - this.x;
+    if (Math.abs(dx) < 16 && this.cooldownTimer <= 0) {
+      this.cooldownTimer = this.cooldown;
+      this.game.dropBomb(this);
+    }
+    // Overshoot by a bit, then turn round for the next pass.
+    if (dx * this.heading < -140) this.heading = -this.heading;
+    else if (Math.abs(dx) > 140) this.heading = Math.sign(dx);
+    this.vx = this.heading * this.speed;
+  }
+
+  // Altitude this aircraft wants to hold right now (world y of its underside).
+  cruiseY() {
+    if (this.def.altitude) return this.def.altitude;
+    const t = this.state === State.ATTACKING ? this.target : null;
+    if (t) {
+      const r = t.bounds();
+      return t.air ? r.y + r.h : r.y - this.def.hover + this.h;
+    }
+    return this.cruise ?? this.y;
+  }
+
+  // Aircraft ignore gravity and terrain: slide horizontally, climb/descend
+  // toward cruise height. Freshly built aircraft take off from the pad.
+  fly(dt) {
+    this.x = Math.min(WORLD_W - this.w / 2, Math.max(this.w / 2, this.x + this.vx * dt));
+    if (this.cruise == null) this.cruise = this.def.altitude ?? Math.max(this.h + 40, this.y - 160);
+    const want = Math.max(this.h + 24, Math.min(this.cruiseY(), WORLD_H - 64));
+    const climb = 140 * dt;
+    this.y += Math.max(-climb, Math.min(climb, want - this.y));
+    if (this.state === State.ATTACKING) this.cruise = this.y; // keep fighting altitude afterwards
+    this.vy = 0;
+    this.onGround = false;
   }
 
   // Sub-step so fast units (or a long frame) can't tunnel through a 32px tile.
@@ -427,16 +477,20 @@ export class Building {
   scanAndAttack() {
     const [cx, cy] = this.centre();
     let best = null;
-    let bestD = this.def.range;
+    let bestScore = Infinity;
     for (const u of this.game.units) {
       if (u.dead || u.faction === this.faction) continue;
       const [ux, uy] = u.centre();
       const d = Math.hypot(ux - cx, uy - cy);
-      if (d < bestD) { bestD = d; best = u; }
+      const range = u.air ? this.def.airRange ?? this.def.range : this.def.range;
+      if (d > range) continue;
+      // Ground targets in range first; aircraft are engaged at long range.
+      const score = u.air ? d * 0.5 : d;
+      if (score < bestScore) { bestScore = score; best = u; }
     }
     if (best) {
       this.attackTimer = this.def.rate;
-      this.game.fireProjectile(this, best, this.def.damage);
+      this.game.fireProjectile(this, best, best.air ? this.def.airDamage ?? this.def.damage : this.def.damage);
     }
   }
 
@@ -486,14 +540,17 @@ export class Projectile {
     this.game = game;
     [this.x, this.y] = from;
     this.target = target;
-    [this.tx, this.ty] = target.centre();
+    [this.tx, this.ty] = target ? target.centre() : from;
     this.damage = damage;
     this.faction = faction;
     this.kind = opts.kind || 'bullet';
     this.splash = opts.splash || 0;
     this.vsBuildings = opts.vsBuildings || 1;
     this.shooter = opts.shooter || null;
-    this.radius = this.kind === 'bullet' ? PROJECTILE_RADIUS : 4.5;
+    this.radius = this.kind === 'bullet' ? PROJECTILE_RADIUS : this.kind === 'bomb' ? 5.5 : 4.5;
+    // Bombs: released with the bomber's forward speed, then fall.
+    this.vx = opts.vx || 0;
+    this.vy = 40;
     this.angle = 0;
     this.life = this.kind === 'lob' ? 8 : 4;
     this.done = false;
@@ -518,6 +575,22 @@ export class Projectile {
     }
     this.life -= dt;
     if (this.life <= 0) { this.done = true; return; }
+
+    if (this.kind === 'bomb') {
+      this.vy = Math.min(this.vy + GRAVITY * dt, 700);
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+      this.vx *= 1 - dt * 0.8;
+      this.angle = Math.atan2(this.vy, this.vx);
+      const g = this.game;
+      const hitThing = [...g.units, ...g.buildings].find((e) => !e.dead && !e.air
+        && e.faction !== this.faction && e.containsPoint(this.x, this.y, 2));
+      // Bombs drop through floating platforms; ground and bridges stop them.
+      const [tx, ty] = g.map.worldToTile(this.x, this.y);
+      const tile = g.map.get(tx, ty);
+      if (hitThing || tile === TILE_GROUND || tile === TILE_BRIDGE || ty >= MAP_H) this.impact(hitThing || null);
+      return;
+    }
 
     if (this.kind === 'lob') {
       this.t = Math.min(1, this.t + dt / this.flight);
@@ -587,12 +660,13 @@ export class Projectile {
       const g = this.game;
       for (const e of [...g.units, ...g.buildings]) {
         if (e === direct || e.dead || e.faction === this.faction) continue;
+        if (e.air) continue; // ground blasts don't reach aircraft
         const r = e.bounds();
         const cx = Math.max(r.x, Math.min(this.x, r.x + r.w));
         const cy = Math.max(r.y, Math.min(this.y, r.y + r.h));
         const d = Math.hypot(cx - this.x, cy - this.y);
         if (d > this.splash) continue;
-        this.hit(e, this.kind === 'lob' && d < 8 ? this.damage : this.damage * 0.5);
+        this.hit(e, (this.kind === 'lob' || this.kind === 'bomb') && d < 8 ? this.damage : this.damage * 0.5);
       }
       this.exploded = 0.3;
       return;

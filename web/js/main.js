@@ -382,7 +382,7 @@ function renderPanel() {
       const info = {
         hq: `Command centre. Earns +${BUILDING_TYPES.hq.income}/s. Lose it and you lose.`,
         mine: `Earns +${BUILDING_TYPES.mine.income}/s once built.`,
-        turret: 'Fires at enemy units in range automatically.',
+        turret: 'Fires at enemy units in range, and at aircraft from much further away.',
         wall: 'Blocks enemy units. Your troops walk through.',
         bridge: 'Walkable span. Extend it to cross gaps.',
         ramp: 'Units step up ramps automatically.',
@@ -404,7 +404,7 @@ function renderPanel() {
     const d = BUILDING_TYPES[t];
     return `<button class="tile-btn" data-build="${t}" ${money >= d.cost ? '' : 'disabled'}>
       <span class="ic">${BUILD_ICONS[t]}</span><span class="nm">${capitalize(t)}</span><span class="ct">💰${d.cost}</span></button>`;
-  }).join('')}<button class="tile-btn" data-act="all"><span class="ic">🎖️</span><span class="nm">All units</span><span class="ct" style="color:var(--dim)">select army</span></button></div>`;
+  }).join('')}</div>`;
 
   if (mode === 'units') {
     const counts = {};
@@ -426,7 +426,7 @@ function renderPanel() {
     return;
   }
 
-  panel.innerHTML = `<div class="panel-head"><div class="panel-title">Build</div><div class="panel-sub">Tap a structure, then the map</div></div>${buildGrid}`;
+  panel.innerHTML = `<div class="panel-head"><div class="panel-title">Build</div><div class="panel-sub">Tap one, then the map</div><button class="small-btn" data-act="all">🎖️ All units</button></div>${buildGrid}`;
 }
 
 panel.addEventListener('click', (e) => {

@@ -85,6 +85,7 @@ export function drawTerrain(ctx, map, view) {
 
 // ── Units ──────────────────────────────────────────────────────────────────
 export function drawUnit(ctx, u) {
+  if (u.air) { drawAircraft(ctx, u); return; }
   if (u.vehicle) { drawVehicle(ctx, u); return; }
   const f = u.faction;
   const w = UNIT_W;
@@ -283,6 +284,33 @@ const DETAIL = {
     rect(ctx, cx - 6, y + h - 18, 12, 10, 'rgba(199,161,0,0.82)');
     rect(ctx, cx - 6, y + h - 18, 12, 3, 'rgba(255,255,255,0.2)');
   },
+  airbase(ctx, b, pc, f) {
+    const { x, y, w, h } = b;
+    // Hangar with a curved roof and open bay
+    const hw = w * 0.58;
+    ctx.fillStyle = css(shade(f, 0.3));
+    ctx.beginPath();
+    ctx.moveTo(x, y + h * 0.55);
+    ctx.quadraticCurveTo(x + hw / 2, y - h * 0.25, x + hw, y + h * 0.55);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = css(tint(f, 0.35));
+    ctx.lineWidth = 1.5;
+    for (let i = 1; i < 4; i++) {
+      const rx = x + (hw * i) / 4;
+      line(ctx, rx, y + h * 0.15, rx, y + h * 0.55, css(tint(f, 0.2), 0.6), 1);
+    }
+    rect(ctx, x + hw * 0.18, y + h * 0.5, hw * 0.64, h * 0.42, 'rgba(0,0,0,0.5)');
+    // Control tower with a blinking beacon
+    const tx = x + w * 0.76;
+    rect(ctx, tx - 5, y - 18, 10, h * 0.6 + 18, css(shade(f, 0.38)));
+    rect(ctx, tx - 11, y - 28, 22, 12, '#9cc8ff');
+    rect(ctx, tx - 12, y - 30, 24, 3, css(tint(f, 0.3)));
+    if (Math.floor(performance.now() / 500) % 2) circle(ctx, tx, y - 33, 2.5, '#ff4d4d');
+    // Runway markings along the apron
+    rect(ctx, x, y + h - 7, w, 5, '#2a2a2a');
+    for (let i = 0; i < 6; i++) rect(ctx, x + 6 + i * (w / 6), y + h - 5, w / 12, 1.5, '#ffe28a');
+  },
   workshop(ctx, b, pc, f) {
     const { x, y, w, h } = b;
     const rh = 18;
@@ -380,6 +408,92 @@ function drawVehicle(ctx, u) {
   }
   if (u.hp < u.maxHp || u.selected) hpBar(ctx, x, y - 8, w, u.hp / u.maxHp);
 }
+
+// ── Aircraft ──────────────────────────────────────────────────────────────
+function drawAircraft(ctx, u) {
+  const f = u.faction;
+  const { w, h } = u;
+  const x = u.x - w / 2;
+  const y = u.y - h;
+
+  // Ground shadow so altitude reads at a glance.
+  const map = u.game.map;
+  const tx = Math.floor(u.x / TILE_SIZE);
+  let gy = Math.floor(u.y / TILE_SIZE);
+  while (gy < MAP_H && !map.isSolid(tx, gy)) gy++;
+  const groundY = gy * TILE_SIZE;
+  const fade = Math.max(0.08, 0.3 - (groundY - u.y) / 1500);
+  ctx.fillStyle = `rgba(0,0,0,${fade})`;
+  ctx.beginPath();
+  ctx.ellipse(u.x, groundY, w * 0.4, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(u.x, 0);
+  ctx.scale(u.facing, 1);
+  ctx.translate(-u.x, 0);
+  AIRCRAFT[u.type](ctx, u, x, y, w, h, f);
+  ctx.restore();
+
+  if (u.flash > 0) rect(ctx, x, y, w, h, 'rgba(255,255,255,0.6)');
+  if (u.selected) {
+    ctx.strokeStyle = '#00ff66';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - 3, y - 3, w + 6, h + 6);
+  }
+  if (u.hp < u.maxHp || u.selected) hpBar(ctx, x, y - 8, w, u.hp / u.maxHp);
+}
+
+const AIRCRAFT = {
+  // Drawn facing right; drawAircraft mirrors for left-facing units.
+  helicopter(ctx, u, x, y, w, h, f) {
+    const t = performance.now() / 1000;
+    // Tail boom + tail rotor
+    rect(ctx, x, y + h * 0.3, w * 0.45, 4, css(shade(f, 0.25)));
+    poly(ctx, [[x, y + h * 0.05], [x + 6, y + h * 0.3], [x, y + h * 0.5]], css(shade(f, 0.35)));
+    const tr = Math.sin(t * 40) * 5;
+    line(ctx, x + 2, y + h * 0.27 - tr, x + 2, y + h * 0.27 + tr, 'rgba(220,220,220,0.8)', 1.5);
+    // Cabin
+    ctx.fillStyle = css(PLAYER_COLORS[f]);
+    ctx.beginPath();
+    ctx.ellipse(x + w * 0.66, y + h * 0.5, w * 0.3, h * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(160,210,255,0.85)';
+    ctx.beginPath();
+    ctx.ellipse(x + w * 0.82, y + h * 0.42, w * 0.11, h * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Skids and gun pod
+    line(ctx, x + w * 0.45, y + h + 1, x + w * 0.9, y + h + 1, '#333', 2);
+    line(ctx, x + w * 0.55, y + h * 0.85, x + w * 0.55, y + h + 1, '#333', 1.5);
+    line(ctx, x + w * 0.8, y + h * 0.85, x + w * 0.8, y + h + 1, '#333', 1.5);
+    rect(ctx, x + w * 0.8, y + h * 0.72, w * 0.25, 3, '#2a2a2a');
+    // Main rotor (blur)
+    const span = w * 0.62 * Math.abs(Math.cos(t * 30));
+    rect(ctx, x + w * 0.64 - 1, y - 3, 2, 4, '#444');
+    line(ctx, x + w * 0.64 - span, y - 3, x + w * 0.64 + span, y - 3, 'rgba(230,230,230,0.85)', 2);
+    line(ctx, x + w * 0.64 - w * 0.62, y - 3, x + w * 0.64 + w * 0.62, y - 3, 'rgba(230,230,230,0.18)', 2);
+  },
+  bomber(ctx, u, x, y, w, h, f) {
+    const t = performance.now() / 1000;
+    // Tail fin
+    poly(ctx, [[x + 2, y + h * 0.5], [x + 8, y - 4], [x + 16, y - 4], [x + 18, y + h * 0.5]], css(shade(f, 0.3)));
+    // Fuselage
+    ctx.fillStyle = css(PLAYER_COLORS[f]);
+    ctx.beginPath();
+    ctx.roundRect(x, y + h * 0.3, w, h * 0.5, h * 0.25);
+    ctx.fill();
+    rect(ctx, x + 6, y + h * 0.3, w - 12, 2.5, css(tint(f, 0.4)));
+    // Cockpit glass + nose
+    rect(ctx, x + w * 0.78, y + h * 0.32, w * 0.12, h * 0.2, 'rgba(160,210,255,0.85)');
+    // Wing (side view) with engine + spinning prop
+    poly(ctx, [[x + w * 0.35, y + h * 0.55], [x + w * 0.62, y + h * 0.55], [x + w * 0.5, y + h * 1.05], [x + w * 0.32, y + h * 1.05]], css(shade(f, 0.25)));
+    rect(ctx, x + w * 0.52, y + h * 0.6, 10, 6, '#3a3a3a');
+    const pr = Math.abs(Math.sin(t * 45)) * 7;
+    line(ctx, x + w * 0.52 + 11, y + h * 0.63 - pr, x + w * 0.52 + 11, y + h * 0.63 + pr, 'rgba(220,220,220,0.8)', 1.5);
+    // Open bomb bay while reloading
+    if (u.cooldownTimer > u.cooldown - 0.4) rect(ctx, x + w * 0.4, y + h * 0.78, w * 0.14, 2, '#111');
+  },
+};
 
 function wheel(ctx, cx, cy, r, spin) {
   circle(ctx, cx, cy, r, '#1d1d1d');
