@@ -105,6 +105,8 @@ function wrapConnection(conn, peer) {
   conn.on('error', close);
   t.send = (obj) => { if (conn.open) conn.send(obj); };
   t.pc = conn.peerConnection;
+  // Bytes queued but not yet sent: lets the host skip updates for a slow link.
+  t.buffered = () => conn.dataChannel?.bufferedAmount ?? 0;
   t.close = () => {
     closed = true;
     try { conn.close(); } catch { /* already closed */ }
@@ -234,7 +236,9 @@ function fromBase64(str, out) {
   for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
 }
 
-export function encodeSnapshot(game, lastMapVersion) {
+// The terrain only goes out when it changes (or to a player who has just
+// (re)connected) — see encodeMap.
+export function encodeSnapshot(game) {
   const snap = {
     t: 'snap',
     time: r1(game.time),
@@ -247,9 +251,10 @@ export function encodeSnapshot(game, lastMapVersion) {
     pr: game.projectiles.map((p) => [p.id, SHOT_KINDS.indexOf(p.kind), r1(p.x), r1(p.y), r2(p.angle),
       r2(p.exploded), p.splash, p.radius]),
   };
-  if (game.map.version !== lastMapVersion) snap.map = toBase64(game.map.tiles);
   return snap;
 }
+
+export function encodeMap(game) { return toBase64(game.map.tiles); }
 
 // The guest's copy of the game: same shape as Game so the renderer and UI
 // work unchanged, but it never simulates — it eases toward the latest snapshot.

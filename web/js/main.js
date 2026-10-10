@@ -7,7 +7,7 @@ import { Game } from './game.js';
 import { canReach } from './entities.js';
 import { applyCommand, ref } from './commands.js';
 import {
-  hostRoom, joinRoom, makeRoomCode, connectionRoute, encodeSnapshot, createMirror, applySnapshot, SNAPSHOT_INTERVAL,
+  hostRoom, joinRoom, makeRoomCode, connectionRoute, encodeSnapshot, encodeMap, createMirror, applySnapshot, SNAPSHOT_INTERVAL,
 } from './net.js';
 import {
   drawBackground, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
@@ -121,16 +121,33 @@ function setStatus(text) { statusText = text; $('status').textContent = text; }
 // 'guest'. The host keeps one connection per guest in `peers`; a guest's only
 // connection is `host`. `slots` is the lobby: up to four seats, each
 // { kind: 'host' | 'human' | 'cpu' | 'open' | 'closed', name, ready }.
+//
+// Phones drop off networks all the time (a lift, a Wi-Fi/5G hand-over, the
+// screen locking), so a guest who vanishes mid-battle keeps their seat: the
+// host lists them in `away`, and their phone reconnects with its `token`.
 const net = {
-  role: null, room: null, code: '', phase: 'lobby', snapTimer: 0, mapVersion: -1, pingMs: null, route: null,
-  host: null, peers: [], slots: [], mySlot: 0, names: [],
+  role: null, room: null, code: '', phase: 'lobby', snapTimer: 0, pingMs: null, route: null,
+  host: null, peers: [], slots: [], mySlot: 0, names: [], away: [],
+  token: null, myName: '', reconnecting: false, lastHostMsg: 0,
 };
+const LINK_TIMEOUT = 8000; // ms of silence before a connection counts as dead
+const AWAY_GRACE = 45000;  // ms a dropped player's army waits before the CPU steps in
+const REJOIN_WINDOW = 60000; // ms a guest keeps trying to reconnect
+const SLOW_LINK = 64 * 1024; // queued bytes beyond which the host skips an update
+const SESSION_KEY = 'fortress-session';
+const HOST_WAIT = 'Waiting for the host…';
+const RECONNECTING = 'Connection lost — reconnecting…';
+const NET_STATUS = [HOST_WAIT, RECONNECTING];
 const online = () => net.role !== null;
 
 // Every player order goes through here: applied locally, or sent to the host
 // when we're a guest. Returns an error message (local only) or null.
 function issue(cmd) {
-  if (net.role === 'guest') { net.host.send({ t: 'cmd', cmd }); return null; }
+  if (net.role === 'guest') {
+    if (!net.host) return 'Reconnecting — try again in a moment';
+    net.host.send({ t: 'cmd', cmd });
+    return null;
+  }
   return applyCommand(game, active, cmd);
 }
 const ids = (list) => list.map((u) => u.id);
@@ -566,7 +583,7 @@ function renderHud() {
     : game.humanCount > 1 ? PLAYER_NAMES[active].toUpperCase() : 'YOU';
   chip.style.background = `rgba(${col},0.25)`;
   chip.style.color = `rgb(${col})`;
-  if (!pendingBuild && statusText && statusText !== 'Waiting for the host…') setStatus('');
+  if (!pendingBuild && statusText && !NET_STATUS.includes(statusText)) setStatus('');
 }
 
 // ── Game lifecycle ─────────────────────────────────────────────────────────
@@ -690,6 +707,10 @@ function openLobby(prefill = '') {
   lobbyView('home');
   $('join-code').value = prefill;
   try { $('player-name').value = localStorage.getItem(NAME_KEY) || ''; } catch { /* storage unavailable */ }
+  // The page reloaded mid-battle (iOS does this to background apps): offer the way back in.
+  const saved = savedSession();
+  $('btn-rejoin').classList.toggle('hidden', !saved);
+  if (saved) $('btn-rejoin').textContent = `Rejoin game ${saved.code}`;
 }
 
 // Seats that will play, in seat order. Their position is their faction.
@@ -795,17 +816,25 @@ function canStart() {
 
 function onGuestConnected(transport) {
   if (net.role !== 'host') { transport.close(); return; }
-  const peer = { transport, slot: -1, faction: -1, name: 'Player', pingMs: null };
+  const peer = { transport, slot: -1, faction: -1, name: 'Player', pingMs: null, token: null, lastSeen: performance.now(), mapVersion: -1 };
   net.peers.push(peer);
-  transport.on('message', (m) => onPeerMessage(peer, m));
+  transport.on('message', (m) => { peer.lastSeen = performance.now(); onPeerMessage(peer, m); });
   transport.on('close', () => dropPeer(peer));
 }
 
 // Turn a guest away with a reason, then hang up.
 function refuse(peer, msg) {
   peer.transport.send({ t: 'error', msg });
-  setTimeout(() => dropPeer(peer), 300);
+  setTimeout(() => dropPeer(peer, true), 300);
 }
+
+// Tell everyone (host included) something happened.
+function announce(text) {
+  toast(text, 'info');
+  broadcast({ t: 'msg', text });
+}
+
+const makeToken = () => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 
 function onPeerMessage(peer, m) {
   switch (m.t) {
@@ -814,11 +843,18 @@ function onPeerMessage(peer, m) {
         refuse(peer, `The host is on ${VERSION} but you're on ${m.v}. Close and reopen the app to update, then try again.`);
         break;
       }
+      // Coming back after a dropped connection: hand them their army again.
+      if (m.rejoin && net.phase === 'game' && game && !game.over) {
+        const seat = net.away.find((a) => a.token === m.rejoin) || net.peers.find((p) => p !== peer && p.token === m.rejoin);
+        if (seat) { rejoin(peer, seat); break; }
+      }
       if (net.phase !== 'lobby') { refuse(peer, 'That game has already started. Ask the host to go back to the lobby.'); break; }
       const slot = net.slots.findIndex((sl) => sl.kind === 'open');
       if (slot < 0) { refuse(peer, 'That room is full.'); break; }
       peer.slot = slot;
       peer.name = String(m.name || 'Player').slice(0, 12);
+      peer.token = makeToken();
+      peer.transport.send({ t: 'welcome', token: peer.token });
       net.slots[slot] = { kind: 'human', name: peer.name, ready: false };
       syncLobby();
       toast(`${peer.name} joined`, 'info');
@@ -838,29 +874,54 @@ function onPeerMessage(peer, m) {
       break;
     case 'ping': peer.transport.send({ t: 'pong', at: m.at }); break;
     case 'pong': peer.pingMs = Math.round(performance.now() - m.at); break;
-    case 'bye': dropPeer(peer); break;
+    case 'bye': dropPeer(peer, true); break;
     default: break;
   }
 }
 
-// A guest left (or was removed): free their seat, and mid-battle hand their
-// army to the CPU so the game carries on.
-function dropPeer(peer) {
+// seat: an `away` record, or a peer whose old link hasn't timed out yet.
+function rejoin(peer, seat) {
+  if (net.peers.includes(seat)) {
+    net.peers = net.peers.filter((p) => p !== seat);
+    seat.transport.close();
+  } else net.away = net.away.filter((a) => a !== seat);
+  Object.assign(peer, { token: seat.token, name: seat.name, slot: seat.slot, faction: seat.faction, mapVersion: -1 });
+  const p = game.players[peer.faction];
+  if (p.alive) p.isAi = false;
+  peer.transport.send({ t: 'welcome', token: peer.token });
+  peer.transport.send({ t: 'start', mode: game.mode, you: peer.faction, names: net.names, rejoin: true });
+  if (seat.since) announce(`${peer.name} reconnected`);
+}
+
+function cpuTakeover(faction, text) {
+  const p = game.players[faction];
+  if (!p?.alive) return;
+  p.isAi = true;
+  announce(text);
+  game.checkGameOver();
+}
+
+// A guest's connection ended. left: they chose to go (or were removed).
+// Mid-battle, someone who just dropped keeps their seat so they can
+// reconnect; anyone who left is replaced by the CPU straight away.
+function dropPeer(peer, left = false) {
   if (!net.peers.includes(peer)) return;
   net.peers = net.peers.filter((p) => p !== peer);
   peer.transport.close();
-  if (peer.slot >= 0) net.slots[peer.slot] = { kind: 'open' };
   if (net.phase === 'game' && game && !game.over && peer.faction >= 0) {
-    const p = game.players[peer.faction];
-    if (p.alive) {
-      p.isAi = true;
-      const text = `${peer.name} left — the CPU takes over ${PLAYER_NAMES[peer.faction]}`;
-      toast(text, 'info');
-      broadcast({ t: 'msg', text });
-      game.checkGameOver();
+    if (left) {
+      net.slots[peer.slot] = { kind: 'open' };
+      cpuTakeover(peer.faction, `${peer.name} left — the CPU takes over ${PLAYER_NAMES[peer.faction]}`);
+    } else {
+      net.away.push({ token: peer.token, name: peer.name, slot: peer.slot, faction: peer.faction, since: performance.now() });
+      announce(`${peer.name} lost connection — reconnecting…`);
     }
+    return;
   }
-  if (peer.slot >= 0) syncLobby();
+  if (peer.slot >= 0) {
+    net.slots[peer.slot] = { kind: 'open' };
+    syncLobby();
+  }
 }
 
 function startOnlineGame() {
@@ -872,14 +933,31 @@ function startOnlineGame() {
     players: players.map((sl, i) => [layout.hqs[i], sl.kind === 'cpu']),
   };
   net.names = players.map((sl) => (sl.kind === 'cpu' ? 'CPU' : sl.name));
-  for (const p of net.peers) p.faction = players.findIndex((sl) => sl.slot === p.slot);
-  Object.assign(net, { phase: 'game', mapVersion: -1, snapTimer: 0 });
+  for (const p of net.peers) Object.assign(p, { faction: players.findIndex((sl) => sl.slot === p.slot), mapVersion: -1 });
+  Object.assign(net, { phase: 'game', snapTimer: 0, away: [] });
   startGame('online', { mode, you: 0 });
   for (const p of net.peers) p.transport.send({ t: 'start', mode, you: p.faction, names: net.names });
 }
 
+// One update to every guest. A guest whose link is backed up misses this one
+// rather than queueing more behind it; anyone missing the terrain gets it.
+function sendSnapshots() {
+  const snap = encodeSnapshot(game);
+  let map = null;
+  for (const p of net.peers) {
+    if (p.faction < 0 || (p.transport.buffered?.() ?? 0) > SLOW_LINK) continue;
+    if (p.mapVersion !== game.map.version) {
+      map ??= encodeMap(game);
+      p.transport.send({ ...snap, map });
+      p.mapVersion = game.map.version;
+    } else p.transport.send(snap);
+  }
+}
+
 function backToLobby() {
   net.phase = 'lobby';
+  for (const a of net.away) net.slots[a.slot] = { kind: 'open' };
+  net.away = [];
   for (const sl of net.slots) if (sl.kind === 'human') sl.ready = false;
   for (const p of net.peers) p.faction = -1;
   game = null;
@@ -890,19 +968,42 @@ function backToLobby() {
 }
 
 // ── Guest side ──
-async function joinOnline() {
+function savedSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+    return s && Date.now() - s.at < 15 * 60 * 1000 ? s : null;
+  } catch { return null; }
+}
+function saveSession(clear = false) {
+  try {
+    if (clear) localStorage.removeItem(SESSION_KEY);
+    else localStorage.setItem(SESSION_KEY, JSON.stringify({ code: net.code, token: net.token, at: Date.now() }));
+  } catch { /* storage unavailable */ }
+}
+
+function attachHost(transport) {
+  Object.assign(net, { role: 'guest', host: transport, lastHostMsg: performance.now() });
+  transport.on('message', (m) => {
+    if (net.host !== transport) return;
+    net.lastHostMsg = performance.now();
+    onHostMessage(m);
+  });
+  transport.on('close', () => { if (net.host === transport) onHostLost(); });
+}
+
+// rejoinToken: reclaim a seat in a game already under way (after a reload).
+async function joinOnline(rejoinToken = null) {
   const code = $('join-code').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length !== 5) { lobbyView('home'); $('join-code').focus(); return; }
   const name = playerName();
-  net.code = code;
+  Object.assign(net, { code, myName: name, token: rejoinToken });
   lobbyView('wait', `Connecting to room ${code}…`);
   try {
     const transport = await joinRoom(code);
-    Object.assign(net, { role: 'guest', host: transport, phase: 'lobby' });
-    transport.on('message', onHostMessage);
-    transport.on('close', () => onHostLost());
-    transport.send({ t: 'hello', v: VERSION, name });
-    lobbyView('wait', 'Connected — joining the lobby…');
+    net.phase = 'lobby';
+    attachHost(transport);
+    transport.send({ t: 'hello', v: VERSION, name, rejoin: rejoinToken || undefined });
+    lobbyView('wait', rejoinToken ? 'Connected — rejoining…' : 'Connected — joining the lobby…');
   } catch (e) {
     lobbyView('wait', e.message);
   }
@@ -910,9 +1011,13 @@ async function joinOnline() {
 
 function onHostMessage(m) {
   switch (m.t) {
+    case 'welcome':
+      net.token = m.token;
+      saveSession();
+      break;
     case 'lobby': {
       const fromGame = net.phase !== 'lobby' || $('online-lobby').classList.contains('hidden');
-      Object.assign(net, { slots: m.slots, mySlot: m.you, phase: 'lobby' });
+      Object.assign(net, { slots: m.slots, mySlot: m.you, phase: 'lobby', reconnecting: false });
       if (fromGame) {
         game = null;
         paused = true;
@@ -921,11 +1026,17 @@ function onHostMessage(m) {
       } else renderLobby();
       break;
     }
-    case 'start':
+    case 'start': {
+      // Back after a dropped connection: carry on from the same view.
+      const keep = m.rejoin && game?.mirror && !game.over ? { x: cam.x, y: cam.y, zoom: cam.zoom } : null;
       net.phase = 'game';
+      net.reconnecting = false;
       net.names = m.names || [];
       startGame('online', { mode: m.mode, mirror: true, you: m.you });
+      if (keep) { Object.assign(cam, keep); clampCam(); }
+      if (m.rejoin) { setStatus(''); toast('Reconnected', 'info'); }
       break;
+    }
     case 'snap':
       if (game?.mirror) applySnapshot(game, m);
       break;
@@ -936,44 +1047,80 @@ function onHostMessage(m) {
       if (game) setTimeout(() => gameOver(m.winner), 400);
       break;
     case 'error':
-      leaveOnline();
-      showOverlay('overlay-online');
-      lobbyView('wait', m.msg);
+      hostGone(m.msg);
       break;
     case 'ping': net.host.send({ t: 'pong', at: m.at }); break;
     case 'pong': net.pingMs = Math.round(performance.now() - m.at); break;
-    case 'bye': onHostLost('left'); break;
+    case 'bye': hostGone(net.phase === 'game' && game && !game.over ? 'The host left the game.' : 'The host closed the room.'); break;
     default: break;
   }
 }
 
-function onHostLost(reason) {
+// The link to the host dropped without a goodbye. Mid-battle, try to get
+// back in; otherwise there's nothing to rejoin.
+function onHostLost() {
   if (net.role !== 'guest') return;
+  if (net.phase === 'game' && game && !game.over && net.token) reconnect();
+  else hostGone('The connection to the host was lost.');
+}
+
+async function reconnect() {
+  if (net.reconnecting) return;
+  net.reconnecting = true;
+  const old = net.host;
+  net.host = null;
+  old?.close();
+  setStatus(RECONNECTING);
+  const until = performance.now() + REJOIN_WINDOW;
+  while (net.role === 'guest' && net.reconnecting && performance.now() < until) {
+    try {
+      const transport = await joinRoom(net.code);
+      if (net.role !== 'guest' || !net.reconnecting) { transport.close(); return; }
+      attachHost(transport);
+      transport.send({ t: 'hello', v: VERSION, name: net.myName, rejoin: net.token });
+      return; // the host's 'start' completes it
+    } catch {
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+  if (net.role === 'guest' && net.reconnecting) hostGone("Couldn't reconnect to the host.");
+}
+
+// The session is over for this guest: say why.
+function hostGone(text) {
   const inGame = net.phase === 'game' && game && !game.over;
-  resetNet();
+  saveSession(true);
+  leaveOnline(false);
   if (!inGame) {
     showOverlay('overlay-online');
-    lobbyView('wait', reason === 'left' ? 'The host closed the room.' : 'The connection to the host was lost.');
+    lobbyView('wait', text);
     return;
   }
+  setStatus('');
   paused = true;
   game.over = true;
   $('result-label').textContent = 'DISCONNECTED';
   $('result-label').style.color = 'var(--dim)';
-  $('result-sub').textContent = reason === 'left' ? 'The host left the game.' : 'The connection to the host was lost.';
+  $('result-sub').textContent = text;
   $('btn-again').classList.add('hidden');
   showOverlay('overlay-gameover');
 }
 
 function resetNet() {
   net.room?.cancel?.();
-  Object.assign(net, { role: null, host: null, room: null, peers: [], slots: [], phase: 'lobby', pingMs: null, route: null });
+  Object.assign(net, {
+    role: null, host: null, room: null, peers: [], slots: [], away: [], phase: 'lobby',
+    pingMs: null, route: null, reconnecting: false, token: null,
+  });
 }
 
-function leaveOnline() {
+// sayBye: tell the other side we're going on purpose (so they don't wait for
+// us to reconnect).
+function leaveOnline(sayBye = true) {
   const links = net.role === 'host' ? net.peers.map((p) => p.transport) : net.host ? [net.host] : [];
+  if (net.role === 'guest' && sayBye) saveSession(true);
   for (const t of links) {
-    t.send({ t: 'bye' });
+    if (sayBye) t.send({ t: 'bye' });
     setTimeout(() => t.close(), 100);
   }
   // Give the goodbyes a moment to go out before the host's room shuts.
@@ -981,6 +1128,52 @@ function leaveOnline() {
   net.room = null;
   if (room) setTimeout(() => room.cancel?.(), 200);
   resetNet();
+}
+
+// Connection watchdog, once a second. A phone that was in the background
+// (timers frozen) gets a few seconds' grace instead of being written off.
+let lastWatch = performance.now();
+setInterval(() => {
+  const now = performance.now();
+  const resumed = now - lastWatch > 3000;
+  lastWatch = now;
+  if (net.role === 'host') {
+    for (const p of [...net.peers]) {
+      if (resumed) p.lastSeen = Math.max(p.lastSeen, now - LINK_TIMEOUT + 4000);
+      else if (now - p.lastSeen > LINK_TIMEOUT) dropPeer(p);
+    }
+    if (net.phase === 'game' && game && !game.over) {
+      for (const a of net.away) {
+        if (a.cpu || now - a.since < AWAY_GRACE) continue;
+        a.cpu = true;
+        cpuTakeover(a.faction, `${a.name} hasn't reconnected — the CPU takes over ${PLAYER_NAMES[a.faction]} until they're back`);
+      }
+    }
+  } else if (net.role === 'guest' && net.host && !net.reconnecting) {
+    if (resumed) {
+      net.lastHostMsg = Math.max(net.lastHostMsg, now - LINK_TIMEOUT + 3000);
+      net.host.send({ t: 'ping', at: now });
+    } else if (now - net.lastHostMsg > LINK_TIMEOUT) onHostLost();
+  }
+  keepAwake(online() && !!game && !game.over);
+}, 1000);
+
+// Stop the screen auto-locking mid-battle — locking drops the connection.
+let wakeLock = null;
+let wakePending = false;
+async function keepAwake(on) {
+  if (!('wakeLock' in navigator) || wakePending) return;
+  try {
+    wakePending = true;
+    if (on && !wakeLock && !document.hidden) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) {
+      const l = wakeLock;
+      wakeLock = null;
+      await l.release();
+    }
+  } catch { /* not allowed right now */ } finally { wakePending = false; }
 }
 
 async function shareInvite() {
@@ -996,7 +1189,13 @@ async function shareInvite() {
 }
 
 $('btn-host').addEventListener('click', hostOnline);
-$('btn-join').addEventListener('click', joinOnline);
+$('btn-join').addEventListener('click', () => joinOnline());
+$('btn-rejoin').addEventListener('click', () => {
+  const saved = savedSession();
+  if (!saved) return;
+  $('join-code').value = saved.code;
+  joinOnline(saved.token);
+});
 $('join-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinOnline(); });
 $('btn-share').addEventListener('click', shareInvite);
 $('btn-online-back').addEventListener('click', () => showOverlay('overlay-title'));
@@ -1004,7 +1203,7 @@ $('btn-online-cancel').addEventListener('click', () => { leaveOnline(); lobbyVie
 $('btn-lobby-leave').addEventListener('click', () => { leaveOnline(); lobbyView('home'); });
 $('btn-lobby-main').addEventListener('click', () => {
   if (net.role === 'host') startOnlineGame();
-  else if (net.role === 'guest') net.host.send({ t: 'ready', ready: !net.slots[net.mySlot]?.ready });
+  else if (net.role === 'guest') net.host?.send({ t: 'ready', ready: !net.slots[net.mySlot]?.ready });
 });
 
 $('btn-pause').addEventListener('click', () => {
@@ -1038,16 +1237,19 @@ document.addEventListener('visibilitychange', () => {
 // Online heartbeat: measure latency, shown next to the mode label (the host
 // shows its slowest guest).
 setInterval(() => {
-  if (!online() || !game) return;
+  if (!online()) return;
   const now = performance.now();
   if (net.role === 'guest') {
+    if (!net.host) return;
     net.host.send({ t: 'ping', at: now });
-    if (!net.route) connectionRoute(net.host).then((r) => { if (net.host) net.route = r; });
+    const h = net.host;
+    if (!net.route) connectionRoute(h).then((r) => { if (net.host === h) net.route = r; });
   } else {
     for (const p of net.peers) p.transport.send({ t: 'ping', at: now });
     const pings = net.peers.map((p) => p.pingMs).filter((v) => v != null);
     net.pingMs = pings.length ? Math.max(...pings) : null;
   }
+  if (!game) return;
   $('mode-label').textContent = `${game.mode.label}${net.pingMs != null ? ` · ${net.pingMs} ms` : ''}${net.route ? ` · ${net.route}` : ''}`;
 }, 2000);
 
@@ -1065,8 +1267,7 @@ function frame(now) {
       net.snapTimer -= dt;
       if (net.snapTimer <= 0) {
         net.snapTimer = SNAPSHOT_INTERVAL;
-        broadcast(encodeSnapshot(game, net.mapVersion));
-        net.mapVersion = game.map.version;
+        sendSnapshots();
       }
     }
     // Knocked out of a multiplayer game that's still going: keep watching.
@@ -1076,8 +1277,9 @@ function frame(now) {
     }
     if (game.mirror && !game.over) {
       const stale = performance.now() - game.lastSnapshotAt > 2000;
-      if (stale) setStatus('Waiting for the host…');
-      else if (statusText === 'Waiting for the host…') setStatus('');
+      if (net.reconnecting) setStatus(RECONNECTING);
+      else if (stale) setStatus(HOST_WAIT);
+      else if (NET_STATUS.includes(statusText)) setStatus('');
     }
 
     // Keyboard pan + pan inertia
@@ -1172,7 +1374,7 @@ function draw(dt) {
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 // Read-only handle for automated browser tests.
-window.__fortress = { get game() { return game; }, cam };
+window.__fortress = { get game() { return game; }, cam, net };
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 buildModeButtons();
