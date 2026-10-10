@@ -537,6 +537,7 @@ export class Building {
 // 'lob' (arcs to the spot the target was at when fired, splash on landing).
 export class Projectile {
   constructor(game, from, target, damage, faction, opts = {}) {
+    this.id = nextId++;
     this.game = game;
     [this.x, this.y] = from;
     this.target = target;

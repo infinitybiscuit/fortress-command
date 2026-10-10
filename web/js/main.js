@@ -4,7 +4,11 @@ import {
   UNIT_ICONS, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize,
 } from './config.js';
 import { Game } from './game.js';
-import { State, canReach } from './entities.js';
+import { canReach } from './entities.js';
+import { applyCommand, ref } from './commands.js';
+import {
+  hostRoom, joinRoom, makeRoomCode, encodeSnapshot, createMirror, applySnapshot, SNAPSHOT_INTERVAL,
+} from './net.js';
 import {
   drawSky, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap,
 } from './render.js';
@@ -94,8 +98,18 @@ function toast(text, kind = 'error') {
 }
 function setStatus(text) { statusText = text; $('status').textContent = text; }
 
-// A fresh player order cancels Hold and Retreat stances.
-function order(u) { u.hold = false; u.forced = false; return u; }
+// ── Online session ─────────────────────────────────────────────────────────
+// role: null offline, 'host' (runs the game, plays Blue) or 'guest' (Red).
+const net = { role: null, transport: null, room: null, code: '', snapTimer: 0, mapVersion: -1, pingMs: null };
+const online = () => net.role !== null;
+
+// Every player order goes through here: applied locally, or sent to the host
+// when we're the guest. Returns an error message (local only) or null.
+function issue(cmd) {
+  if (net.role === 'guest') { net.transport.send({ t: 'cmd', cmd }); return null; }
+  return applyCommand(game, active, cmd);
+}
+const ids = (list) => list.map((u) => u.id);
 
 // ── Selection helpers ──────────────────────────────────────────────────────
 const selectedUnits = () => (game ? game.units.filter((u) => u.selected && u.faction === active) : []);
@@ -160,7 +174,7 @@ function handleTap(sx, sy) {
   const target = enemyUnit || enemyBuilding;
   if (target && sel.length) {
     if (!sel.some((u) => canReach(u, target))) { toast("Can't reach that — it's too high up"); return; }
-    for (const u of sel) order(u).attack(target);
+    issue({ c: 'attack', ids: ids(sel), target: ref(target) });
     markers.push({ x: target.centre()[0], y: target.centre()[1], t: 0.6, color: '#ff4d4d' });
     return;
   }
@@ -168,7 +182,7 @@ function handleTap(sx, sy) {
   const ownUnit = pickUnit(wx, wy, mine);
   const repairers = sel.filter((u) => u.repairRate > 0 && u !== ownUnit);
   if (ownUnit?.vehicle && ownUnit.hp < ownUnit.maxHp && repairers.length) {
-    for (const u of repairers) order(u).attack(ownUnit);
+    issue({ c: 'repair', ids: ids(repairers), target: ref(ownUnit) });
     toast('Repairing', 'info');
     return;
   }
@@ -190,7 +204,7 @@ function handleTap(sx, sy) {
   if (ownBuilding) {
     const engineers = sel.filter((u) => u.repairRate > 0);
     if (engineers.length && ownBuilding.hp < ownBuilding.maxHp) {
-      for (const u of engineers) order(u).attack(ownBuilding);
+      issue({ c: 'repair', ids: ids(engineers), target: ref(ownBuilding) });
       toast('Repairing', 'info');
       return;
     }
@@ -199,7 +213,7 @@ function handleTap(sx, sy) {
   }
 
   if (sel.length) {
-    for (const u of sel) order(u).moveTo(wx + (Math.random() - 0.5) * Math.min(60, sel.length * 6));
+    issue({ c: 'move', ids: ids(sel), x: wx });
     markers.push({ x: wx, y: wy, t: 0.6, color: '#00ff66' });
     return;
   }
@@ -208,14 +222,18 @@ function handleTap(sx, sy) {
 
 function confirmPlacement() {
   if (!ghost || !pendingBuild) return;
-  const err = game.tryPlaceAt(active, pendingBuild, ghost.tx, ghost.ty);
+  if (game.players[active].money < BUILDING_TYPES[pendingBuild].cost) { toast('Not enough credits!'); return; }
+  if (!game.placementAt(pendingBuild, ghost.tx, ghost.ty).valid) { toast("Can't place here!"); return; }
+  const err = issue({ c: 'place', type: pendingBuild, tx: ghost.tx, ty: ghost.ty });
   if (err) { toast(err); return; }
   toast(`${capitalize(pendingBuild)} placed`, 'info');
   // Bridges and ramps are usually laid in runs — stay in placement mode,
   // previewing the next tile along.
   if (pendingBuild === 'bridge' || pendingBuild === 'ramp') {
     ghost = game.placementAt(pendingBuild, ghost.tx + 1, ghost.ty);
-    if (game.players[active].money < BUILDING_TYPES[pendingBuild].cost) cancelPlacement();
+    // Online guests see their spend a moment later, so count it now.
+    const spent = net.role === 'guest' ? BUILDING_TYPES[pendingBuild].cost : 0;
+    if (game.players[active].money - spent < BUILDING_TYPES[pendingBuild].cost) cancelPlacement();
   } else {
     cancelPlacement();
   }
@@ -441,8 +459,10 @@ panel.addEventListener('click', (e) => {
     ghost = null;
     setStatus(`Tap to place ${capitalize(t)}`);
   } else if (btn.dataset.train) {
-    if (selectedBuilding && game.train(active, selectedBuilding, btn.dataset.train)) {
-      toast(`${capitalize(btn.dataset.train)} queued`, 'info');
+    const t = btn.dataset.train;
+    if (selectedBuilding && p.money >= UNIT_TYPES[t].cost) {
+      const err = issue({ c: 'train', id: selectedBuilding.id, type: t });
+      if (!err) toast(`${capitalize(t)} queued`, 'info');
     }
   } else {
     const sel = selectedUnits();
@@ -457,7 +477,8 @@ panel.addEventListener('click', (e) => {
         if (sellArmed?.id === b.id && performance.now() < sellArmed.until) {
           sellArmed = null;
           const name = capitalize(b.type);
-          const refund = game.sell(active, b);
+          const refund = game.sellValue(b);
+          issue({ c: 'sell', id: b.id });
           clearSelection();
           toast(`${name} sold · +💰${refund}`, 'info');
         } else {
@@ -472,26 +493,16 @@ panel.addEventListener('click', (e) => {
         break;
       }
       case 'stop':
-        // Hold: stay put, but still fire at anything that comes into range.
-        for (const u of sel) {
-          order(u).hold = true;
-          Object.assign(u, { state: State.IDLE, target: null, resume: null, home: null, vx: 0 });
-        }
+        issue({ c: 'hold', ids: ids(sel) });
         toast('Holding position', 'info');
         break;
-      case 'charge': {
-        // Advance toward the nearest enemy HQ.
-        const enemies = game.players.filter((o, i) => i !== active && o.hq).map((o) => o.hq);
-        if (!enemies.length || !sel.length) break;
-        const ax = sel.reduce((s, u) => s + u.x, 0) / sel.length;
-        enemies.sort((a, b) => Math.abs(a.centre()[0] - ax) - Math.abs(b.centre()[0] - ax));
-        for (const u of sel) order(u).attack(enemies[0]);
+      case 'charge':
+        if (!sel.length) break;
+        issue({ c: 'charge', ids: ids(sel) });
         toast('Charge!', 'info');
         break;
-      }
       case 'retreat':
-        // Retreat ignores enemies on the way home.
-        if (hq) for (const u of sel) { order(u).moveTo(hq.centre()[0] + (Math.random() - 0.5) * 80); u.forced = true; }
+        if (hq) issue({ c: 'retreat', ids: ids(sel) });
         break;
       case 'find': {
         if (!sel.length) break;
@@ -516,30 +527,43 @@ function renderHud() {
   $('income').textContent = `+${p.income}/s`;
   const chip = $('player-chip');
   const col = PLAYER_COLORS[active].map((v) => Math.round(v * 255)).join(',');
-  chip.textContent = game.humanCount > 1 ? PLAYER_NAMES[active].toUpperCase() : 'YOU';
+  chip.textContent = online() ? `YOU · ${PLAYER_NAMES[active].toUpperCase()}`
+    : game.humanCount > 1 ? PLAYER_NAMES[active].toUpperCase() : 'YOU';
   chip.style.background = `rgba(${col},0.25)`;
   chip.style.color = `rgb(${col})`;
-  if (!pendingBuild && statusText) setStatus('');
+  if (!pendingBuild && statusText && statusText !== 'Waiting for the host…') setStatus('');
 }
 
 // ── Game lifecycle ─────────────────────────────────────────────────────────
 function showOverlay(id) {
-  for (const o of ['overlay-title', 'overlay-pause', 'overlay-gameover']) $(o).classList.toggle('hidden', o !== id);
+  for (const o of ['overlay-title', 'overlay-online', 'overlay-pause', 'overlay-gameover']) $(o).classList.toggle('hidden', o !== id);
 }
 
-function startGame(key) {
+function startGame(key, opts = {}) {
   modeKey = key;
-  game = new Game(key, {
-    onGameOver: (winner) => setTimeout(() => gameOver(winner), 600),
-    onMessage: (m) => toast(m, 'info'),
-  });
-  active = 0;
+  if (opts.mirror) {
+    game = createMirror(key);
+  } else {
+    game = new Game(key, {
+      onGameOver: (winner) => {
+        if (net.role === 'host') net.transport.send({ t: 'over', winner });
+        setTimeout(() => gameOver(winner), 600);
+      },
+      onMessage: (m) => {
+        toast(m, 'info');
+        if (net.role === 'host') net.transport.send({ t: 'msg', text: m });
+      },
+    });
+  }
+  active = net.role === 'guest' ? 1 : 0;
   selectedBuilding = null;
   cancelPlacement();
   markers = [];
   panelKey = '';
   $('mode-label').textContent = MODES[key].label;
-  $('btn-switch').classList.toggle('hidden', game.humanCount < 2);
+  $('btn-switch').classList.toggle('hidden', game.humanCount < 2 || online());
+  $('btn-restart').classList.toggle('hidden', online());
+  $('btn-quit').textContent = online() ? 'Leave game' : 'Main Menu';
   showOverlay(null);
   paused = false;
   resize();
@@ -549,14 +573,32 @@ function startGame(key) {
 
 function focusHq() {
   const hq = game.players[active].hq;
-  if (hq) centreOn(hq.x + hq.w / 2 + view().w * 0.25, null);
+  if (!hq) return;
+  // Look out from the HQ toward the middle of the map.
+  const towardRight = hq.x < WORLD_W / 2;
+  centreOn(hq.x + hq.w / 2 + (towardRight ? 1 : -1) * view().w * 0.25, null);
 }
 
 function gameOver(winner) {
   paused = true;
+  game.over = true;
   const label = $('result-label');
   const sub = $('result-sub');
-  if (game.humanCount > 1) {
+  const again = $('btn-again');
+  again.classList.remove('hidden');
+  again.textContent = 'Restart';
+  if (online()) {
+    const won = winner === active;
+    label.textContent = won ? 'VICTORY' : 'DEFEAT';
+    label.style.color = won ? 'var(--good)' : 'var(--danger)';
+    if (net.role === 'host') {
+      sub.textContent = won ? `Battle won in ${formatTime(game.time)}.` : 'Your HQ was destroyed.';
+      again.textContent = 'Rematch';
+    } else {
+      sub.textContent = `${won ? `Battle won in ${formatTime(game.time)}.` : 'Your HQ was destroyed.'} Waiting for the host to start a rematch…`;
+      again.classList.add('hidden');
+    }
+  } else if (game.humanCount > 1) {
     label.textContent = winner >= 0 ? `${PLAYER_NAMES[winner].toUpperCase()} WINS` : 'DRAW';
     label.style.color = winner >= 0 ? `rgb(${PLAYER_COLORS[winner].map((v) => v * 255).join(',')})` : '#fff';
     sub.textContent = 'Every rival HQ has fallen.';
@@ -579,16 +621,183 @@ function buildModeButtons() {
   wrap.innerHTML = Object.entries(MODES).map(([k, m]) => `<button class="menu-btn" data-mode="${k}">${m.label}</button>`).join('');
   wrap.addEventListener('click', (e) => {
     const b = e.target.closest('[data-mode]');
-    if (b) startGame(b.dataset.mode);
+    if (!b) return;
+    if (MODES[b.dataset.mode].online) openLobby();
+    else startGame(b.dataset.mode);
   });
 }
 
-$('btn-pause').addEventListener('click', () => { if (game && !game.over) { paused = true; showOverlay('overlay-pause'); } });
+// ── Online lobby & session ─────────────────────────────────────────────────
+function lobbyView(which, status = '', code = '') {
+  $('online-home').classList.toggle('hidden', which !== 'home');
+  $('online-wait').classList.toggle('hidden', which !== 'wait');
+  $('online-status').textContent = status;
+  $('room-code').textContent = code;
+  $('btn-share').classList.toggle('hidden', !code);
+}
+
+function openLobby(prefill = '') {
+  leaveOnline();
+  showOverlay('overlay-online');
+  lobbyView('home');
+  $('join-code').value = prefill;
+}
+
+async function hostOnline() {
+  lobbyView('wait', 'Opening a room…');
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const code = makeRoomCode();
+    try {
+      net.code = code;
+      net.room = await hostRoom(code, onHostConnected);
+      lobbyView('wait', 'Waiting for your opponent. Share this room code with them:', code);
+      return;
+    } catch (e) {
+      if (attempt === 2 || !/taken/.test(e.message)) { lobbyView('wait', e.message); return; }
+    }
+  }
+}
+
+function onHostConnected(transport) {
+  net.role = 'host';
+  net.transport = transport;
+  transport.on('message', onNetMessage);
+  transport.on('close', () => onDisconnect());
+  lobbyView('wait', 'Opponent found — starting…', net.code);
+}
+
+async function joinOnline() {
+  const code = $('join-code').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length !== 5) { lobbyView('home'); $('join-code').focus(); return; }
+  net.code = code;
+  lobbyView('wait', `Connecting to room ${code}…`);
+  try {
+    const transport = await joinRoom(code);
+    net.role = 'guest';
+    net.transport = transport;
+    transport.on('message', onNetMessage);
+    transport.on('close', () => onDisconnect());
+    transport.send({ t: 'hello', v: VERSION });
+    lobbyView('wait', 'Connected — waiting for the host to start…');
+  } catch (e) {
+    lobbyView('wait', e.message);
+  }
+}
+
+function startHostedGame() {
+  net.mapVersion = -1;
+  net.snapTimer = 0;
+  startGame('online');
+  net.transport.send({ t: 'start' });
+}
+
+function onNetMessage(m) {
+  switch (m.t) {
+    case 'hello':
+      if (net.role !== 'host') break;
+      if (m.v !== VERSION) {
+        net.transport.send({ t: 'error', msg: `The host is on ${VERSION} but you're on ${m.v}. Close and reopen the app on both phones to update, then try again.` });
+        lobbyView('wait', `Your opponent is on a different version (${m.v}). Ask them to close and reopen the app.`);
+        setTimeout(() => leaveOnline(), 500);
+        break;
+      }
+      startHostedGame();
+      break;
+    case 'start':
+      if (net.role === 'guest') startGame('online', { mirror: true });
+      break;
+    case 'snap':
+      if (net.role === 'guest' && game?.mirror) applySnapshot(game, m);
+      break;
+    case 'cmd':
+      if (net.role === 'host' && game && !game.over) {
+        const err = applyCommand(game, 1, m.cmd);
+        if (err) net.transport.send({ t: 'msg', text: err, error: true });
+      }
+      break;
+    case 'msg':
+      toast(m.text, m.error ? 'error' : 'info');
+      break;
+    case 'over':
+      if (net.role === 'guest' && game) setTimeout(() => gameOver(m.winner), 400);
+      break;
+    case 'error':
+      lobbyView('wait', m.msg);
+      break;
+    case 'ping':
+      net.transport.send({ t: 'pong', at: m.at });
+      break;
+    case 'pong':
+      net.pingMs = Math.round(performance.now() - m.at);
+      break;
+    case 'bye':
+      onDisconnect('left');
+      break;
+    default:
+      break;
+  }
+}
+
+function onDisconnect(reason) {
+  if (!net.role) return;
+  const inGame = game && $('overlay-title').classList.contains('hidden') && $('overlay-online').classList.contains('hidden');
+  resetNet();
+  if (!inGame) { lobbyView('wait', 'The connection was lost.'); return; }
+  paused = true;
+  if (game) game.over = true;
+  $('result-label').textContent = 'DISCONNECTED';
+  $('result-label').style.color = 'var(--dim)';
+  $('result-sub').textContent = reason === 'left' ? 'Your opponent left the game.' : 'The connection to your opponent was lost.';
+  $('btn-again').classList.add('hidden');
+  showOverlay('overlay-gameover');
+}
+
+function resetNet() {
+  net.room?.cancel?.();
+  Object.assign(net, { role: null, transport: null, room: null, pingMs: null });
+}
+
+function leaveOnline() {
+  if (net.transport) {
+    net.transport.send({ t: 'bye' });
+    const t = net.transport;
+    setTimeout(() => t.close(), 100);
+  }
+  resetNet();
+}
+
+async function shareInvite() {
+  const url = `${location.origin}${location.pathname}?join=${net.code}`;
+  const text = `Join my Fortress Command game! Room code: ${net.code}`;
+  try {
+    if (navigator.share) await navigator.share({ title: 'Fortress Command', text, url });
+    else {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      $('online-status').textContent = 'Invite link copied. Paste it to your opponent:';
+    }
+  } catch { /* share sheet dismissed */ }
+}
+
+$('btn-host').addEventListener('click', hostOnline);
+$('btn-join').addEventListener('click', joinOnline);
+$('join-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinOnline(); });
+$('btn-share').addEventListener('click', shareInvite);
+$('btn-online-back').addEventListener('click', () => showOverlay('overlay-title'));
+$('btn-online-cancel').addEventListener('click', () => { leaveOnline(); lobbyView('home'); });
+
+$('btn-pause').addEventListener('click', () => {
+  if (!game || game.over) return;
+  if (!online()) paused = true; // online games keep running
+  showOverlay('overlay-pause');
+});
 $('btn-resume').addEventListener('click', () => { paused = false; showOverlay(null); });
 $('btn-restart').addEventListener('click', () => startGame(modeKey));
-$('btn-again').addEventListener('click', () => startGame(modeKey));
-$('btn-quit').addEventListener('click', () => { paused = true; showOverlay('overlay-title'); });
-$('btn-menu').addEventListener('click', () => showOverlay('overlay-title'));
+$('btn-again').addEventListener('click', () => {
+  if (net.role === 'host') startHostedGame();
+  else startGame(modeKey);
+});
+$('btn-quit').addEventListener('click', () => { leaveOnline(); paused = true; showOverlay('overlay-title'); });
+$('btn-menu').addEventListener('click', () => { leaveOnline(); showOverlay('overlay-title'); });
 $('btn-switch').addEventListener('click', () => {
   if (!game || paused) return;
   clearSelection();
@@ -599,10 +808,17 @@ $('btn-switch').addEventListener('click', () => {
   toast(`${PLAYER_NAMES[active]}'s turn`, 'info');
 });
 
-// Auto-pause when the app is backgrounded.
+// Auto-pause when the app is backgrounded (online games can't pause).
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && game && !game.over && !paused) { paused = true; showOverlay('overlay-pause'); }
+  if (document.hidden && game && !game.over && !paused && !online()) { paused = true; showOverlay('overlay-pause'); }
 });
+
+// Online heartbeat: measure latency, shown next to the mode label.
+setInterval(() => {
+  if (!net.transport || !game) return;
+  net.transport.send({ t: 'ping', at: performance.now() });
+  if (online()) $('mode-label').textContent = `${MODES.online.label}${net.pingMs != null ? ` · ${net.pingMs} ms` : ''}`;
+}, 2000);
 
 // ── Main loop ──────────────────────────────────────────────────────────────
 let last = performance.now();
@@ -613,7 +829,20 @@ function frame(now) {
   last = now;
 
   if (game) {
-    if (!paused) game.update(dt);
+    if (!paused || online()) game.update(dt);
+    if (net.role === 'host' && !game.over) {
+      net.snapTimer -= dt;
+      if (net.snapTimer <= 0) {
+        net.snapTimer = SNAPSHOT_INTERVAL;
+        net.transport.send(encodeSnapshot(game, net.mapVersion));
+        net.mapVersion = game.map.version;
+      }
+    }
+    if (game.mirror && !game.over) {
+      const stale = performance.now() - game.lastSnapshotAt > 2000;
+      if (stale) setStatus('Waiting for the host…');
+      else if (statusText === 'Waiting for the host…') setStatus('');
+    }
 
     // Keyboard pan + pan inertia
     const kx = (keys.has('arrowright') || keys.has('d')) - (keys.has('arrowleft') || keys.has('a'));
@@ -673,6 +902,18 @@ window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 buildModeButtons();
 resize();
+{
+  // Invite links open straight into the join screen.
+  const params = new URLSearchParams(location.search);
+  const join = params.get('join');
+  if (join) {
+    params.delete('join');
+    const qs = params.toString();
+    history.replaceState(null, '', `${location.pathname}${qs ? `?${qs}` : ''}`);
+    openLobby(join.toUpperCase());
+    joinOnline();
+  }
+}
 requestAnimationFrame(frame);
 
 for (const el of document.querySelectorAll('.version')) el.textContent = `Fortress Command ${VERSION}`;

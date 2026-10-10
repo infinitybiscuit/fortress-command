@@ -68,6 +68,32 @@
     </div>
   </div>
 
+  <div id="overlay-online" class="overlay hidden">
+    <div class="overlay-card">
+      <h2 class="online-title">ONLINE<br>1 VS 1</h2>
+      <div id="online-home">
+        <p class="tagline">Play a friend on their own phone. One of you hosts, the other joins with the room code.</p>
+        <div class="menu-buttons">
+          <button class="menu-btn" id="btn-host">Host a game</button>
+          <div class="join-row">
+            <input id="join-code" class="code-input" maxlength="5" placeholder="CODE" autocapitalize="characters"
+              autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Room code">
+            <button class="menu-btn" id="btn-join">Join</button>
+          </div>
+          <button class="menu-btn secondary" id="btn-online-back">Back</button>
+        </div>
+      </div>
+      <div id="online-wait" class="hidden">
+        <p class="tagline" id="online-status"></p>
+        <div class="room-code" id="room-code"></div>
+        <div class="menu-buttons">
+          <button class="menu-btn" id="btn-share">Share invite</button>
+          <button class="menu-btn secondary" id="btn-online-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="overlay-pause" class="overlay hidden">
     <div class="overlay-card">
       <h2>PAUSED</h2>

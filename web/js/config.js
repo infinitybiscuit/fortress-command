@@ -4,7 +4,7 @@
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v7 · Airbase';
+export const VERSION = 'v8 · Online';
 
 export const TILE_SIZE = 32;
 export const MAP_W = 200;
@@ -99,6 +99,8 @@ export const PLAYER_NAMES = ['Blue', 'Red', 'Green', 'Yellow'];
 export const MODES = {
   cpu:  { label: '1 vs CPU',         players: [[2, false], [193, true]], startSoldiers: true },
   local:{ label: '1 vs 1 Local',     players: [[2, false], [193, false]], startSoldiers: true },
+  // Two phones over the internet: the host plays Blue, the guest plays Red.
+  online: { label: '🌐 Online 1 vs 1', players: [[2, false], [193, false]], startSoldiers: true, online: true },
   ffa3: { label: 'Free-for-All (3)', players: [[2, false], [97, true], [193, true]] },
   ffa4: { label: 'Free-for-All (4)', players: [[2, false], [60, true], [130, true], [193, true]] },
 };

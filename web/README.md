@@ -19,6 +19,24 @@ web manifest and service worker, so the game launches without browser chrome and
 offline after the first load. When served over HTTPS (e.g. GitHub Pages, see
 `.github/workflows/pages.yml`), the service worker caches the assets.
 
+## Online 1 vs 1 (two phones)
+
+Play a friend on their own device, anywhere with internet:
+
+1. Both players open the game and tap **🌐 Online 1 vs 1**.
+2. One player taps **Host a game** and gets a 5-letter room code. **Share invite** opens the iOS share sheet with a link that drops your friend straight into the game.
+3. The other player types the code and taps **Join**, or opens the invite link.
+
+The host plays **Blue** (left) and the guest plays **Red** (right). Both use the normal controls. Online games can't be paused. ⏸ opens the menu, but the battle keeps going. The latency to your opponent shows under your name. After a game, the host can start a **Rematch**.
+
+**How it works.** The phones connect directly to each other (WebRTC, via the bundled [PeerJS](https://peerjs.com) library). PeerJS's free public server only introduces them. The host's phone runs the game. The guest sends its orders and receives the battlefield state about 12 times a second, smoothed between updates. Both players must be on the same app version; the menu shows it.
+
+**Limits.**
+- If either player leaves or closes the app, the game ends for both.
+- If the host switches away from the app, the game freezes until they come back.
+- Some mobile carriers and strict networks block direct connections. If joining keeps failing, put one or both phones on Wi-Fi.
+- Two tabs on one device can play each other without the internet by adding `?net=local` to the URL, which is handy for testing.
+
 ## Controls (touch)
 
 | Action | Gesture |
