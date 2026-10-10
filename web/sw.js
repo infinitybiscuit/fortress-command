@@ -1,9 +1,9 @@
 // Network-first service worker: always fetch fresh when online, fall back to
 // the cache so the game still launches from the home screen when offline.
-const CACHE = 'fortress-command-v12';
+const CACHE = 'fortress-command-v13';
 const ASSETS = [
   './', 'index.html', 'style.css', 'manifest.webmanifest',
-  'js/main.js', 'js/game.js', 'js/commands.js', 'js/net.js', 'vendor/peerjs-1.5.4.min.js', 'js/entities.js', 'js/tilemap.js', 'js/render.js', 'js/config.js',
+  'js/main.js', 'js/game.js', 'js/commands.js', 'js/net.js', 'vendor/peerjs-1.5.4.min.js', 'vendor/fonts/press-start-2p-latin-400-normal.woff2', 'js/entities.js', 'js/tilemap.js', 'js/render.js', 'js/config.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 

@@ -1,15 +1,25 @@
+@font-face {
+  font-family: 'Press Start 2P';
+  src: url('vendor/fonts/press-start-2p-latin-400-normal.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* 90s home-computer war game palette: olive drab, khaki, cream text. */
 :root {
-  --bg: #0e1124;
-  --panel: rgba(26, 26, 38, 0.97);
-  --panel-2: #23233a;
-  --line: rgba(255, 255, 255, 0.08);
-  --accent: #3380ff;
-  --accent-dim: #1f4fa3;
-  --text: #fff;
-  --dim: #8a8fa8;
-  --good: #00ff66;
-  --danger: #ff4d4d;
-  --gold: #ffcc33;
+  --bg: #14160d;
+  --panel: #1f2314;
+  --panel-2: #3b4224;
+  --bevel-light: #66703f;
+  --bevel-dark: #0e100a;
+  --line: rgba(0, 0, 0, 0.6);
+  --accent: #4f8f2c;
+  --accent-dim: #2f5a1a;
+  --text: #f4ecd0;
+  --dim: #b4ab86;
+  --good: #7ee04f;
+  --danger: #e8402a;
+  --gold: #f2c230;
+  --pixel: 'Press Start 2P', ui-monospace, monospace;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
@@ -208,3 +218,77 @@ button {
 @media (orientation: landscape) and (max-height: 500px) {
   #rotate-hint { display: grid; }
 }
+
+
+/* ── Retro theme ─────────────────────────────────────────────────────── */
+/* Bevelled, square-cornered controls like an old Amiga/DOS war game. */
+.tile-btn, .act-btn, .small-btn, .hud-btn, .menu-btn, .round-btn, .howto, .code-input {
+  border-radius: 2px;
+  border: 2px solid;
+  border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
+  background: var(--panel-2);
+  box-shadow: 0 2px 0 #000;
+}
+.tile-btn:active:not(:disabled), .act-btn:active:not(:disabled), .small-btn:active, .hud-btn:active, .menu-btn:active, .round-btn:active {
+  border-color: var(--bevel-dark) var(--bevel-light) var(--bevel-light) var(--bevel-dark);
+  background: var(--accent-dim);
+  transform: translateY(2px);
+  box-shadow: none;
+}
+.round-btn { border-radius: 2px; background: rgba(31, 35, 20, 0.85); font-family: var(--pixel); font-size: 14px; }
+.tile-btn.active { border-color: var(--good); box-shadow: inset 0 0 0 2px var(--good); }
+
+#hud { background: var(--panel); border-bottom: 3px solid var(--bevel-dark); box-shadow: inset 0 -2px 0 var(--bevel-light); }
+#minimap-wrap, #panel { background: var(--panel); }
+#minimap-wrap { border-top: 3px solid var(--bevel-dark); }
+#minimap { border-radius: 0; border: 2px solid var(--bevel-dark); image-rendering: pixelated; }
+
+.credits, .income, .player-chip, .mode-label, .panel-title, .panel-sub, .tile-btn .nm, .tile-btn .ct,
+.act-btn, .small-btn, .menu-btn, .status, .toast, .badge, .room-code, .code-input, .howto summary, .version {
+  font-family: var(--pixel);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.credits { font-size: 15px; color: var(--gold); text-shadow: 2px 2px 0 #000; }
+.income { font-size: 10px; }
+.player-chip { font-size: 10px; border-radius: 0; padding: 4px 8px; }
+.mode-label { font-size: 8px; color: var(--dim); }
+.panel-title { font-size: 11px; color: var(--gold); line-height: 1.4; }
+.panel-sub { font-size: 8px; }
+.tile-btn .nm { font-size: 8px; margin-top: 2px; }
+.tile-btn .ct { font-size: 8px; }
+.act-btn { font-size: 10px; }
+.act-btn.primary { background: var(--accent); border-color: #7cc24e #1d3a0f #1d3a0f #7cc24e; }
+.act-btn.danger { color: #ff8a73; }
+.small-btn { font-size: 9px; }
+.status { font-size: 9px; border-radius: 0; background: rgba(20, 22, 13, 0.85); border: 2px solid #000; line-height: 1.5; }
+.toast { font-size: 9px; border-radius: 0; border: 2px solid #000; line-height: 1.5; background: rgba(176, 44, 26, 0.95); }
+.toast.info { background: rgba(47, 90, 26, 0.95); }
+.badge { border-radius: 0; font-size: 8px; background: var(--danger); }
+.progress { border-radius: 0; background: #000; border: 1px solid var(--bevel-dark); }
+.progress > div { background: var(--good); }
+.hint { color: var(--dim); }
+
+/* Overlays: dark olive with a banded "sky" behind the title */
+.overlay { background: linear-gradient(#2b5f8f 0 18%, #3d7fc4 18% 34%, #5a9a4a 34% 36%, rgba(20, 22, 13, 0.96) 36%); }
+#overlay-pause, #overlay-gameover { background: rgba(14, 16, 10, 0.9); }
+.overlay h1, .overlay h2 {
+  font-family: var(--pixel);
+  font-weight: 400;
+  color: var(--gold);
+  text-shadow: 3px 3px 0 #a3261a, 6px 6px 0 #000;
+  letter-spacing: 0;
+}
+.overlay h1 { font-size: 30px; line-height: 1.35; }
+.overlay h2 { font-size: 30px; line-height: 1.35; }
+.online-title { font-size: 24px !important; }
+.tagline { color: var(--text); font-family: var(--pixel); font-size: 10px; line-height: 1.7; }
+#online-status { font-family: inherit; font-size: 14px; }
+.menu-btn { font-size: 13px; background: var(--accent); border-color: #7cc24e #1d3a0f #1d3a0f #7cc24e; text-shadow: 2px 2px 0 #000; }
+.menu-btn.secondary { background: var(--panel-2); border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light); }
+.howto { background: var(--panel); }
+.howto summary { font-size: 10px; color: var(--gold); }
+.howto ul { color: var(--text); }
+.version { font-size: 8px; color: var(--dim); }
+.room-code { color: var(--gold); text-shadow: 3px 3px 0 #000; font-size: 36px; }
+.code-input { font-size: 18px; background: #0e100a; }

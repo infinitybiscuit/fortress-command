@@ -19,6 +19,7 @@ export class Game {
     this.units = [];
     this.buildings = [];
     this.projectiles = [];
+    this.effects = []; // purely visual (falling soldiers, wrecks, debris)
     this.players = [];
     this.economyTimer = 0;
     this.aiTimer = 0;

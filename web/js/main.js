@@ -10,7 +10,8 @@ import {
   hostRoom, joinRoom, makeRoomCode, connectionRoute, encodeSnapshot, createMirror, applySnapshot, SNAPSHOT_INTERVAL,
 } from './net.js';
 import {
-  drawSky, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
+  drawBackground, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
+  drawEffects, updateEffects,
 } from './render.js';
 
 const $ = (id) => document.getElementById(id);
@@ -878,55 +879,71 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// The battlefield is drawn into a low-resolution buffer and scaled up with
+// smoothing off, for chunky retro pixels.
+const PIXEL = 2; // screen points per game pixel
+const low = document.createElement('canvas');
+const lctx = low.getContext('2d');
+
 function draw(dt) {
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawSky(ctx, viewW, viewH);
-  const s = cam.scale * dpr;
-  ctx.setTransform(s, 0, 0, s, -cam.x * s, -cam.y * s);
+  const lw = Math.ceil(viewW / PIXEL);
+  const lh = Math.ceil(viewH / PIXEL);
+  if (low.width !== lw || low.height !== lh) { low.width = lw; low.height = lh; }
+  const s = cam.scale / PIXEL;
+  lctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawBackground(lctx, lw, lh, cam, s);
+  lctx.setTransform(s, 0, 0, s, -cam.x * s, -cam.y * s);
   const v = view();
   // On looping maps the view can straddle the seam: draw the world again one
   // map-width over so both sides show.
   const offsets = game.wrap ? [0, WORLD_W, -WORLD_W].filter((o) => o + WORLD_W > v.x && o < v.x + v.w) : [0];
   const eachCopy = (fn) => {
     for (const o of offsets) {
-      ctx.save();
-      ctx.translate(o, 0);
+      lctx.save();
+      lctx.translate(o, 0);
       fn({ ...v, x: v.x - o });
-      ctx.restore();
+      lctx.restore();
     }
   };
+  game.effects = updateEffects(game.effects, dt);
   eachCopy((vv) => {
-    drawTerrain(ctx, game.map, vv);
+    drawTerrain(lctx, game.map, vv);
     const onScreen = (e) => e.x + (e.w || 30) > vv.x - 40 && e.x - 30 < vv.x + vv.w + 40;
-    for (const b of game.buildings) if (onScreen(b)) drawBuilding(ctx, b);
-    for (const u of game.units) if (onScreen(u)) drawUnit(ctx, u);
-    for (const p of game.projectiles) drawProjectile(ctx, p);
+    drawEffects(lctx, game.effects);
+    for (const b of game.buildings) if (onScreen(b)) drawBuilding(lctx, b);
+    for (const u of game.units) if (onScreen(u)) drawUnit(lctx, u);
+    for (const p of game.projectiles) drawProjectile(lctx, p);
   });
   if (pendingBuild) {
     let zones = game.buildZones(active);
     if (game.wrap) zones = [-1, 0, 1].flatMap((k) => zones.map(([a, b]) => [a + k * MAP_W, b + k * MAP_W]));
-    drawBuildZones(ctx, zones.sort((a, b) => a[0] - b[0]), v);
+    drawBuildZones(lctx, zones.sort((a, b) => a[0] - b[0]), v);
   }
 
   markers = markers.filter((m) => (m.t -= dt) > 0);
   eachCopy(() => {
-    if (pendingBuild && ghost) drawGhost(ctx, ghost);
+    if (pendingBuild && ghost) drawGhost(lctx, ghost);
     drawMarkers();
   });
 
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(low, 0, 0, lw, lh, 0, 0, lw * PIXEL * dpr, lh * PIXEL * dpr);
+
   mctx.setTransform(1, 0, 0, 1, 0, 0);
+  mctx.imageSmoothingEnabled = false;
   drawMinimap(mctx, game, mini.width, mini.height, v, minimapCache, pendingBuild ? game.buildZones(active) : null);
 }
 
 function drawMarkers() {
   for (const m of markers) {
-    ctx.strokeStyle = m.color;
-    ctx.globalAlpha = Math.min(1, m.t * 2);
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(m.x, m.y, 14 * (1.2 - m.t), 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
+    lctx.strokeStyle = m.color;
+    lctx.globalAlpha = Math.min(1, m.t * 2);
+    lctx.lineWidth = 3;
+    lctx.beginPath();
+    lctx.arc(m.x, m.y, 14 * (1.2 - m.t), 0, Math.PI * 2);
+    lctx.stroke();
+    lctx.globalAlpha = 1;
   }
 }
 
