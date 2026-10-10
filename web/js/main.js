@@ -11,7 +11,7 @@ import {
 } from './net.js';
 import {
   drawBackground, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
-  drawEffects, updateEffects,
+  drawEffects, updateEffects, drawMarker, G,
 } from './render.js';
 
 const $ = (id) => document.getElementById(id);
@@ -40,7 +40,10 @@ let sellArmed = null;       // { id, until } — sell needs a second tap to conf
 const minimapCache = {};
 
 // ── Camera ─────────────────────────────────────────────────────────────────
-const cam = { x: 0, y: 0, scale: 1, vx: 0, vy: 0 };
+// scale = screen points per world unit. It's snapped so each art pixel
+// (G world units) covers a whole number of device pixels, keeping the pixel
+// art sharp; `zoom` is the unsnapped target that pinch gestures adjust.
+const cam = { x: 0, y: 0, scale: 1, zoom: 1, vx: 0, vy: 0 };
 let viewW = 0;
 let viewH = 0;
 let dpr = 1;
@@ -49,8 +52,16 @@ function minScale() { return Math.max(viewH / WORLD_H, viewW / WORLD_W); }
 function defaultScale() { return Math.min(MAX_SCALE, Math.max(minScale(), viewH / (WORLD_H - 5 * TILE_SIZE))); }
 function view() { return { x: cam.x, y: cam.y, w: viewW / cam.scale, h: viewH / cam.scale }; }
 
+function snapScale(z) {
+  const unit = dpr * G; // device pixels per world unit at scale 1, times art pixel size
+  let p = Math.max(1, Math.round(z * unit));
+  while (p / unit < minScale() - 1e-6) p++;
+  return p / unit;
+}
+
 function clampCam() {
-  cam.scale = Math.min(MAX_SCALE, Math.max(minScale(), cam.scale));
+  cam.zoom = Math.min(MAX_SCALE, Math.max(minScale(), cam.zoom));
+  cam.scale = snapScale(cam.zoom);
   const v = view();
   // Looping maps pan forever; otherwise stop at the map edges.
   if (game?.wrap) cam.x = ((cam.x % WORLD_W) + WORLD_W) % WORLD_W;
@@ -68,7 +79,7 @@ function centreOn(wx, wy) {
 function zoomAt(factor, sx, sy) {
   const wx = cam.x + sx / cam.scale;
   const wy = cam.y + sy / cam.scale;
-  cam.scale *= factor;
+  cam.zoom *= factor;
   clampCam();
   cam.x = wx - sx / cam.scale;
   cam.y = wy - sy / cam.scale;
@@ -576,7 +587,8 @@ function startGame(key, opts = {}) {
   showOverlay(null);
   paused = false;
   resize();
-  cam.scale = defaultScale();
+  cam.zoom = defaultScale();
+  clampCam();
   focusHq();
 }
 
@@ -879,30 +891,34 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-// The battlefield is drawn into a low-resolution buffer and scaled up with
-// smoothing off, for chunky retro pixels.
-const PIXEL = 2; // screen points per game pixel
+// The battlefield is drawn into a low-resolution "art" buffer (one pixel per G
+// world units) and blown up by a whole number of device pixels with no
+// smoothing, so every pixel stays crisp. A sub-pixel offset on the final blit
+// keeps scrolling smooth.
 const low = document.createElement('canvas');
 const lctx = low.getContext('2d');
 
 function draw(dt) {
-  const lw = Math.ceil(viewW / PIXEL);
-  const lh = Math.ceil(viewH / PIXEL);
-  if (low.width !== lw || low.height !== lh) { low.width = lw; low.height = lh; }
-  const s = cam.scale / PIXEL;
+  const P = Math.max(1, Math.round(cam.scale * dpr * G)); // device px per art px
+  const bw = Math.ceil(canvas.width / P) + 2;
+  const bh = Math.ceil(canvas.height / P) + 2;
+  if (low.width !== bw || low.height !== bh) { low.width = bw; low.height = bh; }
+  lctx.imageSmoothingEnabled = false;
+  const camAX = Math.floor(cam.x / G);
+  const camAY = Math.floor(cam.y / G);
+  const offX = Math.round((cam.x / G - camAX) * P);
+  const offY = Math.round((cam.y / G - camAY) * P);
+
   lctx.setTransform(1, 0, 0, 1, 0, 0);
-  drawBackground(lctx, lw, lh, cam, s);
-  lctx.setTransform(s, 0, 0, s, -cam.x * s, -cam.y * s);
+  drawBackground(lctx, bw, bh, camAX, camAY);
   const v = view();
   // On looping maps the view can straddle the seam: draw the world again one
   // map-width over so both sides show.
   const offsets = game.wrap ? [0, WORLD_W, -WORLD_W].filter((o) => o + WORLD_W > v.x && o < v.x + v.w) : [0];
   const eachCopy = (fn) => {
     for (const o of offsets) {
-      lctx.save();
-      lctx.translate(o, 0);
+      lctx.setTransform(1, 0, 0, 1, o / G - camAX, -camAY);
       fn({ ...v, x: v.x - o });
-      lctx.restore();
     }
   };
   game.effects = updateEffects(game.effects, dt);
@@ -917,34 +933,22 @@ function draw(dt) {
   if (pendingBuild) {
     let zones = game.buildZones(active);
     if (game.wrap) zones = [-1, 0, 1].flatMap((k) => zones.map(([a, b]) => [a + k * MAP_W, b + k * MAP_W]));
+    lctx.setTransform(1, 0, 0, 1, -camAX, -camAY);
     drawBuildZones(lctx, zones.sort((a, b) => a[0] - b[0]), v);
   }
 
   markers = markers.filter((m) => (m.t -= dt) > 0);
   eachCopy(() => {
     if (pendingBuild && ghost) drawGhost(lctx, ghost);
-    drawMarkers();
+    for (const m of markers) drawMarker(lctx, m);
   });
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(low, 0, 0, lw, lh, 0, 0, lw * PIXEL * dpr, lh * PIXEL * dpr);
+  ctx.drawImage(low, 0, 0, bw, bh, -offX, -offY, bw * P, bh * P);
 
   mctx.setTransform(1, 0, 0, 1, 0, 0);
-  mctx.imageSmoothingEnabled = false;
   drawMinimap(mctx, game, mini.width, mini.height, v, minimapCache, pendingBuild ? game.buildZones(active) : null);
-}
-
-function drawMarkers() {
-  for (const m of markers) {
-    lctx.strokeStyle = m.color;
-    lctx.globalAlpha = Math.min(1, m.t * 2);
-    lctx.lineWidth = 3;
-    lctx.beginPath();
-    lctx.arc(m.x, m.y, 14 * (1.2 - m.t), 0, Math.PI * 2);
-    lctx.stroke();
-    lctx.globalAlpha = 1;
-  }
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────
