@@ -34,6 +34,7 @@ offline after the first load. When served over HTTPS (e.g. GitHub Pages, see
 | Repair | Select engineers, tap a damaged friendly building |
 | Hold / Charge / Retreat | Buttons in the unit panel |
 | Train | Tap your Barracks/Workshop, then tap a unit type |
+| Sell | Tap your structure, then **Sell** twice: a full refund while it's still being built, otherwise 50% of its cost scaled by remaining health, plus any queued units. The HQ can't be sold |
 | Build | Tap a structure, tap the map to preview (green = valid), tap again or press **Place** |
 
 Placement snaps to the surface under your finger. Bridges and ramps stay in placement mode

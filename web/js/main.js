@@ -31,6 +31,7 @@ let ghost = null;           // current placement preview
 let markers = [];           // move-order feedback
 let statusText = '';
 let panelKey = '';
+let sellArmed = null;       // { id, until } — sell needs a second tap to confirm
 const minimapCache = {};
 
 // ── Camera ─────────────────────────────────────────────────────────────────
@@ -326,7 +327,9 @@ function renderPanel() {
     + Object.keys(UNIT_TYPES).map((t) => +(money >= UNIT_TYPES[t].cost)).join('');
   const bState = b ? `${b.id}|${b.constructing}|${b.queue.join(',')}|${b.trainCurrent}|${Math.round(b.hp)}|${Math.floor(b.progress * 20)}|${b.trainCurrent ? Math.floor((1 - b.trainTimer / b.trainTotal) * 20) : ''}` : '';
   const uState = sel.length ? `${sel.length}|${sel.map((u) => u.type[0]).sort().join('')}` : '';
-  const key = `${mode}|${afford}|${pendingBuild}|${ghost?.valid}|${bState}|${uState}`;
+  const armed = !!(b && sellArmed && sellArmed.id === b.id && performance.now() < sellArmed.until);
+  const refund = b ? game.sellValue(b) : 0;
+  const key = `${mode}|${afford}|${pendingBuild}|${ghost?.valid}|${bState}|${uState}|${armed}|${refund}`;
   if (key === panelKey) return;
   panelKey = key;
 
@@ -380,7 +383,10 @@ function renderPanel() {
       <div class="panel-head"><div class="panel-title">${BUILD_ICONS[b.type] || '🏰'} ${name}</div>
         <div class="panel-sub">${hp}</div>
         <button class="small-btn" data-act="deselect">✕</button></div>
-      ${body}`;
+      ${body}
+      ${b.type === 'hq' ? '' : `<div class="row" style="margin-top:auto">
+        <button class="act-btn ${armed ? 'primary' : 'danger'}" data-act="sell">${armed ? `Tap again to sell for 💰${refund}` : `💲 Sell · 💰${refund}`}</button>
+      </div>`}`;
     return;
   }
 
@@ -435,6 +441,20 @@ panel.addEventListener('click', (e) => {
       case 'cancel': cancelPlacement(); break;
       case 'place': confirmPlacement(); break;
       case 'deselect': clearSelection(); break;
+      case 'sell': {
+        const b = selectedBuilding;
+        if (!b) break;
+        if (sellArmed?.id === b.id && performance.now() < sellArmed.until) {
+          sellArmed = null;
+          const name = capitalize(b.type);
+          const refund = game.sell(active, b);
+          clearSelection();
+          toast(`${name} sold · +💰${refund}`, 'info');
+        } else {
+          sellArmed = { id: b.id, until: performance.now() + 3000 };
+        }
+        break;
+      }
       case 'all': {
         const army = game.units.filter((u) => u.faction === active);
         if (!army.length) { toast('No units yet — build a Barracks'); break; }

@@ -83,6 +83,26 @@ export class Game {
     return null;
   }
 
+  // Refund for selling: a full refund while still under construction, otherwise
+  // half the cost scaled by remaining health. Queued units are refunded in full.
+  sellValue(b) {
+    if (b.type === 'hq') return 0;
+    const base = b.constructing ? b.def.cost : Math.floor(b.def.cost * 0.5 * (b.hp / b.maxHp));
+    const queued = [...b.queue, ...(b.trainCurrent ? [b.trainCurrent] : [])]
+      .reduce((sum, t) => sum + UNIT_TYPES[t].cost, 0);
+    return base + queued;
+  }
+
+  sell(playerIdx, b) {
+    if (b.dead || b.faction !== playerIdx || b.type === 'hq') return 0;
+    const refund = this.sellValue(b);
+    this.players[playerIdx].money += refund;
+    b.dead = true;
+    this.buildings = this.buildings.filter((o) => o !== b);
+    this.map.release(b);
+    return refund;
+  }
+
   train(playerIdx, building, type) {
     const p = this.players[playerIdx];
     const cost = UNIT_TYPES[type].cost;
