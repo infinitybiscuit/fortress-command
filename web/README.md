@@ -31,7 +31,7 @@ offline after the first load. When served over HTTPS (e.g. GitHub Pages, see
 | Select your whole army | **All units** |
 | Move | With units selected, tap the ground |
 | Attack | With units selected, tap an enemy unit or building |
-| Repair | Select engineers, tap a damaged friendly building |
+| Repair | Select engineers, tap a damaged friendly building or vehicle |
 | Hold / Charge / Retreat | Buttons in the unit panel |
 | Train | Tap your Barracks/Workshop, then tap a unit type |
 | Sell | Tap your structure, then **Sell** twice: a full refund while it's still being built, otherwise 50% of its cost scaled by remaining health, plus any queued units. The HQ can't be sold |
@@ -42,6 +42,16 @@ after each block, so you can lay several in a row.
 
 Desktop works too: click instead of tap, mouse wheel zooms, WASD or the arrow keys pan,
 and Esc cancels.
+
+## Vehicles (Workshop)
+
+| Vehicle | Cost | Build | Role |
+|---|---|---|---|
+| 🚙 Jeep | 120 | 6s | Fast raider (240 speed), rapid machine gun |
+| Tank | 300 | 12s | 450 HP armour; cannon shells do splash damage (40px), ×1.25 vs buildings |
+| Artillery | 260 | 10s | 340 range; lobbed shells land where the target *was*, with big splash (60px), ×1.75 vs buildings. Fragile, so keep it behind your lines |
+
+Vehicles climb ramps just like infantry, and engineers can repair them. From about 90 seconds in, the CPU builds its own Workshop and mixes jeeps, tanks and artillery into its attacks.
 
 ## Layout
 

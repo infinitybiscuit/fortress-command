@@ -85,6 +85,7 @@ export function drawTerrain(ctx, map, view) {
 
 // ── Units ──────────────────────────────────────────────────────────────────
 export function drawUnit(ctx, u) {
+  if (u.vehicle) { drawVehicle(ctx, u); return; }
   const f = u.faction;
   const w = UNIT_W;
   const h = UNIT_H;
@@ -327,13 +328,121 @@ function drawRamp(ctx, b) {
 
 // ── Projectiles + placement ghost ──────────────────────────────────────────
 export function drawProjectile(ctx, p) {
-  const tx = p.x - Math.cos(p.angle) * 14;
-  const ty = p.y - Math.sin(p.angle) * 14;
+  if (p.exploded > 0) {
+    // Blast: expanding ring + hot core, sized to the splash radius.
+    const k = 1 - p.exploded / 0.3;
+    const r = p.splash * (0.4 + 0.6 * k);
+    ctx.globalAlpha = 1 - k;
+    circle(ctx, p.x, p.y, r, 'rgba(255,140,40,0.35)');
+    circle(ctx, p.x, p.y, r * 0.45, 'rgba(255,230,140,0.9)');
+    ctx.strokeStyle = 'rgba(255,200,90,0.9)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    return;
+  }
+  const trail = p.kind === 'bullet' ? 14 : 20;
+  const tx = p.x - Math.cos(p.angle) * trail;
+  const ty = p.y - Math.sin(p.angle) * trail;
   ctx.lineCap = 'round';
-  line(ctx, tx, ty, p.x, p.y, 'rgba(255,219,79,0.4)', p.radius * 1.2);
+  line(ctx, tx, ty, p.x, p.y, p.kind === 'bullet' ? 'rgba(255,219,79,0.4)' : 'rgba(200,200,200,0.35)', p.radius * 1.2);
   ctx.lineCap = 'butt';
-  circle(ctx, p.x, p.y, p.radius, '#ffff80');
+  circle(ctx, p.x, p.y, p.radius, p.kind === 'bullet' ? '#ffff80' : '#2b2b2b');
+  if (p.kind !== 'bullet') circle(ctx, p.x - 1, p.y - 1, p.radius * 0.4, '#ffb347');
 }
+
+// ── Vehicles (bottom-centre origin, mirrored to face their direction) ─────
+function drawVehicle(ctx, u) {
+  const f = u.faction;
+  const { w, h } = u;
+  const x = u.x - w / 2;
+  const y = u.y - h;
+
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(u.x, u.y + 2, w / 2 + 3, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(u.x, 0);
+  ctx.scale(u.facing, 1);
+  ctx.translate(-u.x, 0);
+  VEHICLE[u.type](ctx, u, x, y, w, h, f);
+  ctx.restore();
+
+  if (u.flash > 0) rect(ctx, x, y, w, h, 'rgba(255,255,255,0.6)');
+  if (u.selected) {
+    ctx.strokeStyle = '#00ff66';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - 3, y - 3, w + 6, h + 6);
+  }
+  if (u.hp < u.maxHp || u.selected) hpBar(ctx, x, y - 8, w, u.hp / u.maxHp);
+}
+
+function wheel(ctx, cx, cy, r, spin) {
+  circle(ctx, cx, cy, r, '#1d1d1d');
+  circle(ctx, cx, cy, r * 0.45, '#8a8a8a');
+  line(ctx, cx, cy, cx + Math.cos(spin) * r * 0.8, cy + Math.sin(spin) * r * 0.8, '#555', 1.5);
+}
+
+const VEHICLE = {
+  // Drawn facing right; drawVehicle mirrors for left-facing units.
+  jeep(ctx, u, x, y, w, h, f) {
+    const spin = u.x / 7;
+    rect(ctx, x + 2, y + h * 0.4, w - 4, h * 0.38, css(PLAYER_COLORS[f]));
+    rect(ctx, x + 2, y + h * 0.4, w - 4, 3, css(tint(f, 0.4)));
+    poly(ctx, [[x + w * 0.3, y + h * 0.4], [x + w * 0.42, y + h * 0.1], [x + w * 0.62, y + h * 0.1], [x + w * 0.7, y + h * 0.4]], css(shade(f, 0.25)));
+    rect(ctx, x + w * 0.45, y + h * 0.16, w * 0.14, h * 0.2, 'rgba(160,210,255,0.8)');
+    // Mounted gun
+    rect(ctx, x + w * 0.62, y + h * 0.02, 3, h * 0.2, '#333');
+    rect(ctx, x + w * 0.62, y, w * 0.38, 3, '#2a2a2a');
+    rect(ctx, x + w - 4, y + h * 0.5, 4, 3, '#ffe28a'); // headlight
+    wheel(ctx, x + w * 0.22, y + h - 5, 5, spin);
+    wheel(ctx, x + w * 0.78, y + h - 5, 5, spin);
+  },
+  tank(ctx, u, x, y, w, h, f) {
+    // Treads
+    const ty = y + h * 0.6;
+    ctx.fillStyle = '#262626';
+    ctx.beginPath();
+    ctx.roundRect(x, ty, w, h * 0.4, h * 0.2);
+    ctx.fill();
+    const off = (u.x / 3) % 6;
+    for (let i = -1; i < w / 6; i++) rect(ctx, x + 3 + i * 6 + off, ty + 2, 2, h * 0.4 - 4, '#444');
+    for (let i = 0; i < 5; i++) circle(ctx, x + 5 + i * ((w - 10) / 4), ty + h * 0.2, 2.6, '#6d6d6d');
+    // Hull
+    poly(ctx, [[x + 2, ty], [x + 6, y + h * 0.36], [x + w - 4, y + h * 0.36], [x + w, ty]], css(PLAYER_COLORS[f]));
+    rect(ctx, x + 6, y + h * 0.36, w - 10, 3, css(tint(f, 0.35)));
+    // Turret + barrel
+    ctx.fillStyle = css(shade(f, 0.2));
+    ctx.beginPath();
+    ctx.roundRect(x + w * 0.28, y + h * 0.08, w * 0.4, h * 0.3, 4);
+    ctx.fill();
+    rect(ctx, x + w * 0.28, y + h * 0.08, w * 0.4, 2, css(tint(f, 0.4)));
+    const recoil = u.cooldownTimer > u.cooldown - 0.15 ? 3 : 0;
+    rect(ctx, x + w * 0.66 - recoil, y + h * 0.16, w * 0.44, 4, '#2f2f2f');
+    rect(ctx, x + w * 1.06 - recoil, y + h * 0.13, 4, 6, '#2f2f2f');
+  },
+  artillery(ctx, u, x, y, w, h, f) {
+    const spin = u.x / 7;
+    // Long barrel raised at ~35°
+    ctx.save();
+    ctx.translate(x + w * 0.45, y + h * 0.42);
+    ctx.rotate(-0.6);
+    rect(ctx, 0, -2.5, w * 0.75, 5, '#333');
+    rect(ctx, w * 0.68, -3.5, 6, 7, '#2a2a2a');
+    ctx.restore();
+    rect(ctx, x + 2, y + h * 0.42, w - 6, h * 0.36, css(PLAYER_COLORS[f]));
+    rect(ctx, x + 2, y + h * 0.42, w - 6, 3, css(tint(f, 0.4)));
+    rect(ctx, x + w * 0.32, y + h * 0.28, w * 0.26, h * 0.18, css(shade(f, 0.3)));
+    // Stabiliser leg at the back
+    line(ctx, x + 4, y + h * 0.7, x - 4, y + h, '#3a3a3a', 3);
+    wheel(ctx, x + w * 0.28, y + h - 5, 5, spin);
+    wheel(ctx, x + w * 0.72, y + h - 5, 5, spin);
+  },
+};
 
 export function drawGhost(ctx, pl) {
   const x = pl.tx * TILE_SIZE;
@@ -378,7 +487,7 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache) {
   }
   for (const u of game.units) {
     ctx.fillStyle = css(tint(u.faction, 0.3));
-    ctx.fillRect(u.x * sx - 1.5, (u.y - UNIT_H) * sy, 3, Math.max(3, UNIT_H * sy));
+    ctx.fillRect(u.x * sx - (u.vehicle ? 2.5 : 1.5), (u.y - u.h) * sy, u.vehicle ? 5 : 3, Math.max(3, u.h * sy));
   }
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 1.5;

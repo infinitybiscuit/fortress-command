@@ -25,6 +25,10 @@ export class Unit {
     this.game = game;
     this.kind = 'unit';
     this.type = type;
+    this.def = s;
+    this.vehicle = !!s.vehicle;
+    this.w = s.w || UNIT_W;
+    this.h = s.h || UNIT_H;
     this.faction = faction;
     this.x = x; // feet (bottom-centre)
     this.y = y;
@@ -49,8 +53,8 @@ export class Unit {
     this.dead = false;
   }
 
-  bounds() { return { x: this.x - UNIT_W / 2, y: this.y - UNIT_H, w: UNIT_W, h: UNIT_H }; }
-  centre() { return [this.x, this.y - UNIT_H / 2]; }
+  bounds() { return { x: this.x - this.w / 2, y: this.y - this.h, w: this.w, h: this.h }; }
+  centre() { return [this.x, this.y - this.h / 2]; }
 
   containsPoint(px, py, pad = 6) {
     const b = this.bounds();
@@ -66,7 +70,8 @@ export class Unit {
 
   attack(target) {
     if (this.dead || !target || target.dead) return;
-    if (this.repairRate > 0 && target.faction === this.faction && target.kind === 'building') {
+    // Engineers repair friendly buildings and vehicles.
+    if (this.repairRate > 0 && target.faction === this.faction && (target.kind === 'building' || target.vehicle)) {
       this.target = target;
       this.state = State.REPAIRING;
       return;
@@ -153,8 +158,8 @@ export class Unit {
   applyPhysics(dt) {
     const map = this.game.map;
     const ts = TILE_SIZE;
-    const halfW = UNIT_W / 2;
-    const h = UNIT_H;
+    const halfW = this.w / 2;
+    const h = this.h;
 
     this.vy = Math.min(this.vy + GRAVITY * dt, TERMINAL_VELOCITY);
 
@@ -219,6 +224,11 @@ export class Unit {
       this.dead = true;
       this.state = State.DEAD;
     }
+  }
+
+  repair(amount) {
+    if (this.dead) return;
+    this.hp = Math.min(this.maxHp, this.hp + amount);
   }
 }
 
@@ -331,34 +341,95 @@ export class Building {
   }
 }
 
+// kind: 'bullet' (homing, single target), 'shell' (homing, splash on impact),
+// 'lob' (arcs to the spot the target was at when fired, splash on landing).
 export class Projectile {
-  constructor(from, target, damage, faction) {
+  constructor(game, from, target, damage, faction, opts = {}) {
+    this.game = game;
     [this.x, this.y] = from;
     this.target = target;
     [this.tx, this.ty] = target.centre();
     this.damage = damage;
     this.faction = faction;
-    this.radius = PROJECTILE_RADIUS;
+    this.kind = opts.kind || 'bullet';
+    this.splash = opts.splash || 0;
+    this.vsBuildings = opts.vsBuildings || 1;
+    this.radius = this.kind === 'bullet' ? PROJECTILE_RADIUS : 4.5;
     this.angle = 0;
-    this.life = 4;
+    this.life = this.kind === 'lob' ? 8 : 4;
     this.done = false;
+    this.exploded = 0; // >0 while the blast flash is shown
+    if (this.kind === 'lob') {
+      // Aim at the ground under the target and fly a fixed parabola.
+      this.sx = this.x;
+      this.sy = this.y;
+      this.ty = target.kind === 'unit' ? target.y : target.y + target.h;
+      const dist = Math.hypot(this.tx - this.sx, this.ty - this.sy);
+      this.flight = Math.max(0.6, dist / 260);
+      this.arc = Math.min(220, 60 + dist * 0.45);
+      this.t = 0;
+    }
   }
 
   update(dt) {
+    if (this.exploded > 0) {
+      this.exploded -= dt;
+      if (this.exploded <= 0) this.done = true;
+      return;
+    }
     this.life -= dt;
     if (this.life <= 0) { this.done = true; return; }
+
+    if (this.kind === 'lob') {
+      this.t = Math.min(1, this.t + dt / this.flight);
+      const px = this.x;
+      const py = this.y;
+      this.x = this.sx + (this.tx - this.sx) * this.t;
+      this.y = this.sy + (this.ty - this.sy) * this.t - Math.sin(Math.PI * this.t) * this.arc;
+      this.angle = Math.atan2(this.y - py, this.x - px);
+      if (this.t >= 1) this.impact(null);
+      return;
+    }
+
     if (!this.target.dead) [this.tx, this.ty] = this.target.centre();
     const dx = this.tx - this.x;
     const dy = this.ty - this.y;
     const dist = Math.hypot(dx, dy);
     this.angle = Math.atan2(dy, dx);
-    const step = PROJECTILE_SPEED * dt;
+    const step = PROJECTILE_SPEED * (this.kind === 'shell' ? 0.9 : 1) * dt;
     if (dist <= step || dist < 4) {
-      if (!this.target.dead && this.target.faction !== this.faction) this.target.takeDamage(this.damage);
-      this.done = true;
+      this.x = this.tx;
+      this.y = this.ty;
+      this.impact(this.target.dead ? null : this.target);
       return;
     }
     this.x += (dx / dist) * step;
     this.y += (dy / dist) * step;
+  }
+
+  hit(e, amount) {
+    if (e.dead || e.faction === this.faction) return;
+    e.takeDamage(amount * (e.kind === 'building' ? this.vsBuildings : 1));
+  }
+
+  impact(direct) {
+    if (direct) this.hit(direct, this.damage);
+    if (this.splash > 0) {
+      // Lobbed shells deal full damage to whatever they land on; everything
+      // else inside the blast takes half.
+      const g = this.game;
+      for (const e of [...g.units, ...g.buildings]) {
+        if (e === direct || e.dead || e.faction === this.faction) continue;
+        const r = e.bounds();
+        const cx = Math.max(r.x, Math.min(this.x, r.x + r.w));
+        const cy = Math.max(r.y, Math.min(this.y, r.y + r.h));
+        const d = Math.hypot(cx - this.x, cy - this.y);
+        if (d > this.splash) continue;
+        this.hit(e, this.kind === 'lob' && d < 8 ? this.damage : this.damage * 0.5);
+      }
+      this.exploded = 0.3;
+      return;
+    }
+    this.done = true;
   }
 }

@@ -1,6 +1,6 @@
 // Game state, economy, AI and win conditions. Ported from godot/scripts/game/game_scene.gd.
 import {
-  TILE_SIZE, UNIT_H, MODES, PLAYER_NAMES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
+  TILE_SIZE, MODES, PLAYER_NAMES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
 } from './config.js';
 import { TileMap } from './tilemap.js';
 import { Unit, Building, Projectile, State } from './entities.js';
@@ -121,9 +121,19 @@ export class Game {
   }
 
   fireProjectile(shooter, target, damage) {
-    const from = shooter.kind === 'unit' ? [shooter.x, shooter.y - 14] : shooter.centre();
-    if (shooter.kind === 'building') from[1] = shooter.y + 10;
-    this.projectiles.push(new Projectile(from, target, damage, shooter.faction));
+    let from;
+    let opts = {};
+    if (shooter.kind === 'unit') {
+      // Muzzle sits near the top of vehicles' guns and at chest height on infantry.
+      from = shooter.vehicle
+        ? [shooter.x + shooter.facing * shooter.w * 0.45, shooter.y - shooter.h * 0.75]
+        : [shooter.x, shooter.y - 14];
+      opts = { kind: shooter.def.shot, splash: shooter.def.splash, vsBuildings: shooter.def.vsBuildings };
+    } else {
+      from = shooter.centre();
+      from[1] = shooter.y + 10;
+    }
+    this.projectiles.push(new Projectile(this, from, target, damage, shooter.faction, opts));
     if (this.projectiles.length > MAX_PROJECTILES) this.projectiles.shift();
   }
 
@@ -215,7 +225,28 @@ export class Game {
         barracks = this.spawnBuilding('barracks', tx, groundY, i);
       }
     }
-    if (barracks && !barracks.constructing && barracks.queue.length < 2) {
+    // Mid-game: add a workshop and save up for vehicles.
+    let workshop = this.buildings.find((b) => b.faction === i && b.type === 'workshop');
+    if (!workshop && barracks && this.time > 90 && p.money >= 200) {
+      const tx = dir > 0 ? hq.tx + hq.wt + 8 : hq.tx - 12;
+      if (this.map.canPlace(tx, groundY, 3, 2, 'workshop')) {
+        p.money -= 200;
+        workshop = this.spawnBuilding('workshop', tx, groundY, i);
+      }
+    }
+    const workshopIdle = workshop && !workshop.constructing && !workshop.trainCurrent && !workshop.queue.length;
+    if (workshopIdle) {
+      // Choose the next vehicle up front, then save for it.
+      p.nextVehicle ||= Math.random() < 0.45 ? 'tank' : Math.random() < 0.5 ? 'artillery' : 'jeep';
+      const cost = UNIT_TYPES[p.nextVehicle].cost;
+      if (p.money >= cost && workshop.queueTrain(p.nextVehicle)) {
+        p.money -= cost;
+        p.nextVehicle = null;
+      }
+    }
+    const saving = workshopIdle && Math.random() < 0.6;
+
+    if (!saving && barracks && !barracks.constructing && barracks.queue.length < 2) {
       // Mix in heavier units as the match goes on.
       const pick = this.time > 120 && Math.random() < 0.35 ? 'heavy' : 'soldier';
       const cost = UNIT_TYPES[pick].cost;
@@ -232,7 +263,7 @@ export class Game {
       let bestD = Infinity;
       for (const e of enemies) {
         const [ex, ey] = e.centre();
-        const d = Math.hypot(ex - u.x, ey - (u.y - UNIT_H / 2));
+        const d = Math.hypot(ex - u.x, ey - (u.y - u.h / 2));
         if (d < bestD) { bestD = d; best = e; }
       }
       if (best) u.attack(best);

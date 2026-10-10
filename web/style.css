@@ -134,6 +134,8 @@ button {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
 }
 .tile-btn .ic { font-size: 24px; line-height: 1; }
+.vic { width: 1.5em; height: 1.35em; vertical-align: -0.3em; }
+.tile-btn .ic .vic { width: 34px; height: 28px; vertical-align: 0; }
 .tile-btn .nm { font-size: 12px; font-weight: 700; }
 .tile-btn .ct { font-size: 11px; color: var(--gold); font-weight: 700; font-variant-numeric: tabular-nums; }
 .tile-btn:active:not(:disabled) { background: var(--accent-dim); }

@@ -162,6 +162,12 @@ function handleTap(sx, sy) {
   }
 
   const ownUnit = pickUnit(wx, wy, mine);
+  const repairers = sel.filter((u) => u.repairRate > 0 && u !== ownUnit);
+  if (ownUnit?.vehicle && ownUnit.hp < ownUnit.maxHp && repairers.length) {
+    for (const u of repairers) u.attack(ownUnit);
+    toast('Repairing', 'info');
+    return;
+  }
   if (ownUnit) {
     const now = performance.now();
     if (lastTap.unit === ownUnit && now - lastTap.t < DOUBLE_TAP_MS) {
@@ -403,7 +409,7 @@ function renderPanel() {
     panel.innerHTML = `
       <div class="panel-head"><div class="panel-title">${sel.length} selected <span class="panel-sub">${summary}</span></div>
         <button class="small-btn" data-act="deselect">✕</button></div>
-      <div class="hint">Tap ground to move · tap an enemy to attack${counts.engineer ? ' · tap a damaged building to repair' : ''}</div>
+      <div class="hint">Tap ground to move · tap an enemy to attack${counts.engineer ? ' · tap a damaged building or vehicle to repair' : ''}</div>
       <div class="row">
         <button class="act-btn" data-act="stop">✋ Hold</button>
         <button class="act-btn" data-act="charge">⚔️ Charge</button>
@@ -477,7 +483,7 @@ panel.addEventListener('click', (e) => {
         if (!sel.length) break;
         const ax = sel.reduce((s, u) => s + u.x, 0) / sel.length;
         const ay = sel.reduce((s, u) => s + u.y, 0) / sel.length;
-        centreOn(ax, ay - 14);
+        centreOn(ax, ay - 20);
         break;
       }
       default: break;
@@ -647,6 +653,8 @@ function draw(dt) {
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────
+// Read-only handle for automated browser tests.
+window.__fortress = { get game() { return game; } };
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 buildModeButtons();

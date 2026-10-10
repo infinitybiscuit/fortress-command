@@ -38,6 +38,14 @@ export const UNIT_TYPES = {
   scout:    { hp: 60,  speed: 220, range: 70,  damage: 8,  cooldown: 0.3, repair: 0,  cost: 30,  trainTime: 1.5 },
   engineer: { hp: 80,  speed: 120, range: 60,  damage: 5,  cooldown: 0.5, repair: 15, cost: 60,  trainTime: 4.0 },
   sniper:   { hp: 50,  speed: 100, range: 250, damage: 45, cooldown: 1.5, repair: 0,  cost: 200, trainTime: 8.0 },
+  // Workshop vehicles. splash = blast radius (other targets inside take half damage);
+  // vsBuildings = damage multiplier against structures; lob = arcing shell fired at a spot.
+  jeep:      { hp: 160, speed: 240, range: 110, damage: 10, cooldown: 0.35, repair: 0, cost: 120, trainTime: 6.0,
+               vehicle: true, w: 34, h: 20, shot: 'bullet' },
+  tank:      { hp: 450, speed: 70,  range: 150, damage: 40, cooldown: 1.8,  repair: 0, cost: 300, trainTime: 12.0,
+               vehicle: true, w: 42, h: 26, shot: 'shell', splash: 40, vsBuildings: 1.25 },
+  artillery: { hp: 140, speed: 55,  range: 340, damage: 60, cooldown: 3.5,  repair: 0, cost: 260, trainTime: 10.0,
+               vehicle: true, w: 40, h: 24, shot: 'lob', splash: 60, vsBuildings: 1.75 },
 };
 
 export const BUILDING_TYPES = {
@@ -46,7 +54,7 @@ export const BUILDING_TYPES = {
   turret:   { hp: 120, w: 2, h: 2, cost: 100, buildTime: 4.0, autoAttack: true, damage: 12, range: 150, rate: 1.2 },
   wall:     { hp: 300, w: 1, h: 2, cost: 40,  buildTime: 2.0, blocksUnits: true },
   mine:     { hp: 100, w: 2, h: 2, cost: 200, buildTime: 8.0, income: 15 },
-  workshop: { hp: 180, w: 3, h: 2, cost: 200, buildTime: 6.0, canTrain: ['engineer'] },
+  workshop: { hp: 180, w: 3, h: 2, cost: 200, buildTime: 6.0, canTrain: ['engineer', 'jeep', 'tank', 'artillery'] },
   bridge:   { hp: 150, w: 1, h: 1, cost: 15,  buildTime: 3.0, isBridge: true },
   ramp:     { hp: 120, w: 1, h: 1, cost: 20,  buildTime: 4.0, isRamp: true },
 };
@@ -57,7 +65,14 @@ export const BUILD_ICONS = {
 };
 export const UNIT_ICONS = {
   soldier: '🪖', heavy: '🛡️', scout: '🏃', engineer: '🔩', sniper: '🎯',
+  jeep: vehicleIcon('<rect x="3" y="9" width="18" height="6" rx="1.5"/><path d="M7 9l2-4h6l2 4z"/><rect x="14" y="3" width="8" height="2"/><circle cx="7" cy="17" r="2.6" fill="#222" stroke="#bbb"/><circle cx="17" cy="17" r="2.6" fill="#222" stroke="#bbb"/>'),
+  tank: vehicleIcon('<rect x="2" y="13" width="20" height="6" rx="3" fill="#333" stroke="#999"/><rect x="4" y="9" width="16" height="5" rx="1"/><rect x="8" y="5" width="8" height="5" rx="1.5"/><rect x="15" y="6.5" width="8" height="2"/>'),
+  artillery: vehicleIcon('<rect x="3" y="12" width="15" height="5" rx="1"/><path d="M8 12l12-9 1.5 1.8L11 12z"/><circle cx="6" cy="18.5" r="2.5" fill="#222" stroke="#bbb"/><circle cx="15" cy="18.5" r="2.5" fill="#222" stroke="#bbb"/>'),
 };
+
+function vehicleIcon(body) {
+  return `<svg class="vic" viewBox="0 0 24 22" fill="#8fb3d9" stroke-width="1">${body}</svg>`;
+}
 
 export const PLAYER_COLORS = [
   [0.2, 0.6, 1.0], // blue
