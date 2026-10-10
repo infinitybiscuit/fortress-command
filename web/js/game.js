@@ -3,7 +3,7 @@ import {
   TILE_SIZE, MODES, PLAYER_NAMES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
 } from './config.js';
 import { TileMap } from './tilemap.js';
-import { Unit, Building, Projectile, State } from './entities.js';
+import { Unit, Building, Projectile, State, canReach, distTo } from './entities.js';
 
 const MAX_PROJECTILES = 100;
 
@@ -135,8 +135,24 @@ export class Game {
       from = shooter.centre();
       from[1] = shooter.y + 10;
     }
+    opts.shooter = shooter;
     this.projectiles.push(new Projectile(this, from, target, damage, shooter.faction, opts));
     if (this.projectiles.length > MAX_PROJECTILES) this.projectiles.shift();
+  }
+
+  // Something of ours was hit: idle troops nearby rally to deal with the attacker.
+  callForHelp(victim, source) {
+    if (!source || source.dead || source.faction === victim.faction) return;
+    if (victim.lastAlert && this.time - victim.lastAlert < 1) return;
+    victim.lastAlert = this.time;
+    const radius = victim.kind === 'building' ? 450 : 320;
+    for (const u of this.units) {
+      if (u.dead || u === victim || u.faction !== victim.faction || u.repairRate > 0) continue;
+      if (u.state !== State.IDLE || u.hold) continue;
+      if (distTo(u.x, u.y - u.h / 2, victim) > radius || !canReach(u, source)) continue;
+      u.attack(source);
+      u.home = u.x;
+    }
   }
 
   incomeFor(i) {
@@ -255,20 +271,45 @@ export class Game {
       if (p.money >= cost && barracks.queueTrain(pick)) p.money -= cost;
     }
 
-    const enemies = [];
-    for (const u of this.units) if (u.faction !== i && !u.dead) enemies.push(u);
-    for (const b of this.buildings) if (b.faction !== i && !b.dead) enemies.push(b);
+    this.commandArmy(i);
+  }
+
+  // CPU army orders: defend the base when it's threatened, otherwise march on
+  // the nearest enemy HQ and fight whatever gets in the way.
+  commandArmy(i) {
+    const hq = this.players[i].hq;
+    const mine = this.buildings.filter((b) => b.faction === i);
+    const threats = this.units.filter((e) => !e.dead && e.faction !== i
+      && mine.some((b) => distTo(e.x, e.y - e.h / 2, b) < 650));
+    const enemyHqs = this.players.filter((o, j) => j !== i && o.hq).map((o) => o.hq);
+    const [hx] = hq.centre();
 
     for (const u of this.units) {
-      if (u.faction !== i || u.dead || u.state === State.ATTACKING) continue;
-      let best = null;
-      let bestD = Infinity;
-      for (const e of enemies) {
-        const [ex, ey] = e.centre();
-        const d = Math.hypot(ex - u.x, ey - (u.y - u.h / 2));
-        if (d < bestD) { bestD = d; best = e; }
+      if (u.faction !== i || u.dead || u.repairRate > 0) continue;
+      const busy = u.state === State.ATTACKING && u.target && !u.target.dead;
+      const nearest = (list) => {
+        let best = null;
+        let bestD = Infinity;
+        for (const e of list) {
+          if (e.dead || u.isIgnoring(e) || !canReach(u, e)) continue;
+          const d = distTo(u.x, u.y - u.h / 2, e);
+          if (d < bestD) { bestD = d; best = e; }
+        }
+        return best;
+      };
+
+      // Defence: units near home turn back on raiders.
+      if (threats.length && Math.abs(u.x - hx) < 1500) {
+        if (busy && threats.includes(u.target)) continue;
+        const t = nearest(threats);
+        if (t) { u.attack(t); continue; }
       }
-      if (best) u.attack(best);
+      // Already fighting a unit, an HQ, or something blocking the way: carry on.
+      if (busy && (u.target.kind === 'unit' || u.target.type === 'hq' || u.resume)) continue;
+      // Offence: engage enemies close by, else push on the nearest enemy HQ.
+      const local = nearest(this.units.filter((e) => e.faction !== i && distTo(u.x, u.y - u.h / 2, e) < 350));
+      const target = local || nearest(enemyHqs);
+      if (target && target !== u.target) u.attack(target);
     }
   }
 }

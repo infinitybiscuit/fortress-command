@@ -8,6 +8,12 @@ let nextId = 1;
 
 export const State = { IDLE: 0, MOVING: 1, ATTACKING: 2, REPAIRING: 3, DEAD: 4 };
 const AUTO_SCAN_INTERVAL = 0.5;
+const AGGRO_BONUS = 120;          // idle units notice enemies this far beyond weapon range
+const MIN_AGGRO = 220;
+const LEASH = 450;                // how far an idle unit chases before returning to post
+const STUCK_SECONDS = 2;          // no progress toward an out-of-range target → give up
+const IGNORE_SECONDS = 6;         // how long an abandoned target is ignored
+const ENGINEER_REPAIR_RADIUS = 260;
 
 // Distance from a point to an entity's body (closest point), so attacking a
 // wide building works from either side.
@@ -16,6 +22,15 @@ export function distTo(x, y, e) {
   const cx = Math.max(r.x, Math.min(x, r.x + r.w));
   const cy = Math.max(r.y, Math.min(y, r.y + r.h));
   return Math.hypot(cx - x, cy - y);
+}
+
+// Can `u` get a shot at `t`? Units can drop down to lower ground, but can't
+// climb to a target that's above their weapon range (e.g. a high platform).
+export function canReach(u, t) {
+  const r = t.bounds();
+  const [, cy] = u.centre();
+  const gapAbove = cy - (r.y + r.h);
+  return gapAbove <= u.range * 0.95;
 }
 
 export class Unit {
@@ -64,6 +79,7 @@ export class Unit {
   moveTo(x) {
     if (this.dead) return;
     this.resume = null;
+    this.home = null;
     this.moveX = x;
     this.target = null;
     this.state = State.MOVING;
@@ -72,6 +88,9 @@ export class Unit {
   attack(target) {
     if (this.dead || !target || target.dead) return;
     this.resume = null;
+    this.home = null;
+    this.stuckT = 0;
+    this.stuckX = this.x;
     // Engineers repair friendly buildings and vehicles.
     if (this.repairRate > 0 && target.faction === this.faction && (target.kind === 'building' || target.vehicle)) {
       this.target = target;
@@ -82,44 +101,81 @@ export class Unit {
     this.state = State.ATTACKING;
   }
 
+  // Attack `target`, then pick `resume` ({ moveX } or { target }) back up afterwards.
+  engage(target, resume = null) {
+    this.attack(target);
+    this.resume = resume;
+  }
+
+  isIgnoring(t) { return t === this.ignoreTarget && this.game.time < this.ignoreUntil; }
+
+  // Current target is dead or abandoned: resume the interrupted order, or
+  // walk back to the post we left to chase something.
+  finishTarget() {
+    const r = this.resume;
+    const home = this.home;
+    this.target = null;
+    this.state = State.IDLE;
+    this.vx = 0;
+    this.resume = null;
+    if (r?.target && !r.target.dead && !this.isIgnoring(r.target)) this.attack(r.target);
+    else if (r?.moveX != null) this.moveTo(r.moveX);
+    else if (home != null && Math.abs(home - this.x) > 24 && !this.hold) this.moveTo(home);
+  }
+
+  giveUp(t) {
+    this.ignoreTarget = t;
+    this.ignoreUntil = this.game.time + IGNORE_SECONDS;
+    this.finishTarget();
+  }
+
   update(dt) {
     if (this.cooldownTimer > 0) this.cooldownTimer = Math.max(0, this.cooldownTimer - dt);
     if (this.flash > 0) this.flash -= dt;
+    this.scanTimer -= dt;
+    const scan = this.scanTimer <= 0;
+    if (scan) this.scanTimer = AUTO_SCAN_INTERVAL;
 
     switch (this.state) {
       case State.IDLE:
         this.vx = 0;
-        this.scanTimer -= dt;
-        if (this.scanTimer <= 0) {
-          this.scanTimer = AUTO_SCAN_INTERVAL;
-          this.scanForEnemy();
-        }
+        if (scan) this.autoEngage();
         break;
       case State.MOVING: {
         const dx = this.moveX - this.x;
-        if (Math.abs(dx) < 6) { this.vx = 0; this.state = State.IDLE; }
-        else this.vx = Math.sign(dx) * this.speed;
+        if (Math.abs(dx) < 6) { this.vx = 0; this.state = State.IDLE; this.forced = false; break; }
+        this.vx = Math.sign(dx) * this.speed;
+        // Attack-move: fight anything that comes into weapon range, then carry on.
+        if (scan && !this.forced && this.repairRate === 0) {
+          const e = this.findEnemyUnit(this.range);
+          if (e) this.engage(e, { moveX: this.moveX });
+        }
         break;
       }
       case State.ATTACKING: {
         const t = this.target;
-        if (!t || t.dead) {
-          this.target = null;
-          this.state = State.IDLE;
-          this.vx = 0;
-          // A wall that was in the way is down — carry on with the original order.
-          const r = this.resume;
-          if (r?.target && !r.target.dead) this.attack(r.target);
-          else if (r?.moveX != null) this.moveTo(r.moveX);
-          this.resume = null;
-          break;
-        }
+        if (!t || t.dead) { this.finishTarget(); break; }
         const [cx, cy] = this.centre();
+        if (scan) {
+          if (!canReach(this, t)) { this.giveUp(t); break; }
+          // Marching on a building: turn on enemy units that come into range.
+          if (t.kind === 'building') {
+            const e = this.findEnemyUnit(this.range);
+            if (e) { this.engage(e, { target: t }); break; }
+          }
+        }
         if (distTo(cx, cy, t) > this.range) {
+          // Out of range: hold position, leash back to post, or chase.
+          if (this.hold) { this.vx = 0; if (scan) this.finishTarget(); break; }
+          if (this.home != null && Math.abs(this.x - this.home) > LEASH) { this.giveUp(t); break; }
           const [tx] = t.centre();
           this.vx = Math.sign(tx - this.x) * this.speed;
+          if (Math.abs(this.x - this.stuckX) > 6) { this.stuckX = this.x; this.stuckT = 0; }
+          else if ((this.stuckT += dt) > STUCK_SECONDS) { this.giveUp(t); break; }
         } else {
           this.vx = 0;
+          this.stuckT = 0;
+          this.stuckX = this.x;
           this.facing = Math.sign(t.centre()[0] - this.x) || this.facing;
           if (this.cooldownTimer <= 0) {
             this.cooldownTimer = this.cooldown;
@@ -130,7 +186,7 @@ export class Unit {
       }
       case State.REPAIRING: {
         const t = this.target;
-        if (!t || t.dead || t.hp >= t.maxHp) { this.target = null; this.state = State.IDLE; this.vx = 0; break; }
+        if (!t || t.dead || t.hp >= t.maxHp) { this.finishTarget(); break; }
         const [cx, cy] = this.centre();
         if (distTo(cx, cy, t) > this.range) {
           this.vx = Math.sign(t.centre()[0] - this.x) * this.speed;
@@ -153,28 +209,75 @@ export class Unit {
     if (wall && !wall.dead && this.target !== wall && this.repairRate === 0) {
       const resume = wasMoving ? { moveX: this.moveX }
         : this.state === State.ATTACKING ? { target: this.target } : null;
-      this.attack(wall);
-      this.resume = resume;
+      this.engage(wall, resume);
     }
   }
 
-  scanForEnemy() {
-    let best = null;
-    let bestD = this.range;
+  // Idle behaviour: engineers patch up nearby friendlies; everyone else
+  // engages enemies within their aggro radius and returns to post afterwards.
+  autoEngage() {
     const [cx, cy] = this.centre();
-    for (const u of this.game.units) {
-      if (u === this || u.dead || u.faction === this.faction) continue;
-      const d = Math.hypot(u.x - this.x, u.y - this.y);
-      if (d < bestD) { bestD = d; best = u; }
-    }
-    if (!best) {
-      for (const b of this.game.buildings) {
-        if (b.dead || b.faction === this.faction) continue;
-        const d = distTo(cx, cy, b);
-        if (d < bestD) { bestD = d; best = b; }
+    if (this.repairRate > 0) {
+      let best = null;
+      let bestD = ENGINEER_REPAIR_RADIUS;
+      for (const e of [...this.game.buildings, ...this.game.units]) {
+        if (e.dead || e.faction !== this.faction || e.hp >= e.maxHp || e.constructing) continue;
+        if (e.kind === 'unit' && !e.vehicle) continue;
+        const d = distTo(cx, cy, e);
+        if (d < bestD && canReach(this, e)) { bestD = d; best = e; }
       }
+      if (best) { const home = this.x; this.attack(best); this.home = home; }
+      return;
     }
-    if (best) this.attack(best);
+    const radius = this.hold ? this.range : this.aggroRadius;
+    const target = this.findEnemyUnit(radius) || this.findEnemyBuilding(this.range);
+    if (target) {
+      const home = this.home ?? this.x;
+      this.attack(target);
+      this.home = home;
+    }
+  }
+
+  get aggroRadius() { return Math.max(this.range + AGGRO_BONUS, MIN_AGGRO); }
+
+  findEnemyUnit(radius) {
+    const [cx, cy] = this.centre();
+    let best = null;
+    let bestD = radius;
+    for (const u of this.game.units) {
+      if (u === this || u.dead || u.faction === this.faction || this.isIgnoring(u)) continue;
+      const d = distTo(cx, cy, u);
+      if (d <= bestD && canReach(this, u)) { bestD = d; best = u; }
+    }
+    return best;
+  }
+
+  findEnemyBuilding(radius) {
+    const [cx, cy] = this.centre();
+    let best = null;
+    let bestD = radius;
+    for (const b of this.game.buildings) {
+      if (b.dead || b.faction === this.faction || this.isIgnoring(b)) continue;
+      const d = distTo(cx, cy, b);
+      if (d <= bestD && canReach(this, b)) { bestD = d; best = b; }
+    }
+    return best;
+  }
+
+  // Shot by someone: fight back (unless holding an explicit order) and call for help.
+  onAttacked(source) {
+    if (!source || source.dead || source.faction === this.faction) return;
+    this.game.callForHelp(this, source);
+    if (this.repairRate > 0 || !canReach(this, source)) return;
+    if (this.state === State.IDLE) {
+      const home = this.home ?? this.x;
+      this.attack(source);
+      this.home = home;
+    } else if (this.state === State.MOVING && !this.forced) {
+      this.engage(source, { moveX: this.moveX });
+    } else if (this.state === State.ATTACKING && this.target?.kind === 'building' && source.kind === 'unit') {
+      this.engage(source, { target: this.target });
+    }
   }
 
   // Sub-step so fast units (or a long frame) can't tunnel through a 32px tile.
@@ -247,7 +350,7 @@ export class Unit {
     this.y = newY;
   }
 
-  takeDamage(amount) {
+  takeDamage(amount, source) {
     if (this.dead) return;
     this.hp -= amount;
     this.flash = 0.15;
@@ -255,7 +358,9 @@ export class Unit {
       this.hp = 0;
       this.dead = true;
       this.state = State.DEAD;
+      return;
     }
+    this.onAttacked(source);
   }
 
   repair(amount) {
@@ -360,11 +465,12 @@ export class Building {
     }
   }
 
-  takeDamage(amount) {
+  takeDamage(amount, source) {
     if (this.dead) return;
     this.hp -= amount;
     this.flash = 0.15;
-    if (this.hp <= 0) { this.hp = 0; this.dead = true; }
+    if (this.hp <= 0) { this.hp = 0; this.dead = true; return; }
+    if (source && !source.dead) this.game.callForHelp(this, source);
   }
 
   repair(amount) {
@@ -386,6 +492,7 @@ export class Projectile {
     this.kind = opts.kind || 'bullet';
     this.splash = opts.splash || 0;
     this.vsBuildings = opts.vsBuildings || 1;
+    this.shooter = opts.shooter || null;
     this.radius = this.kind === 'bullet' ? PROJECTILE_RADIUS : 4.5;
     this.angle = 0;
     this.life = this.kind === 'lob' ? 8 : 4;
@@ -463,7 +570,13 @@ export class Projectile {
 
   hit(e, amount) {
     if (e.dead || e.faction === this.faction) return;
-    e.takeDamage(amount * (e.kind === 'building' ? this.vsBuildings : 1));
+    let mult = 1;
+    if (e.kind === 'building') {
+      mult = this.vsBuildings;
+      // Walls shrug off small-arms fire; shells and artillery hit them fully.
+      if (this.kind === 'bullet') mult *= e.def.bulletResist ?? 1;
+    }
+    e.takeDamage(amount * mult, this.shooter);
   }
 
   impact(direct) {

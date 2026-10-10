@@ -52,7 +52,8 @@ export const BUILDING_TYPES = {
   hq:       { hp: 500, w: 4, h: 3, cost: 0,   buildTime: 0,   income: 5 },
   barracks: { hp: 200, w: 3, h: 2, cost: 150, buildTime: 5.0, canTrain: ['soldier', 'heavy', 'scout', 'sniper'] },
   turret:   { hp: 120, w: 2, h: 2, cost: 100, buildTime: 4.0, autoAttack: true, damage: 12, range: 150, rate: 1.2 },
-  wall:     { hp: 300, w: 1, h: 2, cost: 40,  buildTime: 2.0, blocksUnits: true },
+  // Walls take half damage from bullets (shells and artillery hit them fully).
+  wall:     { hp: 1000, w: 1, h: 2, cost: 50, buildTime: 3.0, blocksUnits: true, bulletResist: 0.5 },
   mine:     { hp: 100, w: 2, h: 2, cost: 200, buildTime: 8.0, income: 15 },
   workshop: { hp: 180, w: 3, h: 2, cost: 200, buildTime: 6.0, canTrain: ['engineer', 'jeep', 'tank', 'artillery'] },
   bridge:   { hp: 150, w: 1, h: 1, cost: 15,  buildTime: 3.0, isBridge: true },

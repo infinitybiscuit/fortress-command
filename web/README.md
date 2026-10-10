@@ -45,7 +45,15 @@ and Esc cancels.
 
 ## Walls
 
-Walls block enemy units, and your own troops walk straight through them. Enemies that run into a wall stop and attack it, then carry on with their orders once it falls. Walls also stop direct fire: bullets and tank shells aimed past a wall hit the wall instead. Lobbed artillery shells arc over walls.
+Walls (💰50, 1000 HP) block enemy units, and your own troops walk straight through them. Bullets do half damage to walls; tank shells and artillery do full damage. Enemies that run into a wall stop and attack it, then carry on with their orders once it falls. Walls also stop direct fire: bullets and tank shells aimed past a wall hit the wall instead. Lobbed artillery shells arc over walls.
+
+## Unit behaviour
+
+- **Aggressive:** idle units notice enemies 120px beyond their weapon range (220px minimum) and attack them. Units on a move order fight anything that comes into range, then carry on to their destination. Units heading for a building turn on enemy units that come into range.
+- **Defensive:** units that get shot hit back. When a unit or building is hit, nearby idle friendlies rally to it. After a chase, idle units return to the spot they left, and they give up a chase after 450px. Idle engineers repair damaged buildings and vehicles nearby.
+- **Hold** keeps units in place, and they still fire at anything in range. **Retreat** heads home without stopping to fight.
+- Units give up on targets they can't reach (for example, something on a platform above their range) or that they've been stuck trying to reach for 2 seconds.
+- **CPU:** units defend their base when it's raided. Otherwise they march on the nearest enemy HQ and fight whatever gets in the way.
 
 ## Vehicles (Workshop)
 

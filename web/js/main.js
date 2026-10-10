@@ -4,7 +4,7 @@ import {
   UNIT_ICONS, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize,
 } from './config.js';
 import { Game } from './game.js';
-import { State } from './entities.js';
+import { State, canReach } from './entities.js';
 import {
   drawSky, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap,
 } from './render.js';
@@ -94,6 +94,9 @@ function toast(text, kind = 'error') {
 }
 function setStatus(text) { statusText = text; $('status').textContent = text; }
 
+// A fresh player order cancels Hold and Retreat stances.
+function order(u) { u.hold = false; u.forced = false; return u; }
+
 // ── Selection helpers ──────────────────────────────────────────────────────
 const selectedUnits = () => (game ? game.units.filter((u) => u.selected && u.faction === active) : []);
 
@@ -156,7 +159,8 @@ function handleTap(sx, sy) {
   const enemyBuilding = enemyUnit ? null : pickBuilding(wx, wy, enemy);
   const target = enemyUnit || enemyBuilding;
   if (target && sel.length) {
-    for (const u of sel) u.attack(target);
+    if (!sel.some((u) => canReach(u, target))) { toast("Can't reach that — it's too high up"); return; }
+    for (const u of sel) order(u).attack(target);
     markers.push({ x: target.centre()[0], y: target.centre()[1], t: 0.6, color: '#ff4d4d' });
     return;
   }
@@ -164,7 +168,7 @@ function handleTap(sx, sy) {
   const ownUnit = pickUnit(wx, wy, mine);
   const repairers = sel.filter((u) => u.repairRate > 0 && u !== ownUnit);
   if (ownUnit?.vehicle && ownUnit.hp < ownUnit.maxHp && repairers.length) {
-    for (const u of repairers) u.attack(ownUnit);
+    for (const u of repairers) order(u).attack(ownUnit);
     toast('Repairing', 'info');
     return;
   }
@@ -186,7 +190,7 @@ function handleTap(sx, sy) {
   if (ownBuilding) {
     const engineers = sel.filter((u) => u.repairRate > 0);
     if (engineers.length && ownBuilding.hp < ownBuilding.maxHp) {
-      for (const u of engineers) u.attack(ownBuilding);
+      for (const u of engineers) order(u).attack(ownBuilding);
       toast('Repairing', 'info');
       return;
     }
@@ -195,7 +199,7 @@ function handleTap(sx, sy) {
   }
 
   if (sel.length) {
-    for (const u of sel) u.moveTo(wx + (Math.random() - 0.5) * Math.min(60, sel.length * 6));
+    for (const u of sel) order(u).moveTo(wx + (Math.random() - 0.5) * Math.min(60, sel.length * 6));
     markers.push({ x: wx, y: wy, t: 0.6, color: '#00ff66' });
     return;
   }
@@ -409,7 +413,7 @@ function renderPanel() {
     panel.innerHTML = `
       <div class="panel-head"><div class="panel-title">${sel.length} selected <span class="panel-sub">${summary}</span></div>
         <button class="small-btn" data-act="deselect">✕</button></div>
-      <div class="hint">Tap ground to move · tap an enemy to attack${counts.engineer ? ' · tap a damaged building or vehicle to repair' : ''}</div>
+      <div class="hint">Tap ground to move (they fight on the way) · tap an enemy to attack${counts.engineer ? ' · tap a damaged building or vehicle to repair' : ''}</div>
       <div class="row">
         <button class="act-btn" data-act="stop">✋ Hold</button>
         <button class="act-btn" data-act="charge">⚔️ Charge</button>
@@ -467,18 +471,28 @@ panel.addEventListener('click', (e) => {
         selectUnits(army);
         break;
       }
-      case 'stop': for (const u of sel) { u.state = State.IDLE; u.target = null; u.vx = 0; } break;
+      case 'stop':
+        // Hold: stay put, but still fire at anything that comes into range.
+        for (const u of sel) {
+          order(u).hold = true;
+          Object.assign(u, { state: State.IDLE, target: null, resume: null, home: null, vx: 0 });
+        }
+        toast('Holding position', 'info');
+        break;
       case 'charge': {
         // Advance toward the nearest enemy HQ.
         const enemies = game.players.filter((o, i) => i !== active && o.hq).map((o) => o.hq);
         if (!enemies.length || !sel.length) break;
         const ax = sel.reduce((s, u) => s + u.x, 0) / sel.length;
         enemies.sort((a, b) => Math.abs(a.centre()[0] - ax) - Math.abs(b.centre()[0] - ax));
-        for (const u of sel) u.attack(enemies[0]);
+        for (const u of sel) order(u).attack(enemies[0]);
         toast('Charge!', 'info');
         break;
       }
-      case 'retreat': if (hq) for (const u of sel) u.moveTo(hq.centre()[0] + (Math.random() - 0.5) * 80); break;
+      case 'retreat':
+        // Retreat ignores enemies on the way home.
+        if (hq) for (const u of sel) { order(u).moveTo(hq.centre()[0] + (Math.random() - 0.5) * 80); u.forced = true; }
+        break;
       case 'find': {
         if (!sel.length) break;
         const ax = sel.reduce((s, u) => s + u.x, 0) / sel.length;
