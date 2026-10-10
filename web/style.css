@@ -179,6 +179,8 @@ button {
   display: grid; place-items: center;
   padding: calc(var(--safe-top) + 16px) 20px calc(var(--safe-bottom) + 16px);
   overflow-y: auto;
+  /* Never wider than the screen, whatever the card's contents would like */
+  grid-template-columns: minmax(0, 1fr);
 }
 .overlay-card { width: 100%; max-width: 380px; text-align: center; }
 .overlay h1 { font-size: 44px; line-height: 1.05; margin: 0 0 8px; letter-spacing: 0.04em; font-weight: 900; text-shadow: 0 4px 0 var(--accent-dim); }
@@ -294,7 +296,8 @@ button {
 .code-input { font-size: 18px; background: #0e100a; }
 
 /* Online lobby */
-.name-input { letter-spacing: 0.08em; font-size: 14px; }
+/* 16px or more, or iOS zooms the page when the box is tapped */
+.name-input { letter-spacing: 0.08em; font-size: 16px; }
 .lobby-label { font-family: var(--pixel); font-size: 9px; color: var(--dim); margin: 0 0 4px; }
 #online-lobby .room-code { margin-bottom: 14px; }
 .lobby-slots { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
