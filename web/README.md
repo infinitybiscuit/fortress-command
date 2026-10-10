@@ -55,6 +55,8 @@ The host plays **Blue** (left) and the guest plays **Red** (right). Both use the
 | Sell | Tap your structure, then **Sell** twice: a full refund while it's still being built, otherwise 50% of its cost scaled by remaining health, plus any queued units. The HQ can't be sold |
 | Build | Tap a structure, tap the map to preview (green = valid), tap again or press **Place** |
 
+**Build zone.** New structures must go within 8 tiles (sideways) of one of your HQ, Barracks, Turret, Mine, Workshop or Airbase. While you're placing a structure, the zone is outlined in green (and shaded on the minimap), and everything outside it is dimmed. Walls, bridges and ramps can be built inside the zone but don't extend it, so you can't chain cheap pieces across the map. Turrets do extend it, so you can push your front line forward. The CPU plays by the same rule, and in online games the host checks every placement.
+
 Placement snaps to the surface under your finger. Bridges and ramps stay in placement mode
 after each block, so you can lay several in a row.
 

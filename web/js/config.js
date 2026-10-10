@@ -4,7 +4,7 @@
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v10 · Relay on';
+export const VERSION = 'v11 · Build zone';
 
 // Cloudflare Worker (see /relay) that hands out TURN relay credentials, used
 // when two phones can't connect directly. Leave empty to connect direct-only.
@@ -31,6 +31,9 @@ export const ECONOMY_TICK = 1.0;
 export const AI_TICK = 2.0;
 export const MAX_DELTA = 0.25;
 export const STARTING_MONEY = 500;
+// New structures must sit within this many tiles (sideways) of one of your
+// zone-extending buildings — no dropping a Barracks next to the enemy HQ.
+export const BUILD_RADIUS_TILES = 8;
 export const LOW_CREDITS = 50;
 
 export const PROJECTILE_SPEED = 350;
@@ -68,12 +71,13 @@ export const BUILDING_TYPES = {
   // airRange: turrets double as anti-aircraft guns with a much longer reach upward.
   turret:   { hp: 120, w: 2, h: 2, cost: 100, buildTime: 4.0, autoAttack: true, damage: 12, range: 150, rate: 1.2, airRange: 420, airDamage: 30 },
   // Walls take half damage from bullets (shells and artillery hit them fully).
-  wall:     { hp: 1000, w: 1, h: 2, cost: 50, buildTime: 3.0, blocksUnits: true, bulletResist: 0.5 },
+  // noZone: can be built inside your zone but doesn't extend it (stops cheap chains across the map).
+  wall:     { hp: 1000, w: 1, h: 2, cost: 50, buildTime: 3.0, blocksUnits: true, bulletResist: 0.5, noZone: true },
   mine:     { hp: 100, w: 2, h: 2, cost: 200, buildTime: 8.0, income: 15 },
   workshop: { hp: 180, w: 3, h: 2, cost: 200, buildTime: 6.0, canTrain: ['engineer', 'jeep', 'tank', 'artillery'] },
   airbase:  { hp: 300, w: 4, h: 2, cost: 300, buildTime: 10.0, canTrain: ['helicopter', 'bomber'] },
-  bridge:   { hp: 150, w: 1, h: 1, cost: 15,  buildTime: 3.0, isBridge: true },
-  ramp:     { hp: 120, w: 1, h: 1, cost: 20,  buildTime: 4.0, isRamp: true },
+  bridge:   { hp: 150, w: 1, h: 1, cost: 15,  buildTime: 3.0, isBridge: true, noZone: true },
+  ramp:     { hp: 120, w: 1, h: 1, cost: 20,  buildTime: 4.0, isRamp: true, noZone: true },
 };
 
 export const BUILD_MENU = ['barracks', 'turret', 'wall', 'mine', 'workshop', 'airbase', 'bridge', 'ramp'];

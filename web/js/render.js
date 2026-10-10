@@ -558,6 +558,34 @@ const VEHICLE = {
   },
 };
 
+// Placement mode: dim everything outside the player's build zone and mark its edges.
+export function drawBuildZones(ctx, zones, view) {
+  const top = view.y;
+  const h = view.h;
+  let x = Math.max(0, view.x);
+  const right = Math.min(WORLD_W, view.x + view.w);
+  ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  for (const [from, to] of zones) {
+    const zx0 = from * TILE_SIZE;
+    const zx1 = to * TILE_SIZE;
+    if (zx0 > x) ctx.fillRect(x, top, Math.min(zx0, right) - x, h);
+    x = Math.max(x, zx1);
+  }
+  if (x < right) ctx.fillRect(x, top, right - x, h);
+
+  ctx.strokeStyle = 'rgba(0,255,102,0.75)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 6]);
+  for (const [from, to] of zones) {
+    ctx.fillStyle = 'rgba(0,255,102,0.05)';
+    ctx.fillRect(from * TILE_SIZE, top, (to - from) * TILE_SIZE, h);
+    ctx.beginPath();
+    for (const ex of [from * TILE_SIZE, to * TILE_SIZE]) { ctx.moveTo(ex, top); ctx.lineTo(ex, top + h); }
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
 export function drawGhost(ctx, pl) {
   const x = pl.tx * TILE_SIZE;
   const y = pl.ty * TILE_SIZE;
@@ -572,7 +600,7 @@ export function drawGhost(ctx, pl) {
 }
 
 // ── Minimap ────────────────────────────────────────────────────────────────
-export function drawMinimap(ctx, game, cw, ch, view, terrainCache) {
+export function drawMinimap(ctx, game, cw, ch, view, terrainCache, zones = null) {
   const sx = cw / WORLD_W;
   const sy = ch / WORLD_H;
   if (terrainCache.version !== game.map.version || terrainCache.w !== cw || terrainCache.h !== ch) {
@@ -594,6 +622,11 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache) {
     Object.assign(terrainCache, { version: game.map.version, w: cw, h: ch });
   }
   ctx.drawImage(terrainCache.canvas, 0, 0);
+  if (zones) {
+    // Placement mode: highlight where the player is allowed to build.
+    ctx.fillStyle = 'rgba(0,255,102,0.28)';
+    for (const [from, to] of zones) ctx.fillRect(from * TILE_SIZE * sx, 0, (to - from) * TILE_SIZE * sx, ch);
+  }
   for (const b of game.buildings) {
     if (b.type === 'bridge' || b.type === 'ramp') continue;
     ctx.fillStyle = css(PLAYER_COLORS[b.faction]);
