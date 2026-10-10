@@ -60,7 +60,7 @@ The host plays **Blue** (left) and the guest plays **Red** (right). Both use the
 | Action | Gesture |
 |---|---|
 | Pan the battlefield | Drag (with momentum) |
-| Zoom | Pinch, or the ＋ / － buttons |
+| Zoom | Pinch, or the ＋ / － buttons. Zoom out well past the map height (about 40% of the map in view on a phone) for an overview, with sky above |
 | Jump the camera | Tap or drag the minimap |
 | Select a unit | Tap it |
 | Select all units of a type on screen | Double-tap a unit |

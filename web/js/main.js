@@ -11,7 +11,7 @@ import {
 } from './net.js';
 import {
   drawBackground, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
-  drawEffects, updateEffects, drawMarker, G,
+  drawEffects, updateEffects, drawMarker, G, SKY_TOP,
 } from './render.js';
 
 const $ = (id) => document.getElementById(id);
@@ -43,13 +43,15 @@ const minimapCache = {};
 // scale = screen points per world unit. It's snapped so each art pixel
 // (G world units) covers a whole number of device pixels, keeping the pixel
 // art sharp; `zoom` is the unsnapped target that pinch gestures adjust.
+// Zoomed out past the world's height (down to one device pixel per art
+// pixel) the battlefield sits at the bottom of the screen with sky above.
 const cam = { x: 0, y: 0, scale: 1, zoom: 1, vx: 0, vy: 0 };
 let viewW = 0;
 let viewH = 0;
 let dpr = 1;
 
-function minScale() { return Math.max(viewH / WORLD_H, viewW / WORLD_W); }
-function defaultScale() { return Math.min(MAX_SCALE, Math.max(minScale(), viewH / (WORLD_H - 5 * TILE_SIZE))); }
+function minScale() { return Math.max(viewW / WORLD_W, 1 / (dpr * G)); }
+function defaultScale() { return Math.min(MAX_SCALE, Math.max(viewH / WORLD_H, viewW / WORLD_W, viewH / (WORLD_H - 5 * TILE_SIZE))); }
 function view() { return { x: cam.x, y: cam.y, w: viewW / cam.scale, h: viewH / cam.scale }; }
 
 function snapScale(z) {
@@ -66,7 +68,8 @@ function clampCam() {
   // Looping maps pan forever; otherwise stop at the map edges.
   if (game?.wrap) cam.x = ((cam.x % WORLD_W) + WORLD_W) % WORLD_W;
   else cam.x = Math.min(Math.max(0, cam.x), WORLD_W - v.w);
-  cam.y = Math.min(Math.max(0, cam.y), WORLD_H - v.h);
+  // Taller than the world: pin the ground to the bottom of the screen.
+  cam.y = v.h >= WORLD_H ? WORLD_H - v.h : Math.min(Math.max(0, cam.y), WORLD_H - v.h);
 }
 
 function centreOn(wx, wy) {
@@ -351,8 +354,13 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
-$('btn-zoom-in').addEventListener('click', () => zoomAt(1.25, viewW / 2, viewH / 2));
-$('btn-zoom-out').addEventListener('click', () => zoomAt(0.8, viewW / 2, viewH / 2));
+// The buttons zoom about the middle of the battlefield, not the empty sky.
+function zoomButton(factor) {
+  const top = Math.max(0, -cam.y * cam.scale);
+  zoomAt(factor, viewW / 2, (top + viewH) / 2);
+}
+$('btn-zoom-in').addEventListener('click', () => zoomButton(1.4));
+$('btn-zoom-out').addEventListener('click', () => zoomButton(1 / 1.4));
 
 // ── Bottom panel ───────────────────────────────────────────────────────────
 function renderPanel() {
@@ -898,26 +906,31 @@ function frame(now) {
 const low = document.createElement('canvas');
 const lctx = low.getContext('2d');
 
+// Art pixels of sky kept above the top of the world when zoomed out;
+// anything higher is filled with plain sky.
+const SKY_PAD = 100;
+
 function draw(dt) {
   const P = Math.max(1, Math.round(cam.scale * dpr * G)); // device px per art px
-  const bw = Math.ceil(canvas.width / P) + 2;
-  const bh = Math.ceil(canvas.height / P) + 2;
-  if (low.width !== bw || low.height !== bh) { low.width = bw; low.height = bh; }
-  lctx.imageSmoothingEnabled = false;
   const camAX = Math.floor(cam.x / G);
   const camAY = Math.floor(cam.y / G);
+  const topA = Math.max(camAY, -SKY_PAD); // first art row in the buffer
+  const bw = Math.ceil(canvas.width / P) + 2;
+  const bh = Math.ceil(canvas.height / P) + 2 - (topA - camAY);
+  if (low.width !== bw || low.height !== bh) { low.width = bw; low.height = bh; }
+  lctx.imageSmoothingEnabled = false;
   const offX = Math.round((cam.x / G - camAX) * P);
   const offY = Math.round((cam.y / G - camAY) * P);
 
   lctx.setTransform(1, 0, 0, 1, 0, 0);
-  drawBackground(lctx, bw, bh, camAX, camAY);
+  drawBackground(lctx, bw, bh, camAX, topA);
   const v = view();
   // On looping maps the view can straddle the seam: draw the world again one
   // map-width over so both sides show.
   const offsets = game.wrap ? [0, WORLD_W, -WORLD_W].filter((o) => o + WORLD_W > v.x && o < v.x + v.w) : [0];
   const eachCopy = (fn) => {
     for (const o of offsets) {
-      lctx.setTransform(1, 0, 0, 1, o / G - camAX, -camAY);
+      lctx.setTransform(1, 0, 0, 1, o / G - camAX, -topA);
       fn({ ...v, x: v.x - o });
     }
   };
@@ -933,7 +946,7 @@ function draw(dt) {
   if (pendingBuild) {
     let zones = game.buildZones(active);
     if (game.wrap) zones = [-1, 0, 1].flatMap((k) => zones.map(([a, b]) => [a + k * MAP_W, b + k * MAP_W]));
-    lctx.setTransform(1, 0, 0, 1, -camAX, -camAY);
+    lctx.setTransform(1, 0, 0, 1, -camAX, -topA);
     drawBuildZones(lctx, zones.sort((a, b) => a[0] - b[0]), v);
   }
 
@@ -944,8 +957,10 @@ function draw(dt) {
   });
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const top = (topA - camAY) * P - offY;
+  if (top > 0) { ctx.fillStyle = SKY_TOP; ctx.fillRect(0, 0, canvas.width, top + 1); }
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(low, 0, 0, bw, bh, -offX, -offY, bw * P, bh * P);
+  ctx.drawImage(low, 0, 0, bw, bh, -offX, top, bw * P, bh * P);
 
   mctx.setTransform(1, 0, 0, 1, 0, 0);
   drawMinimap(mctx, game, mini.width, mini.height, v, minimapCache, pendingBuild ? game.buildZones(active) : null);
