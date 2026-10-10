@@ -2,7 +2,7 @@ name: Deploy web build to GitHub Pages
 
 on:
   push:
-    branches: [web-iphone]
+    branches: [main]
     paths: ['web/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
