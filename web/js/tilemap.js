@@ -5,6 +5,7 @@ import {
 } from './config.js';
 
 const key = (tx, ty) => ty * MAP_W + tx;
+const modW = (tx) => ((tx % MAP_W) + MAP_W) % MAP_W;
 
 export class TileMap {
   constructor() {
@@ -48,18 +49,25 @@ export class TileMap {
 
   set(tx, ty, t) { this.tiles[key(tx, ty)] = t; }
 
+  // In looping maps, columns past either edge wrap around; otherwise the
+  // map edges act as solid walls.
+  col(tx) { return this.wrap ? modW(tx) : tx; }
+
   get(tx, ty) {
+    tx = this.col(tx);
     if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return TILE_EMPTY;
     return this.tiles[key(tx, ty)];
   }
 
   isSolid(tx, ty) {
+    tx = this.col(tx);
     if (ty < 0 || ty >= MAP_H || tx < 0 || tx >= MAP_W) return true;
     return this.tiles[key(tx, ty)] !== TILE_EMPTY;
   }
 
   // Terrain is always solid; walls only block other factions.
   isSolidForFaction(tx, ty, faction) {
+    tx = this.col(tx);
     if (ty < 0 || ty >= MAP_H || tx < 0 || tx >= MAP_W) return true;
     const k = key(tx, ty);
     if (this.wallTiles.has(k)) return this.wallTiles.get(k) !== faction;
@@ -71,6 +79,7 @@ export class TileMap {
   // Id of the wall building at a tile if it belongs to a faction other than
   // `faction`, else null.
   enemyWallAt(tx, ty, faction) {
+    tx = this.col(tx);
     if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return null;
     const k = key(tx, ty);
     if (!this.wallTiles.has(k) || this.wallTiles.get(k) === faction) return null;

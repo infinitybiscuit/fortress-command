@@ -19,6 +19,12 @@ web manifest and service worker, so the game launches without browser chrome and
 offline after the first load. When served over HTTPS (e.g. GitHub Pages, see
 `.github/workflows/pages.yml`), the service worker caches the assets.
 
+## Free-for-All: looping map
+
+In **Free-for-All (3)** and **(4)**, the battlefield is a loop. Walk, drive or fly off one edge and you come back on the other, and the camera pans endlessly. HQs are spaced evenly around the loop, so every player has a neighbour on each side and nobody gets a safe corner. Units, shots, artillery, aircraft, the minimap and build zones all work across the seam. Orders take the short way round. In 1 vs 1 modes the map still has edges.
+
+Every player in every mode starts with two soldiers in front of their HQ.
+
 ## Online 1 vs 1 (two phones)
 
 Play a friend on their own device, anywhere with internet:

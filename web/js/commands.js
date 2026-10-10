@@ -43,8 +43,8 @@ export function applyCommand(game, p, cmd) {
       // Advance toward the nearest enemy HQ.
       const enemies = game.players.filter((o, i) => i !== p && o.hq).map((o) => o.hq);
       if (!enemies.length || !own.length) return null;
-      const ax = own.reduce((s, u) => s + u.x, 0) / own.length;
-      enemies.sort((a, b) => Math.abs(a.centre()[0] - ax) - Math.abs(b.centre()[0] - ax));
+      const ax = own[0].x;
+      enemies.sort((a, b) => Math.abs(game.dx(ax, a.centre()[0])) - Math.abs(game.dx(ax, b.centre()[0])));
       for (const u of own) order(u).attack(enemies[0]);
       return null;
     }
