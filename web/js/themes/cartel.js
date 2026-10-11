@@ -2,7 +2,7 @@
 // haciendas, gunmen in loud shirts, homemade armoured trucks and a very
 // legitimate taco stand. Fictional outfits only. Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -21,6 +21,7 @@ const palette = {
   sand: '#d8b878', sandLight: '#ecd09a', sandDark: '#b08e56',
   dirt: '#8a5434', dirtMid: '#74442a', dirtDeep: '#5a3420', pebble: '#b07a52', pebbleDark: '#4a2a18',
   cactus: '#3a7a4a', cactusLight: '#5aa064', cactusDark: '#265a34', palm: '#2e6a3a', palmLight: '#4a9050',
+  navy: '#1e2a4a', navyLight: '#34446e', pastelPink: '#f4a8c8', pastelTeal: '#8ae0d4', donut: '#d8964a', icing: '#ff8ac8',
   neonPink: '#ff4aa8', neonTeal: '#3ae8d8', neonGreen: '#5aff7a',
   fire: '#f28a30', glass: '#ffd27a', glassBlue: '#8ac8e8', smoke: '#cfc4c0', shadow: 'rgba(0,0,0,0.3)',
 };
@@ -28,7 +29,7 @@ const FATIGUES = [0.3, 0.29, 0.22];
 
 // ── Infantry ───────────────────────────────────────────────────────────────
 // 20×17 canvas, feet at (8,16), facing right — the same frame as Classic.
-function buildSoldier(type, f, frame) {
+function cartelSoldier(type, f, frame) {
   const t = team(f);
   const [c, g] = canvas(20, 17);
   const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
@@ -104,7 +105,7 @@ function wheel(g, x, y, r, frame) {
 }
 
 // Technical: a pickup with a machine gun on a post in the bed.
-function buildTechnical(f, frame) {
+function cartelTechnical(f, frame) {
   const t = team(f);
   const [c, g] = canvas(30, 18);
   outlined(g, [
@@ -121,7 +122,7 @@ function buildTechnical(f, frame) {
 
 // Monstruo: a homemade armoured truck of welded plate, slit windows, a ram
 // and a gun box on the roof.
-function buildMonstruo(f, frame) {
+function cartelMonstruo(f, frame) {
   const t = team(f);
   const [c, g] = canvas(38, 22);
   outlined(g, [
@@ -139,7 +140,7 @@ function buildMonstruo(f, frame) {
 }
 
 // Rocket truck: a flatbed with a tilted rack of improvised rockets.
-function buildRocketTruck(f, frame) {
+function cartelRocketTruck(f, frame) {
   const t = team(f);
   const [c, g] = canvas(32, 19);
   outlined(g, [
@@ -156,7 +157,7 @@ function buildRocketTruck(f, frame) {
 }
 
 // Narco chopper: a little egg-shaped helicopter (rotors spin live).
-function buildChopper(f) {
+function cartelChopper(f) {
   const t = team(f);
   const [c, g] = canvas(32, 16);
   outlined(g, [
@@ -170,7 +171,7 @@ function buildChopper(f) {
 }
 
 // Smuggler plane: a high-wing twin-prop cargo plane.
-function buildPlane(f) {
+function cartelPlane(f) {
   const t = team(f);
   const [c, g] = canvas(48, 20);
   outlined(g, [
@@ -184,10 +185,138 @@ function buildPlane(f) {
   return { c, ax: 24, ay: 15 };
 }
 
+
+// ── The Cops ───────────────────────────────────────────────────────────────
+// An 80s cop show: pastel blazers, a K-9 unit, a cruiser with a lightbar,
+// a police blimp, the Academy, and a donut shop to answer the taco stand.
+const cops = (f) => sideOf(f) === 'cops';
+
+function copSoldier(type, f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(20, 17);
+  const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
+  const boots = frame ? [[5, 15, 3, 1], [9, 15, 3, 1]] : [[4, 15, 3, 1], [10, 15, 3, 1]];
+  let parts;
+  let details;
+  if (type === 'scout') {
+    // K-9: a police dog in a team vest
+    const legsD = frame ? [[5, 12, 1, 4], [8, 12, 1, 3], [13, 12, 1, 4], [15, 12, 1, 3]] : [[4, 12, 1, 3], [7, 12, 1, 4], [12, 12, 1, 3], [16, 12, 1, 4]];
+    parts = [
+      ...legsD.map((l) => [...l, '#5a3a22']),
+      [4, 8, 13, 5, '#8a5a32'], [15, 5, 4, 5, '#8a5a32'], [17, 7, 3, 2, '#5a3a22'], [15, 3, 1, 2, '#5a3a22'], [17, 3, 1, 2, '#5a3a22'], [1, 6, 3, 2, '#5a3a22'],
+    ];
+    details = [[6, 8, 7, 4, t.main], [7, 9, 5, 1, C.white], [17, 6, 1, 1, C.O], [19, 7, 1, 1, C.O], [4, 12, 13, 1, '#5a3a22']];
+  } else if (type === 'heavy') {
+    // SWAT: helmet, visor, vest, riot shield and shotgun
+    parts = [
+      ...legs.map((l) => [...l, C.navy]), ...boots.map((b) => [...b, C.boot]),
+      [4, 7, 9, 5, C.navy], [6, 3, 6, 5, C.skin], [5, 1, 8, 3, C.navy], [10, 9, 9, 1, C.gun], [2, 6, 3, 9, C.glassBlue],
+    ];
+    details = [[7, 3, 6, 2, C.gunDark], [5, 1, 8, 1, C.navyLight], [5, 9, 8, 2, t.main], [6, 9, 6, 1, C.white], [2, 6, 1, 9, C.white], [18, 9, 1, 1, C.O]];
+  } else if (type === 'engineer') {
+    // Forensics: white coveralls, camera round the neck
+    parts = [
+      ...legs.map((l) => [...l, C.white]), ...boots.map((b) => [...b, C.white]),
+      [5, 8, 7, 4, C.white], [6, 3, 6, 5, C.skin], [6, 1, 6, 2, C.hair], [9, 9, 4, 3, C.gun],
+    ];
+    details = [[10, 5, 1, 1, C.O], [7, 7, 4, 1, C.skinDark], [10, 10, 2, 1, C.glassBlue], [5, 8, 1, 4, t.main], [11, 9, 1, 1, C.white]];
+  } else if (type === 'sniper') {
+    // Sharpshooter: navy cap and scoped rifle
+    parts = [
+      ...legs.map((l) => [...l, C.navy]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.navyLight], [6, 3, 6, 5, C.skin], [5, 1, 7, 2, C.navy], [10, 2, 3, 1, C.navy], [9, 9, 10, 1, C.gun], [12, 7, 4, 1, C.gun],
+    ];
+    details = [[10, 5, 1, 1, C.O], [7, 7, 4, 1, C.skinDark], [6, 1, 2, 1, C.gold], [5, 10, 7, 1, t.main], [12, 8, 1, 1, C.gun], [18, 9, 1, 1, C.O]];
+  } else {
+    // Vice cop: pastel blazer, sleeves pushed up, stubble, aviators
+    parts = [
+      ...legs.map((l) => [...l, C.suit]), ...boots.map((b) => [...b, C.white]),
+      [5, 8, 7, 4, C.pastelTeal], [6, 3, 6, 5, C.skin], [6, 1, 6, 2, '#6a4a2a'], [5, 2, 2, 3, '#6a4a2a'],
+      [11, 9, 5, 1, C.gun], [11, 10, 1, 2, C.gun],
+    ];
+    details = [
+      [8, 4, 4, 1, C.O], [10, 4, 1, 1, C.glassBlue], [7, 6, 5, 2, C.skinDark], [7, 8, 3, 4, t.main], [5, 10, 2, 1, C.skin], [5, 8, 1, 4, C.pastelPink],
+      [10, 11, 1, 1, C.gold],
+    ];
+  }
+  outlined(g, parts, details);
+  return { c, ax: 8, ay: 16 };
+}
+
+// Police cruiser with a lightbar that flashes as it drives.
+function copCruiser(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(32, 18);
+  outlined(g, [[1, 9, 30, 4, C.white], [8, 5, 14, 4, C.gunDark], [6, 3, 4, 2, C.red], [10, 3, 4, 2, '#3a6ae8']], [
+    [1, 11, 30, 2, C.gunDark], [9, 6, 5, 3, C.glassBlue], [15, 6, 6, 3, C.glassBlue], [12, 9, 6, 2, C.gold], [13, 9, 4, 1, t.main],
+    [30, 10, 1, 1, C.glass], [1, 10, 1, 1, C.red], [frame ? 6 : 10, 3, 4, 1, C.white],
+  ]);
+  wheel(g, 7, 14, 3, frame);
+  wheel(g, 24, 14, 3, frame);
+  return { c, ax: 15, ay: 17 };
+}
+
+// SWAT truck: a big boxy armoured van.
+function copSwatTruck(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(38, 22);
+  outlined(g, [[2, 4, 24, 12, C.navy], [26, 7, 9, 9, C.navy], [8, 1, 8, 3, C.gun], [15, 2, 8, 1, C.gun]], [
+    [2, 4, 24, 1, C.navyLight], [27, 8, 5, 3, C.glassBlue], [2, 10, 33, 2, t.main], [5, 6, 3, 2, C.gunDark], [11, 6, 3, 2, C.gunDark], [17, 6, 3, 2, C.gunDark],
+    [34, 13, 1, 2, C.glass], [8, 1, 8, 1, C.gunLight],
+  ]);
+  for (const x of [8, 20, 30]) wheel(g, x, 17, 4, frame);
+  return { c, ax: 18, ay: 21 };
+}
+
+// Riot van with a tear-gas launcher on the roof.
+function copRiotVan(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(32, 19);
+  outlined(g, [[1, 7, 28, 7, C.white], [22, 5, 7, 4, C.white], [6, 3, 6, 4, C.gun], [10, 1, 3, 3, C.gun], [12, 0, 3, 2, C.gun]], [
+    [1, 10, 28, 2, C.navy], [23, 6, 4, 2, C.glassBlue], [1, 12, 28, 1, t.main], [12, 0, 3, 1, C.O], [28, 9, 1, 1, C.glass],
+  ]);
+  wheel(g, 7, 15, 3, frame);
+  wheel(g, 23, 15, 3, frame);
+  return { c, ax: 15, ay: 18 };
+}
+
+// Police chopper with a searchlight (rotors spin live).
+function copChopper(f) {
+  const t = team(f);
+  const [c, g] = canvas(32, 16);
+  outlined(g, [
+    [10, 4, 15, 8, C.navy], [1, 6, 10, 2, C.navy], [0, 3, 3, 4, t.main],
+    [17, 2, 2, 2, C.gun], [13, 12, 1, 2, C.gun], [21, 12, 1, 2, C.gun], [10, 14, 15, 1, C.gun], [22, 11, 3, 2, C.tinLight],
+  ], [
+    [19, 5, 5, 4, C.glassBlue], [10, 9, 15, 1, C.white], [1, 7, 10, 1, C.white], [12, 6, 4, 2, t.main], [23, 12, 2, 1, C.glass],
+  ]);
+  return { c, ax: 16, ay: 13 };
+}
+
+// The police blimp: a slow, smug surveillance gasbag.
+function copBlimp(f) {
+  const t = team(f);
+  const [c, g] = canvas(46, 21);
+  outlined(g, [[6, 3, 34, 11, C.white], [4, 5, 3, 7, C.white], [39, 5, 4, 7, C.white], [1, 3, 4, 4, C.navy], [1, 10, 4, 4, C.navy], [16, 14, 14, 4, C.navy]], [
+    [6, 3, 34, 1, C.suit], [6, 7, 34, 3, C.navy], [10, 8, 26, 1, t.main], [17, 15, 2, 1, C.glass], [21, 15, 2, 1, C.glass], [25, 15, 2, 1, C.glass], [6, 12, 34, 1, C.suitShade],
+  ]);
+  return { c, ax: 23, ay: 16 };
+}
+
+const buildSoldier = (type, f, frame) => (cops(f) ? copSoldier : cartelSoldier)(type, f, frame);
+const buildTechnical = (f, frame) => (cops(f) ? copCruiser : cartelTechnical)(f, frame);
+const buildMonstruo = (f, frame) => (cops(f) ? copSwatTruck : cartelMonstruo)(f, frame);
+const buildRocketTruck = (f, frame) => (cops(f) ? copRiotVan : cartelRocketTruck)(f, frame);
+const buildChopper = (f) => (cops(f) ? copChopper : cartelChopper)(f);
+const buildPlane = (f) => (cops(f) ? copBlimp : cartelPlane)(f);
+
 function rotor(ctx, u, x, y) {
   const tick = Math.floor(performance.now() / 50);
   const s = u.facing;
-  if (u.type === 'helicopter') {
+  if (u.type === 'bomber' && cops(u.faction)) {
+    const px = s > 0 ? x - 23 : x + 22;
+    if (tick % 2) rect(ctx, px, y - 12, 1, 7, C.smoke); else rect(ctx, px, y - 9, 1, 2, C.smoke);
+  } else if (u.type === 'helicopter') {
     if (tick % 2) rect(ctx, x - 15, y - 12, 30, 1, C.gunLight);
     else { rect(ctx, x - 7, y - 12, 14, 1, C.gun); rect(ctx, x - 1, y - 13, 2, 1, C.gun); }
     const tx = s > 0 ? x - 15 : x + 14;
@@ -376,6 +505,78 @@ const BUILD = {
     g.fillStyle = C.woodDark; for (let y = 3; y < 16; y += 4) g.fillRect(0, y, 16, 1);
     g.fillStyle = C.O; g.fillRect(0, 0, 1, 16); g.fillRect(15, 0, 1, 16);
     g.fillStyle = t.main; g.fillRect(2, 1, 3, 2);
+  },
+};
+
+
+// The Cops' buildings; the airstrip, bridge and ramp are shared.
+function brickBlock(g, x, y, w, h) {
+  outlined(g, [[x, y, w, h, '#9a4a36']], [[x, y, w, 1, '#b8624a']]);
+  g.fillStyle = '#723224';
+  for (let yy = y + 3; yy < y + h; yy += 3) { g.fillRect(x, yy, w, 1); for (let xx = x + ((yy - y) % 2 ? 2 : 5); xx < x + w; xx += 6) g.fillRect(xx, yy - 2, 1, 2); }
+}
+const COP_BUILD = {
+  hq(g, t) {
+    // Police precinct: brick, stone steps, twin blue lamps, flag on the roof
+    brickBlock(g, 4, 12, 56, 32);
+    outlined(g, [[2, 9, 60, 3, C.blockLight]], [[2, 11, 60, 1, C.blockDark]]);
+    for (const x of [8, 18, 40, 50]) window_(g, x, 16, 6, 7, x === 18 || x === 50);
+    for (const x of [8, 18, 40, 50]) window_(g, x, 28, 6, 7, x === 8);
+    outlined(g, [[26, 30, 12, 14, '#3a2a20']], [[31, 30, 2, 14, C.O], [26, 30, 12, 1, C.gold]]);
+    outlined(g, [[22, 44, 20, 2, C.blockLight], [20, 46, 24, 2, C.block]], []);
+    for (const x of [22, 40]) { outlined(g, [[x, 32, 2, 8, C.gunDark], [x - 1, 29, 4, 3, '#3a6ae8']], [[x, 30, 2, 1, C.glassBlue]]); }
+    outlined(g, [[24, 21, 16, 6, C.navy]], [[25, 22, 14, 1, C.gold], [25, 25, 14, 1, C.gold], [30, 23, 4, 2, t.main]]);
+    g.fillStyle = C.O; g.fillRect(31, 0, 2, 9); g.fillStyle = C.white; g.fillRect(31, 0, 1, 9);
+    g.fillStyle = C.O; g.fillRect(33, 0, 10, 7); g.fillStyle = t.main; g.fillRect(33, 1, 9, 5); g.fillStyle = C.white; g.fillRect(34, 2, 3, 3);
+  },
+  barracks(g, t) {
+    // Police Academy: brick hall with a big sign and a flagpole
+    brickBlock(g, 3, 12, 42, 20);
+    outlined(g, [[6, 3, 36, 8, C.navy]], [[7, 4, 34, 1, C.gold], [7, 9, 34, 1, C.gold], [10, 6, 28, 2, C.white]]);
+    g.fillStyle = C.O; for (let x = 12; x < 38; x += 4) g.fillRect(x, 6, 1, 2);
+    for (const x of [7, 35]) window_(g, x, 16, 6, 6, x === 7);
+    outlined(g, [[19, 18, 10, 14, '#3a2a20']], [[23, 18, 1, 14, C.O]]);
+    g.fillStyle = t.main; g.fillRect(19, 16, 10, 2);
+  },
+  turret(g, t) {
+    // Checkpoint: a booth with a gun on the roof and a striped barrier arm
+    outlined(g, [[6, 13, 14, 19, C.white], [4, 10, 18, 3, C.navy], [9, 5, 8, 5, C.gun], [16, 6, 12, 2, C.gun], [10, 2, 6, 3, '#3a6ae8']], [
+      [8, 16, 10, 6, C.glassBlue], [9, 5, 8, 1, C.gunLight], [27, 6, 1, 1, C.O], [7, 26, 12, 2, t.main], [11, 2, 2, 3, C.red],
+    ]);
+    g.fillStyle = C.O; g.fillRect(20, 22, 12, 3);
+    for (let x = 20; x < 32; x++) { g.fillStyle = Math.floor(x / 2) % 2 ? C.red : C.white; g.fillRect(x, 23, 1, 1); }
+    g.fillStyle = C.O; g.fillRect(21, 24, 2, 8);
+  },
+  wall(g, t) {
+    // Barricade: a concrete jersey barrier topped with a striped sawhorse
+    outlined(g, [[1, 18, 14, 14, C.blockLight], [3, 14, 10, 4, C.blockLight]], [[1, 22, 14, 1, C.block], [2, 28, 12, 2, t.main]]);
+    g.fillStyle = C.O; g.fillRect(0, 4, 16, 4);
+    for (let x = 0; x < 16; x++) { g.fillStyle = Math.floor(x / 2) % 2 ? '#f2a830' : C.white; g.fillRect(x, 5, 1, 2); }
+    g.fillStyle = C.O; g.fillRect(2, 8, 1, 6); g.fillRect(13, 8, 1, 6);
+    disc(g, 13, 3, 1, C.O); g.fillStyle = '#f2a830'; g.fillRect(13, 3, 1, 1);
+  },
+  mine(g, t) {
+    // Donut shop: a giant donut on the roof, coffee and a counter
+    outlined(g, [[2, 16, 28, 16, C.white]], [[2, 16, 28, 1, C.suit], [2, 30, 28, 2, C.suitShade], [2, 20, 28, 1, C.pastelPink]]);
+    disc(g, 16, 8, 8, C.O); disc(g, 16, 8, 7, C.donut); disc(g, 16, 7, 6, C.icing);
+    disc(g, 16, 8, 2, C.O); disc(g, 16, 8, 1, '#3a2a20');
+    g.fillStyle = C.white; for (const [x, y] of [[11, 4], [20, 5], [13, 11], [21, 10], [17, 3]]) g.fillRect(x, y, 1, 1);
+    g.fillStyle = C.yellow; g.fillRect(12, 7, 1, 1); g.fillRect(19, 3, 1, 1);
+    g.fillStyle = C.O; g.fillRect(5, 22, 13, 8); g.fillStyle = '#2a1a16'; g.fillRect(6, 23, 11, 6);
+    g.fillStyle = C.woodLight; g.fillRect(4, 29, 15, 2);
+    outlined(g, [[21, 22, 6, 10, '#5a3a2a']], [[25, 27, 1, 1, C.gold]]);
+    g.fillStyle = t.main; g.fillRect(2, 17, 28, 1);
+  },
+  workshop(g, t) {
+    // Impound lot: chain-link fence round a towed car and a tow truck hook
+    outlined(g, [[12, 23, 22, 5, C.cactus], [16, 19, 12, 4, C.cactus]], [[17, 20, 4, 2, C.glassBlue], [23, 20, 4, 2, C.glassBlue], [12, 23, 22, 1, C.cactusLight]]);
+    for (const x of [16, 30]) { disc(g, x, 29, 2, C.O); disc(g, x, 29, 1, C.gunLight); }
+    g.fillStyle = C.O; g.fillRect(2, 6, 1, 26); g.fillRect(45, 6, 1, 26); g.fillRect(2, 6, 44, 1);
+    g.fillStyle = 'rgba(176,186,194,0.75)';
+    for (let x = 3; x < 45; x += 3) for (let y = 7; y < 32; y += 3) { g.fillRect(x, y, 1, 1); g.fillRect(x + 1, y + 1, 1, 1); }
+    g.fillStyle = C.O; g.fillRect(36, 2, 2, 20); g.fillRect(30, 2, 8, 2); g.fillRect(30, 4, 1, 6);
+    outlined(g, [[28, 10, 4, 2, C.gun]], []);
+    g.fillStyle = t.main; g.fillRect(6, 9, 10, 4); g.fillStyle = C.white; g.fillRect(7, 10, 8, 1);
   },
 };
 
@@ -568,6 +769,19 @@ function animate(ctx, b, x, y) {
   const ms = performance.now();
   const tick = Math.floor(ms / 160);
   const t = team(b.faction);
+  if (cops(b.faction)) {
+    if (b.type === 'hq') {
+      const on = tick % 4 < 2;
+      rect(ctx, x + 21, y + 29, 4, 3, on ? '#7aa8ff' : '#3a6ae8'); rect(ctx, x + 39, y + 29, 4, 3, on ? '#3a6ae8' : '#7aa8ff');
+    } else if (b.type === 'mine') {
+      if (tick % 6 < 3) { ctx.globalAlpha = 0.35; disc(ctx, x + 16, y + 8, 9, C.icing); ctx.globalAlpha = 1; }
+    } else if (b.type === 'turret') {
+      rect(ctx, x + 11, y + 2, 2, 3, tick % 2 ? C.red : '#3a6ae8'); rect(ctx, x + 13, y + 2, 2, 3, tick % 2 ? '#3a6ae8' : C.red);
+    } else if (b.type === 'airbase') {
+      rect(ctx, x + 64, y + 4 + (tick % 2), 1, 2, C.fire);
+    }
+    return;
+  }
   if (b.type === 'mine') {
     // The neon dollar flickers now and then
     if (tick % 23 !== 0) {
@@ -621,7 +835,12 @@ function projectile(ctx, p, x, y, dx, dy) {
 function corpse(e) {
   const t = team(e.f);
   const [c, g] = canvas(14, 6);
-  const shirt = e.type === 'soldier' ? t.main : e.type === 'sniper' ? C.suit : e.type === 'scout' ? C.white : e.type === 'heavy' ? C.khaki : t.uni;
+  if (cops(e.f) && e.type === 'scout') {
+    outlined(g, [[1, 2, 10, 3, '#8a5a32'], [11, 2, 2, 2, '#5a3a22']], [[3, 2, 5, 2, t.main]]);
+    return { c, ax: 7, ay: 5 };
+  }
+  const shirt = cops(e.f) ? (e.type === 'soldier' ? C.pastelTeal : e.type === 'engineer' ? C.white : C.navy)
+    : e.type === 'soldier' ? t.main : e.type === 'sniper' ? C.suit : e.type === 'scout' ? C.white : e.type === 'heavy' ? C.khaki : t.uni;
   outlined(g, [[1, 2, 3, 3, C.skin], [4, 2, 7, 3, shirt], [11, 3, 2, 2, C.boot]], [[0, 1, 2, 2, C.hair], [5, 3, 2, 1, t.dark]]);
   return { c, ax: 7, ay: 5 };
 }
@@ -629,13 +848,34 @@ function corpse(e) {
 export default {
   id: 'cartel',
   name: 'Cartel Wars',
+  sides: [
+    {
+      id: 'cartel', name: 'The Cartel', short: 'Cartel',
+      blurb: 'Loud shirts, gold chains, homemade armour and a perfectly legitimate taco stand.',
+      win: 'Business is booming. Tacos for everyone.',
+      lose: 'The taco stand is closed for… inspection.',
+    },
+    {
+      id: 'cops', name: 'The Cops', short: 'Cops', plural: true,
+      blurb: 'Pastel blazers, a K-9 unit, a blimp, the Academy and a donut shop. Two days from retirement, every one of them.',
+      names: {
+        soldier: 'Vice Cop', heavy: 'SWAT', scout: 'K-9', engineer: 'Forensics', sniper: 'Sharpshooter',
+        jeep: 'Police Cruiser', tank: 'SWAT Truck', artillery: 'Riot Van', helicopter: 'Police Chopper', bomber: 'Police Blimp',
+        hq: 'Precinct', barracks: 'Police Academy', turret: 'Checkpoint', wall: 'Barricade', mine: 'Donut Shop',
+        workshop: 'Impound Lot', airbase: 'Air Unit', bridge: 'Plank Bridge', ramp: 'Loading Ramp',
+      },
+      icons: { hq: '🚓', barracks: '🎓', turret: '🚨', wall: '🚧', mine: '🍩', workshop: '🚗', airbase: '🚁' },
+      win: 'Case closed. Somebody bring the donuts.',
+      lose: 'Turn in your badge. And your blazer.',
+    },
+  ],
   palette,
   teamBase: FATIGUES,
   roofBase: [0.3, 0.2, 0.18],
   soldier: buildSoldier,
   vehicle: { jeep: buildTechnical, tank: buildMonstruo, artillery: buildRocketTruck },
   aircraft: { helicopter: buildChopper, bomber: buildPlane },
-  buildings: BUILD,
+  buildings: Object.fromEntries(Object.keys(BUILD).map((k) => [k, (g, t, f) => (cops(f) && COP_BUILD[k] ? COP_BUILD[k] : BUILD[k])(g, t, f)])),
   drawTile,
   surface,
   background,
