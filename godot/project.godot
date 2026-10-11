@@ -74,14 +74,14 @@ export_path="export/html5/index.html"
 [preset.1]
 name="Windows"
 platform="Windows"
-export_path="export/windows/slop_the_war.exe"
+export_path="export/windows/slop_wars.exe"
 
 [preset.2]
 name="Linux"
 platform="Linux/X11"
-export_path="export/linux/slop_the_war"
+export_path="export/linux/slop_wars"
 
 [preset.3]
 name="macOS"
 platform="macOS"
-export_path="export/macos/slop_the_war.zip"
+export_path="export/macos/slop_wars.zip"

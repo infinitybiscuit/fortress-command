@@ -16,7 +16,7 @@ Online games connect the phones directly when they can. Some networks, especiall
 ## Setup (works from the Cloudflare dashboard on a phone)
 
 **1. Create a TURN key**
-- In the Cloudflare dashboard, open **Realtime → TURN Server** and create a key. Name it something like `slop-the-war`.
+- In the Cloudflare dashboard, open **Realtime → TURN Server** and create a key. Name it something like `slop-wars`.
 - Copy the **Turn Token ID** and the **API Token**. The API token is only shown once.
 
 **2. Create the Worker**

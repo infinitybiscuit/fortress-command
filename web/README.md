@@ -1,6 +1,6 @@
-# Slop Wars — Web (iPhone portrait)
+# Slop Wars: The Next Generation — Web (iPhone portrait)
 
-*Slop Wars* (originally *Fortress Command*, then *Slop the War*). The name started as a play on the Stop the War Coalition, and the start screen still says "…or, Slop the War". It is ironic about how un-comic war really is, and about AI "slop". It was made by humans and AI together. See the [main README](../README.md#about-the-name).
+*Slop Wars: The Next Generation* (originally *Fortress Command*). The name is a mash-up of *Star Wars* and *Star Trek: The Next Generation*, with a nod to "AI slop" and to the AI generation used to make it. It was made by humans and AI together. See the [main README](../README.md#about-the-name).
 
 A browser port of the Godot game in `../godot`. It's plain HTML5 Canvas and ES modules with
 no build step, laid out for an **iPhone 16 Pro Max in portrait** (440×956 pt, 3× display).

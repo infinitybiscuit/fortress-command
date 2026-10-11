@@ -273,7 +273,7 @@ godot --headless --export-release "Android" build/app.apk
 ## 8. Project Structure
 
 ```
-slop-the-war/
+slop-wars/
 ├── godot/
 │   ├── project.godot          ← Godot 4 project file
 │   ├── scenes/
