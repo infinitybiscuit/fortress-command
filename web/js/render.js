@@ -15,11 +15,12 @@ import warring from './themes/warring.js';
 import steampunk from './themes/steampunk.js';
 import winter from './themes/winter.js';
 import cartel from './themes/cartel.js';
+import tariff from './themes/tariff.js';
 
 export { G };
 
 // ── Themes ─────────────────────────────────────────────────────────────────
-export const THEMES = [classic, robots, medieval, gangster, warring, steampunk, winter, cartel];
+export const THEMES = [classic, robots, medieval, gangster, warring, steampunk, winter, cartel, tariff];
 let theme = null;
 const sprites = new Map();
 const tiles = {};

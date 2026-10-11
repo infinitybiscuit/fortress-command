@@ -1409,6 +1409,7 @@ const TAGLINES = {
   steampunk: 'Steam rises over the Land of the Rising Sun.',
   winter: 'Minus forty. Perfect sauna weather.',
   cartel: 'Totally legitimate business. Ask the taco stand.',
+  tariff: 'The other countries pay. Believe me.',
 };
 function applyTheme(id) {
   const t = setTheme(id);
