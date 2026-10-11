@@ -5,6 +5,7 @@ import {
 } from './config.js';
 
 const key = (tx, ty) => ty * MAP_W + tx;
+export const RAMP_FOOT = 4; // world px: height of a grounded ramp's flat foot
 const modW = (tx) => ((tx % MAP_W) + MAP_W) % MAP_W;
 
 export class TileMap {
@@ -13,6 +14,7 @@ export class TileMap {
     this.buildingTiles = new Map(); // key -> building id (placement overlap check)
     this.wallTiles = new Map();     // key -> owning faction
     this.spanTiles = new Map();     // key -> building id (bridges + ramps)
+    this.rampDirs = new Map();      // key -> which way that ramp rises (+1 right, -1 left)
     this.version = 0;               // bumped whenever terrain changes (minimap cache)
     this.generate();
   }
@@ -24,6 +26,7 @@ export class TileMap {
     this.buildingTiles.clear();
     this.wallTiles.clear();
     this.spanTiles.clear();
+    this.rampDirs.clear();
     const gt = this.groundTop;
 
     for (let x = 0; x < MAP_W; x++)
@@ -92,6 +95,8 @@ export class TileMap {
   // the next ramp up or down the diagonal, or a platform/bridge it meets at
   // the top. A lone ramp on the ground faces the nearer platform it could reach.
   rampDir(tx, ty) {
+    const set = this.rampDirs.get(key(this.col(tx), ty));
+    if (set) return set;
     const ramp = (x, y) => this.get(x, y) === TILE_RAMP;
     const deck = (x, y) => { const t = this.get(x, y); return t === TILE_PLATFORM || t === TILE_BRIDGE; };
     const score = (d) => 2 * (ramp(tx - d, ty + 1) + ramp(tx + d, ty - 1)) + deck(tx + d, ty);
@@ -111,18 +116,35 @@ export class TileMap {
     return Infinity;
   }
 
+  // A ramp resting on the ground (or a platform) ends in a short flat foot.
+  rampFooted(tx, ty) {
+    const below = this.get(tx, ty + 1);
+    return below !== TILE_EMPTY && below !== TILE_RAMP;
+  }
+
   // World y of a ramp's walking surface at world x (clamped to its tile).
   rampSurface(tx, ty, wx) {
     const fx = Math.max(0, Math.min(TILE_SIZE, wx - tx * TILE_SIZE));
-    return ty * TILE_SIZE + (this.rampDir(tx, ty) > 0 ? TILE_SIZE - fx : fx);
+    const y = ty * TILE_SIZE + (this.rampDir(tx, ty) > 0 ? TILE_SIZE - fx : fx);
+    return this.rampFooted(tx, ty) ? Math.min(y, (ty + 1) * TILE_SIZE - RAMP_FOOT) : y;
   }
 
-  // Where the next ramp of a run goes after one at (tx, ty): on up the slope,
-  // or down it when the top already meets a platform, bridge or ramp.
-  rampNext(tx, ty) {
-    const d = this.rampDir(tx, ty);
-    const topJoined = this.get(tx + d, ty) !== TILE_EMPTY || this.get(tx + d, ty - 1) === TILE_RAMP;
-    return topJoined ? [tx - d, ty + 1] : [tx + d, ty - 1];
+  // Up to `n` free tiles running diagonally from (tx, ty) toward `d`, rising
+  // (`up`) or falling. Stops early at anything in the way, once the slope's
+  // top meets a platform or bridge, or once its foot reaches solid ground.
+  rampRun(tx, ty, d, up, n) {
+    const tiles = [];
+    for (let k = 0; k < n; k++) {
+      const x = tx + d * k, y = up ? ty - k : ty + k;
+      if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) break;
+      if (this.get(x, y) !== TILE_EMPTY || this.buildingTiles.has(key(x, y))) break;
+      tiles.push([x, y]);
+      const ahead = this.get(x + d, y);
+      if (up && (ahead === TILE_PLATFORM || ahead === TILE_BRIDGE)) break;
+      const below = this.get(x, y + 1);
+      if (!up && k > 0 && below !== TILE_EMPTY && below !== TILE_RAMP) break;
+    }
+    return tiles;
   }
 
   worldToTile(wx, wy) { return [Math.floor(wx / TILE_SIZE), Math.floor(wy / TILE_SIZE)]; }
@@ -170,6 +192,7 @@ export class TileMap {
         if (b.def.isBridge || b.def.isRamp) {
           this.set(x, y, b.def.isBridge ? TILE_BRIDGE : TILE_RAMP);
           this.spanTiles.set(k, b.id);
+          if (b.def.isRamp && b.dir) this.rampDirs.set(k, b.dir);
         }
       }
     this.version++;
@@ -183,6 +206,7 @@ export class TileMap {
         this.wallTiles.delete(k);
         if (this.spanTiles.get(k) === b.id) {
           this.spanTiles.delete(k);
+          this.rampDirs.delete(k);
           this.set(x, y, TILE_EMPTY);
         }
       }

@@ -84,6 +84,7 @@ export class Unit {
     this.scanTimer = Math.random() * AUTO_SCAN_INTERVAL;
     this.state = State.IDLE;
     this.moveX = x;
+    this.moveY = null;
     this.target = null;
     this.onGround = false;
     this.selected = false;
@@ -100,11 +101,14 @@ export class Unit {
     return px >= b.x - pad && px <= b.x + b.w + pad && py >= b.y - pad && py <= b.y + b.h + pad;
   }
 
-  moveTo(x) {
+  // `y` is where on screen the order pointed: units only climb a ramp when
+  // it's above them.
+  moveTo(x, y = null) {
     if (this.dead) return;
     this.resume = null;
     this.home = null;
     this.moveX = x;
+    this.moveY = y;
     this.target = null;
     this.state = State.MOVING;
   }
@@ -125,7 +129,7 @@ export class Unit {
     this.state = State.ATTACKING;
   }
 
-  // Attack `target`, then pick `resume` ({ moveX } or { target }) back up afterwards.
+  // Attack `target`, then pick `resume` ({ moveX, moveY } or { target }) back up afterwards.
   engage(target, resume = null) {
     this.attack(target);
     this.resume = resume;
@@ -143,7 +147,7 @@ export class Unit {
     this.vx = 0;
     this.resume = null;
     if (r?.target && !r.target.dead && !this.isIgnoring(r.target)) this.attack(r.target);
-    else if (r?.moveX != null) this.moveTo(r.moveX);
+    else if (r?.moveX != null) this.moveTo(r.moveX, r.moveY);
     else if (home != null && Math.abs(this.game.dx(this.x, home)) > 24 && !this.hold) this.moveTo(home);
   }
 
@@ -172,7 +176,7 @@ export class Unit {
         // Attack-move: fight anything that comes into weapon range, then carry on.
         if (scan && !this.forced && this.repairRate === 0) {
           const e = this.findEnemyUnit(this.range);
-          if (e) this.engage(e, { moveX: this.moveX });
+          if (e) this.engage(e, { moveX: this.moveX, moveY: this.moveY });
         }
         break;
       }
@@ -233,7 +237,7 @@ export class Unit {
     // Walked into an enemy wall: knock it down, then resume the order.
     const wall = this.blockedBy;
     if (wall && !wall.dead && this.target !== wall && this.repairRate === 0) {
-      const resume = wasMoving ? { moveX: this.moveX }
+      const resume = wasMoving ? { moveX: this.moveX, moveY: this.moveY }
         : this.state === State.ATTACKING ? { target: this.target } : null;
       this.engage(wall, resume);
     }
@@ -300,7 +304,7 @@ export class Unit {
       this.attack(source);
       this.home = home;
     } else if (this.state === State.MOVING && !this.forced) {
-      this.engage(source, { moveX: this.moveX });
+      this.engage(source, { moveX: this.moveX, moveY: this.moveY });
     } else if (this.state === State.ATTACKING && this.target?.kind === 'building' && source.kind === 'unit') {
       this.engage(source, { target: this.target });
     }
@@ -362,6 +366,13 @@ export class Unit {
 
     this.vy = Math.min(this.vy + GRAVITY * dt, TERMINAL_VELOCITY);
 
+    // Standing on a ramp's slope? Then the slope under the unit's middle
+    // decides its height, so wide vehicles don't hop as their wheels cross
+    // onto the ground or deck.
+    const sx = Math.floor(this.x / ts);
+    const onSlope = this.onGround && [Math.floor((this.y - 1) / ts), Math.floor(this.y / ts)]
+      .some((ty) => map.isRamp(sx, ty) && Math.abs(map.rampSurface(sx, ty, this.x) - this.y) < 2);
+
     let newX = this.x + this.vx * dt;
     if (this.vx !== 0) {
       const dir = this.vx > 0 ? 1 : -1;
@@ -390,12 +401,16 @@ export class Unit {
     this.x = this.game.normX(newX);
 
     let newY = this.y + this.vy * dt;
-    // On a ramp the slope under the unit's middle decides its height, so
-    // wide vehicles don't hop as their wheels cross onto the ground or deck.
     const cx = Math.floor(this.x / ts);
-    const onSlope = map.isRamp(cx, Math.floor((this.y - 1) / ts)) || map.isRamp(cx, Math.floor(this.y / ts));
-    const txL = onSlope ? cx : Math.floor((this.x - halfW + 2) / ts);
-    const txR = onSlope ? cx : Math.floor((this.x + halfW - 2) / ts);
+    // ...including stepping down onto a slope from the deck at its top.
+    const fy = Math.floor(this.y / ts);
+    const slopeMode = onSlope || (this.onGround && [fy - 1, fy, fy + 1].some((ty) => {
+      if (!map.isRamp(cx, ty)) return false;
+      const sy = map.rampSurface(cx, ty, this.x);
+      return sy >= this.y - 0.5 && sy <= this.y + halfW + 4;
+    }));
+    const txL = slopeMode ? cx : Math.floor((this.x - halfW + 2) / ts);
+    const txR = slopeMode ? cx : Math.floor((this.x + halfW - 2) / ts);
     const wasGrounded = this.onGround;
     this.onGround = false;
     if (this.vy >= 0) {
@@ -418,13 +433,22 @@ export class Unit {
         if (map.isSolid(tx, headTy) && !map.isRamp(tx, headTy)) { newY = (headTy + 1) * ts + h; this.vy = 0; break; }
       }
     }
-    if (this.vy >= 0) newY = this.rideRamp(map, newY, wasGrounded);
+    if (this.vy >= 0) newY = this.rideRamp(map, newY, wasGrounded, onSlope);
     this.y = newY;
+  }
+
+  // Is the unit headed somewhere above it? Only then does it start up a ramp;
+  // otherwise it walks on past the foot.
+  wantsUp() {
+    const above = (y) => y != null && y < this.y - TILE_SIZE;
+    if (this.state === State.MOVING) return above(this.moveY);
+    if (this.target && (this.state === State.ATTACKING || this.state === State.REPAIRING)) return above(this.target.centre()[1]);
+    return false;
   }
 
   // Stand on the slope of a ramp under the unit's middle: step up it (at most
   // one sub-step's climb), follow it down while walking, or land on it.
-  rideRamp(map, newY, wasGrounded) {
+  rideRamp(map, newY, wasGrounded, onSlope) {
     const ts = TILE_SIZE;
     const STEP = 14;
     const tx = Math.floor(this.x / ts);
@@ -435,6 +459,7 @@ export class Unit {
       const s = map.rampSurface(tx, ty, this.x);
       if (s < this.y - STEP || s > newY + snapDown) continue;
       if (this.onGround && s >= newY) continue; // already standing higher
+      if (!onSlope && s < this.y - 0.5 && !this.wantsUp()) continue; // not going up there
       if (best == null || s < best) best = s;
     }
     if (best == null) return newY;
