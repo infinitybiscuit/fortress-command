@@ -55,6 +55,7 @@
       <p class="tagline" id="tagline">Build. Train. Conquer.</p>
       <div class="menu-buttons" id="mode-buttons"></div>
       <button class="menu-btn secondary theme-btn" id="btn-theme">Theme: Classic</button>
+      <p class="theme-sides" id="theme-sides"></p>
       <details class="howto">
         <summary>How to play</summary>
         <ul>
@@ -68,6 +69,18 @@
         </ul>
       </details>
       <p class="version"></p>
+    </div>
+  </div>
+
+  <div id="overlay-sides" class="overlay hidden">
+    <div class="overlay-card">
+      <h2 class="online-title">CHOOSE<br>YOUR SIDE</h2>
+      <p class="tagline" id="sides-who"></p>
+      <div class="side-cards" id="side-cards"></div>
+      <div class="menu-buttons">
+        <button class="menu-btn secondary" id="btn-side-random">🎲 Surprise me</button>
+        <button class="menu-btn secondary" id="btn-sides-back">Back</button>
+      </div>
     </div>
   </div>
 
@@ -98,6 +111,7 @@
       <div id="online-lobby" class="hidden">
         <p class="lobby-label">ROOM CODE</p>
         <div class="room-code" id="room-code"></div>
+        <div class="lobby-war"><span id="lobby-war"></span><button class="small-btn hidden" id="btn-lobby-theme">Change ▸</button></div>
         <ul class="lobby-slots" id="lobby-slots"></ul>
         <p class="tagline lobby-status" id="lobby-status"></p>
         <div class="menu-buttons">

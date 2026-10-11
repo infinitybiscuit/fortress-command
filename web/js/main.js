@@ -12,6 +12,7 @@ import {
 import {
   drawBackground, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
   drawEffects, updateEffects, drawMarker, drawWeather, G, skyTop, setTheme, THEMES, currentTheme, unitIcon,
+  themeSides, sideInfo, sideIcon, setFactionSides, setViewer,
 } from './render.js';
 
 // The game used to be called Fortress Command: move its saved settings (name,
@@ -163,12 +164,15 @@ function issue(cmd) {
 const ids = (list) => list.map((u) => u.id);
 
 // Names and badges come from the theme (Rise of the Robots renames units).
-const nameOf = (t) => currentTheme().names?.[t] || capitalize(t);
+// Themes with sides can rename things per side (a Union Bluecoat, a Rebel Greyback).
+const nameOf = (t) => sideInfo(active)?.names?.[t] || currentTheme().names?.[t] || capitalize(t);
 const iconOf = (t) => {
   const th = currentTheme();
   if (th.spriteIcons && UNIT_TYPES[t]) return `<img class="sprite-ic" src="${unitIcon(t, active)}" alt="">`;
-  return th.icons?.[t] || UNIT_ICONS[t] || BUILD_ICONS[t];
+  return sideInfo(active)?.icons?.[t] || th.icons?.[t] || UNIT_ICONS[t] || BUILD_ICONS[t];
 };
+// Short side label for a faction ("Union"), or null when the theme has no sides.
+const sideShort = (f) => (themeSides() ? sideInfo(f)?.short : null);
 
 // ── Selection helpers ──────────────────────────────────────────────────────
 const selectedUnits = () => (game ? game.units.filter((u) => u.selected && u.faction === active) : []);
@@ -597,8 +601,10 @@ function renderHud() {
   $('income').textContent = `+${p.income}/s`;
   const chip = $('player-chip');
   const col = PLAYER_COLORS[active].map((v) => Math.round(v * 255)).join(',');
-  chip.textContent = online() ? `YOU · ${PLAYER_NAMES[active].toUpperCase()}`
-    : game.humanCount > 1 ? PLAYER_NAMES[active].toUpperCase() : 'YOU';
+  const colour = PLAYER_NAMES[active].toUpperCase();
+  const side = sideShort(active)?.toUpperCase();
+  chip.textContent = online() ? `YOU · ${side || colour}`
+    : game.humanCount > 1 ? (side ? `${colour} · ${side}` : colour) : side ? `YOU · ${side}` : 'YOU';
   chip.style.background = `rgba(${col},0.25)`;
   chip.style.color = `rgb(${col})`;
   if (!pendingBuild && statusText && !NET_STATUS.includes(statusText)) setStatus('');
@@ -606,7 +612,7 @@ function renderHud() {
 
 // ── Game lifecycle ─────────────────────────────────────────────────────────
 function showOverlay(id) {
-  for (const o of ['overlay-title', 'overlay-online', 'overlay-pause', 'overlay-gameover']) $(o).classList.toggle('hidden', o !== id);
+  for (const o of ['overlay-title', 'overlay-sides', 'overlay-online', 'overlay-pause', 'overlay-gameover']) $(o).classList.toggle('hidden', o !== id);
 }
 
 // opts: { mode } replaces MODES[key] (online games), { mirror } makes a
@@ -629,6 +635,9 @@ function startGame(key, opts = {}) {
     });
   }
   active = opts.you ?? 0;
+  // Sides come from the side picker (offline) or the host's lobby (online).
+  setFactionSides(opts.sides || mode.sides || null);
+  setViewer(active);
   eliminatedNoted = false;
   selectedBuilding = null;
   cancelPlacement();
@@ -666,8 +675,8 @@ function gameOver(winner) {
     const won = winner === active;
     label.textContent = won ? 'VICTORY' : 'DEFEAT';
     label.style.color = won ? 'var(--good)' : 'var(--danger)';
-    let text = won ? `Battle won in ${formatTime(game.time)}.`
-      : winner >= 0 ? `${net.names[winner] || PLAYER_NAMES[winner]} (${PLAYER_NAMES[winner]}) won the battle.` : 'Nobody survived.';
+    let text = won ? `Battle won in ${formatTime(game.time)}.${quip(active, 'win')}`
+      : winner >= 0 ? `${net.names[winner] || PLAYER_NAMES[winner]} (${sideShort(winner) || PLAYER_NAMES[winner]}) won the battle.${quip(active, 'lose')}` : 'Nobody survived.';
     if (net.role === 'host') again.textContent = 'Back to lobby';
     else {
       text += ' Waiting for the host…';
@@ -677,17 +686,23 @@ function gameOver(winner) {
   } else if (game.humanCount > 1) {
     label.textContent = winner >= 0 ? `${PLAYER_NAMES[winner].toUpperCase()} WINS` : 'DRAW';
     label.style.color = winner >= 0 ? `rgb(${PLAYER_COLORS[winner].map((v) => v * 255).join(',')})` : '#fff';
-    sub.textContent = 'Every rival HQ has fallen.';
+    sub.textContent = sideShort(winner) && winner >= 0 ? `${sideInfo(winner).name} take${sideInfo(winner).plural ? '' : 's'} the field.${quip(winner, 'win')}` : 'Every rival HQ has fallen.';
   } else if (winner === 0) {
     label.textContent = 'VICTORY';
     label.style.color = 'var(--good)';
-    sub.textContent = `Battle won in ${formatTime(game.time)}.`;
+    sub.textContent = `Battle won in ${formatTime(game.time)}.${quip(0, 'win')}`;
   } else {
     label.textContent = 'DEFEAT';
     label.style.color = 'var(--danger)';
-    sub.textContent = 'Your HQ was destroyed.';
+    sub.textContent = `Your HQ was destroyed.${quip(0, 'lose')}`;
   }
   showOverlay('overlay-gameover');
+}
+
+// A side's victory or defeat one-liner, with a leading space (or nothing).
+function quip(f, kind) {
+  const q = themeSides() ? sideInfo(f)?.[kind] : null;
+  return q ? ` ${q}` : '';
 }
 
 function formatTime(s) { return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`; }
@@ -699,9 +714,84 @@ function buildModeButtons() {
     const b = e.target.closest('[data-mode]');
     if (!b) return;
     if (MODES[b.dataset.mode].online) openLobby();
-    else startGame(b.dataset.mode);
+    else chooseSides(b.dataset.mode);
   });
 }
+
+// ── Choosing sides ─────────────────────────────────────────────────────────
+// In themes with sides, each human picks one before an offline battle (in
+// turn, for local multiplayer); CPUs take whichever sides are left. The last
+// pick per theme is remembered and Restart keeps the same sides.
+const SIDES_KEY = 'slop-sides';
+function rememberedSide(themeId) {
+  try { return JSON.parse(localStorage.getItem(SIDES_KEY) || '{}')[themeId]; } catch { return undefined; }
+}
+function rememberSide(themeId, side) {
+  try {
+    const all = JSON.parse(localStorage.getItem(SIDES_KEY) || '{}');
+    all[themeId] = side;
+    localStorage.setItem(SIDES_KEY, JSON.stringify(all));
+  } catch { /* storage unavailable */ }
+}
+const colourOf = (f) => `rgb(${PLAYER_COLORS[f].map((v) => Math.round(v * 255)).join(',')})`;
+
+let lastSides = null; // the sides of the last offline game, reused by Restart
+let pickSide = null;  // callback for the side picker that's showing
+function chooseSides(key) {
+  const sides = themeSides();
+  const mode = MODES[key];
+  if (!sides) { lastSides = null; startGame(key); return; }
+  const humans = mode.players.map((p, f) => (p[1] ? -1 : f)).filter((f) => f >= 0);
+  const picks = [];
+  let step = 0;
+  const ask = () => {
+    if (step < humans.length) {
+      const f = humans[step];
+      showSidePicker(f, humans.length > 1, picks.filter(Boolean), (id) => { picks[f] = id; step++; ask(); });
+      return;
+    }
+    // CPUs take the sides nobody picked first, then share them round.
+    const taken = new Set(picks.filter(Boolean));
+    const order = [...sides.filter((s) => !taken.has(s.id)), ...sides].map((s) => s.id);
+    let k = 0;
+    lastSides = mode.players.map((p, f) => picks[f] || order[k++ % order.length]);
+    startGame(key, { sides: lastSides });
+  };
+  ask();
+}
+
+// f: the faction choosing (its colour tints the previews); taken: sides other
+// players already picked, so a second player is steered to a different one.
+function showSidePicker(f, multi, taken, done) {
+  const th = currentTheme();
+  const sides = themeSides();
+  const remembered = !multi || f === 0 ? rememberedSide(th.id) : null;
+  const suggest = remembered && sides.some((s) => s.id === remembered) ? remembered
+    : (sides.find((s) => !taken.includes(s.id)) || sides[0]).id;
+  $('sides-who').innerHTML = multi
+    ? `<span style="color:${colourOf(f)}">${PLAYER_NAMES[f]} player</span>: pick your side`
+    : `${esc(th.name)}: whose side are you on?`;
+  $('side-cards').innerHTML = sides.map((s) => `<button class="side-card${s.id === suggest ? ' suggested' : ''}" data-side="${s.id}" style="--team:${colourOf(f)}">
+      <span class="side-icons">${['soldier', 'heavy', 'tank', 'helicopter'].map((t) => `<img src="${sideIcon(s.id, t, f)}" alt="">`).join('')}</span>
+      <span class="side-name">${esc(s.name)}</span>
+      <span class="side-blurb">${esc(s.blurb || '')}</span>
+    </button>`).join('');
+  pickSide = (id) => {
+    if (!multi || f === 0) rememberSide(th.id, id);
+    pickSide = null;
+    done(id);
+  };
+  showOverlay('overlay-sides');
+}
+$('side-cards').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-side]');
+  if (b && pickSide) pickSide(b.dataset.side);
+});
+$('btn-side-random').addEventListener('click', () => {
+  const sides = themeSides();
+  if (pickSide && sides) pickSide(sides[Math.floor(Math.random() * sides.length)].id);
+});
+$('btn-sides-back').addEventListener('click', () => { pickSide = null; showOverlay('overlay-title'); });
 
 // ── Online lobby & session ─────────────────────────────────────────────────
 const esc = (t) => String(t).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -737,6 +827,10 @@ const seated = (slots) => slots.map((sl, i) => ({ ...sl, slot: i })).filter((sl)
 function renderLobby() {
   $('room-code').textContent = net.code;
   const isHost = net.role === 'host';
+  if (isHost) ensureSides();
+  const sides = themeSides();
+  $('lobby-war').innerHTML = `War: <b>${esc(currentTheme().name)}</b>${sides ? ` · ${sides.map((x) => esc(x.short)).join(' vs ')}` : ''}`;
+  $('btn-lobby-theme').classList.toggle('hidden', !isHost);
   const order = seated(net.slots).map((sl) => sl.slot);
   $('lobby-slots').innerHTML = net.slots.map((sl, i) => {
     const f = order.indexOf(i);
@@ -759,8 +853,15 @@ function renderLobby() {
     if (isHost && ['cpu', 'open', 'closed'].includes(sl.kind)) {
       btn = `<button class="small-btn slot-btn" data-cycle="${i}">${sl.kind === 'cpu' ? 'CPU' : sl.kind === 'open' ? 'OPEN' : 'CLOSED'} ▸</button>`;
     }
+    let side = '';
+    const info = sides && sl.side ? sides.find((x) => x.id === sl.side) : null;
+    if (info) {
+      const mine = i === net.mySlot || (isHost && sl.kind === 'cpu');
+      side = mine ? `<button class="small-btn slot-btn side-btn" data-side-slot="${i}" aria-label="Change side">${esc(info.short)} ▸</button>`
+        : `<span class="slot-tag side">${esc(info.short)}</span>`;
+    }
     const empty = sl.kind === 'open' || sl.kind === 'closed' ? ' empty' : '';
-    return `<li class="slot${empty}"><span class="swatch" style="background:${col}"></span><span class="slot-name">${name}</span>${tag}${btn}</li>`;
+    return `<li class="slot${empty}"><span class="swatch" style="background:${col}"></span><span class="slot-name">${name}</span>${tag}${side}${btn}</li>`;
   }).join('');
 
   const players = seated(net.slots);
@@ -782,6 +883,8 @@ function renderLobby() {
 }
 
 $('lobby-slots').addEventListener('click', (e) => {
+  const sideBtn = e.target.closest('[data-side-slot]');
+  if (sideBtn && net.phase === 'lobby') { cycleSide(+sideBtn.dataset.sideSlot); return; }
   if (net.role !== 'host' || net.phase !== 'lobby') return;
   const cyc = e.target.closest('[data-cycle]');
   const kick = e.target.closest('[data-kick]');
@@ -794,6 +897,27 @@ $('lobby-slots').addEventListener('click', (e) => {
     const peer = net.peers.find((pp) => pp.slot === +kick.dataset.kick);
     if (peer) refuse(peer, 'The host removed you from the room.');
   }
+});
+
+// Tap your side (or, as host, a CPU's side) to move to the next one.
+function cycleSide(i) {
+  const sides = themeSides();
+  const sl = net.slots[i];
+  if (!sides || !sl) return;
+  const ids = sides.map((x) => x.id);
+  const next = ids[(ids.indexOf(sl.side) + 1) % ids.length];
+  if (i === net.mySlot) rememberSide(currentTheme().id, next);
+  if (net.role === 'host') { sl.side = next; syncLobby(); } else net.host?.send({ t: 'side', side: next });
+}
+
+// The host picks the war for the whole room; everyone's side resets to suit.
+$('btn-lobby-theme').addEventListener('click', () => {
+  if (net.role !== 'host' || net.phase !== 'lobby') return;
+  const i = THEMES.indexOf(currentTheme());
+  applyTheme(THEMES[(i + 1) % THEMES.length].id);
+  for (const sl of net.slots) delete sl.side;
+  syncLobby();
+  renderLobby();
 });
 
 // ── Host side ──
@@ -819,10 +943,28 @@ async function hostOnline() {
 
 function broadcast(msg) { for (const p of net.peers) p.transport.send(msg); }
 
+// The host's theme is the room's war; every seated player has a side in it.
+// Seats without a valid side get whichever side has the fewest players.
+function ensureSides() {
+  const sides = themeSides();
+  const seatedKinds = ['host', 'human', 'cpu'];
+  for (const sl of net.slots) if (!sides || !seatedKinds.includes(sl.kind)) delete sl.side;
+  if (!sides) return;
+  const ids = sides.map((x) => x.id);
+  const count = (id) => net.slots.filter((o) => o.side === id).length;
+  net.slots.forEach((sl, i) => {
+    if (!seatedKinds.includes(sl.kind) || ids.includes(sl.side)) return;
+    const mine = i === 0 ? rememberedSide(currentTheme().id) : null;
+    sl.side = ids.includes(mine) ? mine : ids.reduce((best, id) => (count(id) < count(best) ? id : best), ids[0]);
+  });
+}
+
 function syncLobby() {
   if (net.phase !== 'lobby') return; // mid-battle seat changes show up back in the lobby
+  ensureSides();
+  const slots = net.slots.map(({ kind, name, ready, side }) => ({ kind, name, ready, side }));
   for (const p of net.peers) {
-    if (p.slot >= 0) p.transport.send({ t: 'lobby', slots: net.slots.map(({ kind, name, ready }) => ({ kind, name, ready })), you: p.slot });
+    if (p.slot >= 0) p.transport.send({ t: 'lobby', theme: currentTheme().id, slots, you: p.slot });
   }
   if (!$('online-lobby').classList.contains('hidden')) renderLobby();
 }
@@ -878,6 +1020,12 @@ function onPeerMessage(peer, m) {
       toast(`${peer.name} joined`, 'info');
       break;
     }
+    case 'side':
+      if (net.phase === 'lobby' && peer.slot >= 0 && themeSides()?.some((x) => x.id === m.side)) {
+        net.slots[peer.slot].side = m.side;
+        syncLobby();
+      }
+      break;
     case 'ready':
       if (net.phase === 'lobby' && peer.slot >= 0) {
         net.slots[peer.slot].ready = !!m.ready;
@@ -949,6 +1097,8 @@ function startOnlineGame() {
   const mode = {
     label: layout.label, wrap: layout.wrap, online: true,
     players: players.map((sl, i) => [layout.hqs[i], sl.kind === 'cpu']),
+    theme: currentTheme().id,
+    sides: themeSides() ? players.map((sl) => sl.side) : undefined,
   };
   net.names = players.map((sl) => (sl.kind === 'cpu' ? 'CPU' : sl.name));
   for (const p of net.peers) Object.assign(p, { faction: players.findIndex((sl) => sl.slot === p.slot), mapVersion: -1 });
@@ -1034,6 +1184,7 @@ function onHostMessage(m) {
       saveSession();
       break;
     case 'lobby': {
+      if (m.theme) useRoomTheme(m.theme);
       const fromGame = net.phase !== 'lobby' || $('online-lobby').classList.contains('hidden');
       Object.assign(net, { slots: m.slots, mySlot: m.you, phase: 'lobby', reconnecting: false });
       if (fromGame) {
@@ -1050,6 +1201,7 @@ function onHostMessage(m) {
       net.phase = 'game';
       net.reconnecting = false;
       net.names = m.names || [];
+      if (m.mode?.theme) useRoomTheme(m.mode.theme);
       startGame('online', { mode: m.mode, mirror: true, you: m.you });
       if (keep) { Object.assign(cam, keep); clampCam(); }
       if (m.rejoin) { setStatus(''); toast('Reconnected', 'info'); }
@@ -1138,6 +1290,7 @@ function resetNet() {
 // sayBye: tell the other side we're going on purpose (so they don't wait for
 // us to reconnect).
 function leaveOnline(sayBye = true) {
+  if (net.role === 'guest') applyTheme(savedTheme());
   const links = net.role === 'host' ? net.peers.map((p) => p.transport) : net.host ? [net.host] : [];
   if (net.role === 'guest' && sayBye) saveSession(true);
   for (const t of links) {
@@ -1233,10 +1386,10 @@ $('btn-pause').addEventListener('click', () => {
   showOverlay('overlay-pause');
 });
 $('btn-resume').addEventListener('click', () => { paused = false; showOverlay(null); });
-$('btn-restart').addEventListener('click', () => startGame(modeKey));
+$('btn-restart').addEventListener('click', () => startGame(modeKey, { sides: lastSides }));
 $('btn-again').addEventListener('click', () => {
   if (net.role === 'host') backToLobby();
-  else startGame(modeKey);
+  else startGame(modeKey, { sides: lastSides });
 });
 $('btn-quit').addEventListener('click', () => { leaveOnline(); paused = true; showOverlay('overlay-title'); });
 $('btn-menu').addEventListener('click', () => { leaveOnline(); showOverlay('overlay-title'); });
@@ -1245,6 +1398,7 @@ $('btn-switch').addEventListener('click', () => {
   clearSelection();
   cancelPlacement();
   do { active = (active + 1) % game.players.length; } while (!game.players[active].alive || game.players[active].isAi);
+  setViewer(active);
   panelKey = '';
   focusHq();
   toast(`${PLAYER_NAMES[active]}'s turn`, 'info');
@@ -1398,7 +1552,7 @@ function draw(dt) {
 
 // ── Themes ─────────────────────────────────────────────────────────────────
 // A look for the battlefield and menus, chosen on the title screen and kept
-// on this device. Purely cosmetic: online opponents can use different themes.
+// on this device. Online, the host's theme is the room's war for everyone.
 const THEME_KEY = 'slop-theme';
 const TAGLINES = {
   classic: 'Build. Train. Conquer.',
@@ -1410,24 +1564,31 @@ const TAGLINES = {
   winter: 'Minus forty. Perfect sauna weather.',
   cartel: 'Totally legitimate business. Ask the taco stand.',
   tariff: 'The other countries pay. Believe me.',
+  civil: 'Brother against brother. Beard against beard.',
 };
-function applyTheme(id) {
+// persist: false when a guest is shown the host's war, so their own choice
+// comes back when they leave the room.
+function applyTheme(id, persist = true) {
   const t = setTheme(id);
   document.body.dataset.theme = t.id;
   $('btn-theme').textContent = `Theme: ${t.name}`;
   $('tagline').textContent = TAGLINES[t.id] || TAGLINES.classic;
+  const sides = themeSides(t);
+  $('theme-sides').textContent = sides ? `⚔️ ${sides.map((x) => x.short).join(' vs ')}: you pick a side` : '';
   panelKey = '';
-  try { localStorage.setItem(THEME_KEY, t.id); } catch { /* storage unavailable */ }
+  if (persist) try { localStorage.setItem(THEME_KEY, t.id); } catch { /* storage unavailable */ }
+}
+function savedTheme() {
+  try { return localStorage.getItem(THEME_KEY) || 'classic'; } catch { return 'classic'; }
+}
+function useRoomTheme(id) {
+  if (currentTheme().id !== id) applyTheme(id, false);
 }
 $('btn-theme').addEventListener('click', () => {
   const i = THEMES.indexOf(currentTheme());
   applyTheme(THEMES[(i + 1) % THEMES.length].id);
 });
-{
-  let saved = null;
-  try { saved = localStorage.getItem(THEME_KEY); } catch { /* storage unavailable */ }
-  applyTheme(saved || 'classic');
-}
+applyTheme(savedTheme());
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 // Read-only handle for automated browser tests.

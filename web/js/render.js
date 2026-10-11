@@ -6,7 +6,7 @@ import {
   TILE_SIZE, MAP_W, MAP_H, WORLD_W, WORLD_H, UNIT_H, BUILDING_TYPES,
   TILE_EMPTY, TILE_GROUND, TILE_PLATFORM, TILE_BRIDGE, TILE_RAMP, UNIT_TYPES,
 } from './config.js';
-import { G, T, A, C, canvas, flip, rect, disc, hash, team, setPalette } from './pixel.js';
+import { G, T, A, C, canvas, flip, rect, disc, hash, team, setPalette, sideOf, setSides, withSide } from './pixel.js';
 import classic from './themes/classic.js';
 import robots from './themes/robots.js';
 import medieval from './themes/medieval.js';
@@ -16,23 +16,43 @@ import steampunk from './themes/steampunk.js';
 import winter from './themes/winter.js';
 import cartel from './themes/cartel.js';
 import tariff from './themes/tariff.js';
+import civil from './themes/civil.js';
 
 export { G };
 
 // ── Themes ─────────────────────────────────────────────────────────────────
-export const THEMES = [classic, robots, medieval, gangster, warring, steampunk, winter, cartel, tariff];
+export const THEMES = [classic, robots, medieval, gangster, warring, steampunk, winter, cartel, tariff, civil];
 let theme = null;
 const sprites = new Map();
+const iconCache = new Map();
 const tiles = {};
 
 export function setTheme(id) {
   theme = THEMES.find((t) => t.id === id) || classic;
   setPalette(theme.palette, theme.teamBase, theme.roofBase);
+  setSides([], theme.sides?.[0]?.id);
   sprites.clear();
+  iconCache.clear();
   for (const k of Object.keys(tiles)) delete tiles[k];
   return theme;
 }
 export const currentTheme = () => theme;
+
+// ── Sides ──────────────────────────────────────────────────────────────────
+// A theme may offer `sides` (e.g. Union and Confederacy): each is
+// { id, name, short, blurb, names?, icons?, win?, lose? }. Only themes with two
+// or more sides ask players to choose.
+export const themeSides = (t = theme) => (t.sides?.length > 1 ? t.sides : null);
+export const sideInfo = (f) => theme.sides?.find((s) => s.id === sideOf(f)) || null;
+// The side each faction fights for this game (array of side ids by faction).
+export function setFactionSides(list) {
+  setSides(list, theme.sides?.[0]?.id);
+  sprites.clear();
+  iconCache.clear();
+}
+// Whose eyes we see the battlefield through: themes may vary the backdrop by side.
+let viewer = 0;
+export function setViewer(f) { viewer = f; }
 setTheme('classic');
 
 // Cached sprite + its mirror. `build` returns { c, ax, ay } (anchor in art px).
@@ -49,21 +69,25 @@ function sprite(key, facing, build) {
 function buildingSprite(b) {
   return sprite(`b:${b.type}:${b.faction}`, 1, () => {
     const [c, g] = canvas(b.wt * T, b.ht * T);
-    theme.buildings[b.type](g, team(b.faction));
+    theme.buildings[b.type](g, team(b.faction), b.faction);
     return { c, ax: 0, ay: 0 };
   });
 }
 
 // A unit's sprite as an image URL, for menus in themes that use sprite icons.
-const iconCache = new Map();
 export function unitIcon(type, faction) {
-  const key = `${theme.id}:${type}:${faction}`;
+  const key = `${theme.id}:${sideOf(faction)}:${type}:${faction}`;
   if (!iconCache.has(key)) {
     const d = UNIT_TYPES[type];
     const s = d.air ? theme.aircraft[type](faction) : d.vehicle ? theme.vehicle[type](faction, 0) : theme.soldier(type, faction, 0);
     iconCache.set(key, s.c.toDataURL());
   }
   return iconCache.get(key);
+}
+
+// A unit as it looks on a given side (for the side picker), tinted for faction f.
+export function sideIcon(side, type, f) {
+  return withSide(f, side, () => unitIcon(type, f));
 }
 
 // ── Terrain ────────────────────────────────────────────────────────────────
@@ -109,7 +133,7 @@ export function drawTerrain(ctx, map, view) {
 
 // ── Background & weather (screen space in the art buffer) ──────────────────
 export const skyTop = () => theme.skyTop;
-export function drawBackground(ctx, bw, bh, camAX, camAY) { theme.background(ctx, bw, bh, camAX, camAY); }
+export function drawBackground(ctx, bw, bh, camAX, camAY) { theme.background(ctx, bw, bh, camAX, camAY, sideOf(viewer)); }
 // Drawn over the finished world (rain, haze…), if the theme has any.
 export function drawWeather(ctx, bw, bh, camAX, camAY) { theme.weather?.(ctx, bw, bh, camAX, camAY); }
 
