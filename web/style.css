@@ -380,3 +380,32 @@ body[data-theme="medieval"] .code-input { background: #140d06; }
 body[data-theme="medieval"] .howto ul { color: var(--text); }
 body[data-theme="medieval"] .round-btn { background: rgba(51, 38, 26, 0.88); }
 body[data-theme="medieval"] #tagline { color: #fff4d6; text-shadow: 1px 1px 0 #3a1a0a, -1px -1px 0 #3a1a0a, 1px -1px 0 #3a1a0a, -1px 1px 0 #3a1a0a, 2px 2px 0 #3a1a0a; }
+
+/* ── Gangsters: art-deco black, gold and burgundy ───────────────────────── */
+body[data-theme="gangster"] {
+  --bg: #120e10;
+  --panel: #1e1618;
+  --panel-2: #33262a;
+  --bevel-light: #b08a3e;
+  --bevel-dark: #0a0708;
+  --accent: #7a1a2a;
+  --accent-dim: #450d17;
+  --text: #f6ead0;
+  --dim: #c4b08a;
+  --good: #ffd84a;
+  --danger: #e2504e;
+  --gold: #e8c060;
+}
+body[data-theme="gangster"] .menu-btn,
+body[data-theme="gangster"] .act-btn.primary { border-color: #e8c060 #2a0810 #2a0810 #e8c060; }
+body[data-theme="gangster"] .menu-btn.secondary { border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light); }
+body[data-theme="gangster"] .overlay { background: linear-gradient(#1c1a3c 0 12%, #46305e 12% 20%, #9a4a5e 20% 26%, #eea060 26% 30%, #3a2a4e 30% 33%, rgba(18, 14, 16, 0.97) 33%); }
+body[data-theme="gangster"] #overlay-pause, body[data-theme="gangster"] #overlay-gameover { background: rgba(14, 10, 12, 0.92); }
+body[data-theme="gangster"] .overlay h1, body[data-theme="gangster"] .overlay h2 { color: #e8c060; text-shadow: 3px 3px 0 #7a1a2a, 6px 6px 0 #000; }
+body[data-theme="gangster"] #tagline { color: #fff4d6; text-shadow: 1px 1px 0 #2a0810, -1px -1px 0 #2a0810, 1px -1px 0 #2a0810, -1px 1px 0 #2a0810, 2px 2px 0 #2a0810; }
+body[data-theme="gangster"] .status { background: rgba(30, 22, 24, 0.9); }
+body[data-theme="gangster"] .toast { background: rgba(122, 26, 42, 0.95); }
+body[data-theme="gangster"] .toast.info { background: rgba(140, 104, 30, 0.95); }
+body[data-theme="gangster"] .code-input { background: #0a0708; }
+body[data-theme="gangster"] .howto ul { color: var(--text); }
+body[data-theme="gangster"] .round-btn { background: rgba(30, 22, 24, 0.88); }

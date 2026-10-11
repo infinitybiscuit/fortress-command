@@ -10,11 +10,12 @@ import { G, T, A, C, canvas, flip, rect, disc, hash, team, setPalette } from './
 import classic from './themes/classic.js';
 import robots from './themes/robots.js';
 import medieval from './themes/medieval.js';
+import gangster from './themes/gangster.js';
 
 export { G };
 
 // ── Themes ─────────────────────────────────────────────────────────────────
-export const THEMES = [classic, robots, medieval];
+export const THEMES = [classic, robots, medieval, gangster];
 let theme = null;
 const sprites = new Map();
 const tiles = {};
@@ -223,6 +224,7 @@ export function drawProjectile(ctx, p) {
     // Pixel explosion: hot core, orange body, red rim, then smoke
     const k = 1 - p.exploded / 0.3;
     const r = Math.max(2, Math.round((p.splash / G) * (0.35 + 0.5 * k)));
+    if (theme.explode) { theme.explode(ctx, x, y - 1, r, k, p.id || 0); return; }
     const ex = theme.explosion;
     disc(ctx, x, y - 1, r, k < 0.6 ? ex.rim : ex.smoke);
     disc(ctx, x, y - 1, Math.max(1, r - 2), k < 0.6 ? ex.body : ex.smoke2);
