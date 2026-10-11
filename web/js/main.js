@@ -1407,6 +1407,7 @@ const TAGLINES = {
   gangster: 'Chicago, 1932. The custard flies at midnight.',
   warring: 'Seven kingdoms. Only one will rise.',
   steampunk: 'Steam rises over the Land of the Rising Sun.',
+  winter: 'Minus forty. Perfect sauna weather.',
 };
 function applyTheme(id) {
   const t = setTheme(id);

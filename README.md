@@ -13,7 +13,7 @@ A side-scrolling platformer / RTS crossover. Build bases, train armies, construc
 
 ## Web version (iPhone)
 
-The `web/` folder has a no-build HTML5 version tuned for iPhone portrait play: online play for up to 4 players, six themes (Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun), and more. See [`web/README.md`](web/README.md).
+The `web/` folder has a no-build HTML5 version tuned for iPhone portrait play: online play for up to 4 players, seven themes (Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War), and more. See [`web/README.md`](web/README.md).
 
 The original Godot 4 project is in `godot/`.
 
