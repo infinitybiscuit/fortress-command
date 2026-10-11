@@ -2,7 +2,7 @@
 // airships under Mount Fuji, with cherry blossom drifting through the steam.
 // Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -21,6 +21,11 @@ const palette = {
   grass: '#6a9a4a', grassLight: '#94c06a', grassDark: '#46703a',
   dirt: '#5a4434', dirtMid: '#4a3628', dirtDeep: '#3a2a20', pebble: '#8a7a6a', pebbleDark: '#2a1e16',
   fire: '#f28a30', glass: '#f6d27a', shadow: 'rgba(0,0,0,0.3)',
+  // Sky pirates: sailcloth, patches, leather, iron, monkey fur and parrot feathers
+  sail: '#ece0c2', sailDark: '#c4b48e', patchA: '#8a6a9e', patchB: '#6a9a5a', patchC: '#d0844a', patchD: '#5a7ab0',
+  leather: '#6a4a30', leatherDark: '#46301e', iron: '#4a4852', ironLight: '#74727e',
+  fur: '#8a5a34', furLight: '#d0a678', parrot: '#4ab04a', parrotDark: '#2a7a3a', lens: '#9ad0e0',
+  gold: '#f6cc3a', goldDark: '#c08a1a', denim: '#4a5a7a', pink: '#e89aa0',
 };
 const ARMOUR = [0.22, 0.16, 0.17];
 
@@ -32,7 +37,7 @@ function sashimono(parts, details, t) {
   details.push([1, 1, 1, 3, t.light], [0, 0, 3, 1, C.white]);
 }
 
-function buildSoldier(type, f, frame) {
+function shogunSoldier(type, f, frame) {
   const t = team(f);
   const [c, g] = canvas(20, 17);
   const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
@@ -116,7 +121,7 @@ function gearWheel(g, x, y, r, frame) {
 }
 
 // Rickshaw: a steam-driven rickshaw — boiler and chimney up front, a hooded seat.
-function buildRickshaw(f, frame) {
+function shogunRickshaw(f, frame) {
   const t = team(f);
   const [c, g] = canvas(26, 17);
   outlined(g, [
@@ -133,7 +138,7 @@ function buildRickshaw(f, frame) {
 
 // Kabuto tank: a rhinoceros-beetle crawler — lacquered shell, horn cannon,
 // clanking legs that step between frames, a chimney.
-function buildBeetle(f, frame) {
+function shogunBeetle(f, frame) {
   const t = team(f);
   const [c, g] = canvas(36, 20);
   const legs = frame
@@ -152,7 +157,7 @@ function buildBeetle(f, frame) {
 }
 
 // Hanabi mortar: a wheeled firework mortar with a rack of rockets.
-function buildMortar(f, frame) {
+function shogunMortar(f, frame) {
   const t = team(f);
   const [c, g] = canvas(28, 19);
   outlined(g, [
@@ -168,7 +173,7 @@ function buildMortar(f, frame) {
 
 // Tengu flyer: a crow-masked pilot on a brass airframe (wings flap and the
 // propeller spins live).
-function buildTengu(f) {
+function shogunTengu(f) {
   const t = team(f);
   const [c, g] = canvas(30, 16);
   outlined(g, [
@@ -182,7 +187,7 @@ function buildTengu(f) {
 }
 
 // Koi airship: a zeppelin painted as a koi carp, with a gondola below.
-function buildKoi(f) {
+function shogunKoi(f) {
   const t = team(f);
   const [c, g] = canvas(46, 21);
   outlined(g, [
@@ -196,11 +201,229 @@ function buildKoi(f) {
   return { c, ax: 23, ay: 16 };
 }
 
+// ── Sky Pirates ────────────────────────────────────────────────────────────
+// A rowdy crew of goggled air-pirates: patched coats, eye patches, tricorns
+// with little propellers, a clockwork parrot and a monkey with a spanner.
+const pirate = (f) => sideOf(f) === 'pirates';
+
+function tricorn(parts, details, t, x = 4) {
+  // Tricorn hat with a tiny brass propeller on top and a team band
+  parts.push([x, 3, 10, 1, C.lacquer], [x + 2, 1, 6, 2, C.lacquer], [x + 4, 0, 1, 1, C.brassDark]);
+  details.push([x + 2, 2, 6, 1, t.main], [x + 1, 0, 2, 1, C.brassLight], [x + 5, 0, 2, 1, C.brassLight], [x, 3, 1, 1, C.lacquerLight], [x + 9, 3, 1, 1, C.lacquerLight]);
+}
+
+function pirateSoldier(type, f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(20, 17);
+  const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
+  const boots = frame ? [[5, 15, 3, 1], [9, 15, 3, 1]] : [[4, 15, 3, 1], [10, 15, 3, 1]];
+  let parts;
+  let details;
+  if (type === 'heavy') {
+    // Boiler-Belly Brute: a riveted boiler for a tummy, tiny goggled head,
+    // a smokestack poking out the back and a giant spanner
+    parts = [
+      ...legs.map((l) => [...l, C.leatherDark]), ...boots.map((b) => [...b, C.boot]),
+      [1, 1, 2, 6, C.iron], [3, 6, 11, 7, C.copper], [7, 1, 5, 5, C.skin], [6, 0, 7, 2, t.main],
+      [13, 7, 3, 3, C.skin], [16, 2, 2, 11, C.iron], [15, 1, 4, 2, C.iron],
+    ];
+    details = [
+      [1, 1, 2, 1, C.ironLight], [3, 6, 11, 1, C.brassLight], [3, 11, 11, 1, t.main], [3, 12, 11, 1, C.copperDark],
+      [5, 8, 1, 1, C.brassLight], [12, 8, 1, 1, C.brassLight], [5, 10, 1, 1, C.brassLight], [12, 10, 1, 1, C.brassLight],
+      [7, 7, 4, 4, C.white], [8, 8, 1, 2, C.red], [9, 9, 1, 1, C.O],
+      [8, 2, 4, 1, C.brass], [10, 2, 1, 1, C.lens], [8, 4, 4, 1, C.hair], [6, 0, 7, 1, t.light],
+      [16, 1, 2, 1, C.ironLight], [16, 3, 1, 1, C.O],
+    ];
+  } else if (type === 'scout') {
+    // Robo-Parrot: a clockwork parrot on brass stilts, wind-up key in its back,
+    // a goggle eye and a team-colour wing
+    const pl = frame ? [[8, 11, 1, 4], [11, 11, 1, 4]] : [[7, 11, 1, 4], [12, 11, 1, 4]];
+    const pf = frame ? [[7, 15, 3, 1], [10, 15, 3, 1]] : [[6, 15, 3, 1], [11, 15, 3, 1]];
+    parts = [
+      ...pl.map((l) => [...l, C.brass]), ...pf.map((p) => [...p, C.brassDark]),
+      [1, 9, 5, 2, t.main], [6, 5, 7, 6, C.parrot], [10, 2, 5, 4, C.parrot], [15, 3, 2, 2, C.gold], [11, 0, 2, 2, C.red], [3, 4, 1, 3, C.brassDark],
+    ];
+    details = [
+      [2, 4, 3, 1, C.brassLight], [2, 6, 3, 1, C.brassLight], [16, 5, 1, 1, C.goldDark],
+      [12, 3, 2, 2, C.brass], [13, 3, 1, 1, C.O], [6, 6, 5, 3, t.main], [6, 8, 5, 1, t.dark], [7, 6, 4, 1, t.light],
+      [11, 9, 2, 2, C.parrotDark], [8, 10, 3, 1, C.brassDark], [9, 10, 1, 1, C.brassLight], [10, 2, 3, 1, '#7ad06a'], [1, 9, 5, 1, t.light],
+    ];
+  } else if (type === 'engineer') {
+    // Grease Monkey: a monkey in team overalls, goggles up, tail curled, spanner out
+    parts = [
+      ...legs.map((l) => [...l, C.fur]), ...boots.map((b) => [...b, C.fur]),
+      [1, 5, 1, 7, C.fur], [2, 11, 3, 1, C.fur], [5, 8, 7, 4, C.denim], [6, 3, 6, 5, C.fur], [5, 4, 1, 2, C.furLight],
+      [11, 9, 4, 1, C.iron], [14, 7, 3, 2, C.iron], [14, 10, 3, 1, C.iron],
+    ];
+    details = [
+      [9, 4, 3, 4, C.furLight], [10, 4, 1, 1, C.O], [10, 6, 2, 1, C.fur], [9, 7, 2, 1, C.O],
+      [6, 2, 6, 1, C.brass], [7, 2, 1, 1, C.lens], [10, 2, 1, 1, C.lens], [6, 3, 6, 1, C.fur],
+      [5, 8, 7, 1, t.main], [7, 8, 1, 4, t.main], [10, 8, 1, 4, t.main], [7, 10, 1, 1, C.brassLight], [15, 8, 1, 1, C.O], [14, 7, 3, 1, C.ironLight],
+    ];
+  } else if (type === 'sniper') {
+    // Spyglass Sharpshooter: long team coat, a feathered hat, a brass monocle
+    // and a long rifle with a spyglass for a scope
+    parts = [
+      ...legs.map((l) => [...l, C.leatherDark]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 5, t.uni], [6, 4, 6, 4, C.skin], [4, 3, 10, 1, C.leather], [6, 1, 6, 2, C.leather], [2, 0, 5, 1, C.red],
+      [10, 9, 9, 1, C.wood], [12, 7, 6, 2, C.brass],
+    ];
+    details = [
+      [6, 2, 6, 1, t.main], [2, 0, 2, 1, C.white], [10, 5, 2, 2, C.brassLight], [10, 5, 1, 1, C.O], [8, 7, 4, 1, C.hair],
+      [5, 8, 7, 1, t.main], [5, 10, 1, 3, t.uniDark], [8, 9, 1, 1, C.brassLight], [8, 11, 1, 1, C.brassLight],
+      [17, 7, 1, 2, C.lens], [12, 7, 6, 1, C.brassLight], [14, 8, 1, 1, C.brassDark], [18, 9, 1, 1, C.iron],
+    ];
+  } else {
+    // Deckhand: striped team shirt, eye patch, propeller tricorn, a blunderbuss
+    parts = [
+      ...legs.map((l) => [...l, C.leather]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.white], [6, 4, 6, 4, C.skin], [10, 9, 6, 1, C.wood], [15, 8, 3, 3, C.brass],
+    ];
+    details = [
+      [5, 9, 7, 1, t.main], [5, 11, 7, 1, t.main], [10, 5, 2, 1, C.O], [6, 4, 4, 1, C.O], [8, 7, 3, 1, C.skinDark],
+      [17, 8, 1, 3, C.brassDark], [15, 8, 2, 1, C.brassLight], [11, 10, 1, 1, C.woodDark],
+    ];
+    tricorn(parts, details, t);
+  }
+  outlined(g, parts, details);
+  return { c, ax: 8, ay: 16 };
+}
+
+// Cog-and-crossed-spanners emblem (5×5) for flags, sails and signs.
+function emblem(g, x, y, col = C.white) {
+  g.fillStyle = col;
+  for (let i = 0; i < 5; i++) { g.fillRect(x + i, y + i, 1, 1); g.fillRect(x + 4 - i, y + i, 1, 1); }
+  g.fillRect(x, y, 2, 1); g.fillRect(x + 3, y, 2, 1); g.fillRect(x, y + 4, 2, 1); g.fillRect(x + 3, y + 4, 2, 1);
+  g.fillStyle = C.brassDark; g.fillRect(x + 1, y + 1, 3, 3);
+  g.fillStyle = C.brassLight; g.fillRect(x + 2, y + 1, 1, 1); g.fillRect(x + 1, y + 2, 1, 1); g.fillRect(x + 3, y + 2, 1, 1); g.fillRect(x + 2, y + 3, 1, 1);
+  g.fillStyle = C.O; g.fillRect(x + 2, y + 2, 1, 1);
+}
+
+// Steam Hog: a pig-nosed steam motorbike with a goggled rider and a team scarf.
+function pirateHog(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(30, 18);
+  outlined(g, [
+    [2, 8, 6, 2, C.iron], [7, 9, 17, 3, C.iron], [9, 5, 11, 4, C.copper], [21, 5, 5, 5, C.pink], [21, 4, 1, 1, C.pink], [26, 6, 2, 3, C.pink],
+    [12, 3, 5, 3, C.leather], [12, 0, 4, 3, C.skin], [16, 3, 5, 1, C.leather], [14, 6, 4, 3, C.leatherDark], [7, 2, 5, 1, t.main], [20, 2, 1, 4, C.brass],
+  ], [
+    [9, 5, 11, 1, C.brassLight], [9, 7, 11, 1, t.main], [11, 6, 1, 1, C.brassLight], [17, 6, 1, 1, C.brassLight],
+    [12, 0, 4, 1, C.leather], [14, 1, 2, 1, C.brass], [15, 1, 1, 1, C.lens], [7, 2, 2, 1, t.light],
+    [23, 6, 1, 1, C.O], [26, 7, 1, 1, C.O], [27, 7, 1, 1, '#c87078'], [24, 9, 1, 1, C.white], [21, 5, 5, 1, '#f4c0c4'],
+    [2, 8, 1, 2, C.ironLight], [20, 2, 1, 1, C.brassLight],
+  ]);
+  gearWheel(g, 7, 13, 4, frame);
+  gearWheel(g, 23, 13, 4, frame);
+  return { c, ax: 15, ay: 17 };
+}
+
+// Land Galleon: a pirate ship on wheels — patched sail with the cog-and-spanners
+// emblem, a team pennant, cannon ports and a bowsprit.
+function pirateGalleon(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(38, 22);
+  outlined(g, [
+    [14, 1, 1, 11, C.woodDark], [26, 3, 1, 9, C.woodDark], [15, 0, 5, 2, t.main], [27, 2, 4, 2, t.main],
+    [9, 3, 11, 7, C.sail], [22, 5, 9, 5, C.sail],
+    [1, 7, 7, 5, C.wood], [3, 11, 30, 5, C.wood], [31, 9, 4, 3, C.wood], [7, 16, 23, 2, C.woodDark], [34, 8, 4, 1, C.woodDark],
+  ], [
+    [9, 3, 11, 1, C.white], [9, 9, 11, 1, C.sailDark], [19, 4, 1, 5, C.sailDark], [22, 5, 9, 1, C.white], [22, 9, 9, 1, C.sailDark], [30, 6, 1, 3, C.sailDark],
+    [10, 7, 3, 2, C.patchA], [27, 7, 3, 2, C.patchB], [15, 0, 5, 1, t.light], [27, 2, 4, 1, t.light],
+    [1, 7, 7, 1, C.woodLight], [3, 11, 30, 1, C.woodLight], [31, 9, 4, 1, C.woodLight], [3, 13, 30, 1, t.main], [7, 16, 23, 1, C.wood],
+    [3, 9, 1, 1, C.glass], [6, 9, 1, 1, C.glass],
+  ]);
+  emblem(g, 12, 4);
+  emblem(g, 23, 5);
+  g.fillStyle = C.O;
+  for (const x of [8, 15, 22]) g.fillRect(x, 14, 3, 2);
+  g.fillStyle = C.iron;
+  for (const x of [9, 16, 23]) g.fillRect(x, 15, 1, 1);
+  g.fillStyle = C.O; g.fillRect(33, 12, 5, 3); g.fillStyle = C.iron; g.fillRect(34, 13, 4, 1);
+  for (const x of [8, 15, 22, 29]) gearWheel(g, x, 18, 3, frame);
+  return { c, ax: 18, ay: 21 };
+}
+
+// Broadside Wagon: a cart hauling a stubby great-cannon, a grog barrel and a team flag.
+function pirateWagon(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(32, 19);
+  outlined(g, [
+    [2, 0, 1, 9, C.woodDark], [3, 0, 5, 4, t.main],
+    [3, 9, 23, 3, C.wood], [4, 4, 5, 5, C.wood], [12, 6, 7, 4, C.iron], [17, 4, 5, 4, C.iron], [21, 2, 4, 4, C.iron], [24, 1, 2, 5, C.brass],
+  ], [
+    [3, 0, 5, 1, t.light], [3, 9, 23, 1, C.woodLight], [4, 5, 5, 1, t.main], [4, 7, 5, 1, t.main], [6, 4, 1, 5, C.woodLight],
+    [12, 6, 7, 1, C.ironLight], [17, 4, 5, 1, C.ironLight], [21, 2, 3, 1, C.ironLight], [24, 1, 1, 5, C.brassLight], [25, 2, 1, 3, C.O],
+    [14, 8, 2, 1, C.brass], [10, 10, 14, 1, t.main],
+  ]);
+  for (const [x, y] of [[27, 10], [29, 10], [28, 8]]) { disc(g, x, y, 1, C.O); g.fillStyle = C.ironLight; g.fillRect(x, y, 1, 1); }
+  gearWheel(g, 8, 15, 3, frame);
+  gearWheel(g, 21, 15, 3, frame);
+  return { c, ax: 15, ay: 18 };
+}
+
+// Gyro-Gull: a seagull-painted gyrocopter with a goggled pilot (rotor and
+// pusher prop spin live).
+function pirateGyro(f) {
+  const t = team(f);
+  const [c, g] = canvas(32, 16);
+  outlined(g, [
+    [1, 4, 3, 5, t.main], [3, 8, 6, 1, C.brassDark], [15, 1, 1, 6, C.iron], [8, 7, 16, 4, C.white], [24, 8, 4, 2, C.gold],
+    [17, 3, 4, 4, C.skin], [17, 2, 4, 2, C.leather], [13, 5, 5, 1, t.main], [12, 11, 1, 2, C.iron], [20, 11, 1, 2, C.iron], [9, 13, 14, 1, C.iron],
+  ], [
+    [1, 4, 3, 1, t.light], [14, 1, 3, 1, C.brass], [8, 7, 16, 1, C.steam], [8, 9, 16, 1, t.main], [10, 10, 12, 1, '#b8b4c0'],
+    [22, 8, 1, 1, C.O], [26, 9, 2, 1, C.goldDark], [19, 4, 2, 1, C.brass], [20, 4, 1, 1, C.lens], [18, 6, 2, 1, C.skinDark], [9, 13, 14, 1, C.ironLight],
+  ]);
+  return { c, ax: 16, ay: 13 };
+}
+
+// Patchwork Zeppelin: a much-mended gasbag with a little ship hanging under it.
+function pirateZeppelin(f) {
+  const t = team(f);
+  const [c, g] = canvas(48, 21);
+  outlined(g, [
+    [2, 1, 5, 4, t.main], [2, 10, 5, 4, t.main], [6, 3, 34, 9, C.sail], [9, 2, 28, 1, C.sail], [9, 12, 28, 1, C.sail], [40, 4, 3, 7, C.sail], [43, 6, 1, 3, C.sail],
+    [15, 14, 18, 3, C.wood], [17, 17, 14, 1, C.woodDark],
+  ], [
+    [2, 1, 5, 1, t.light], [9, 2, 28, 1, C.white], [9, 12, 28, 1, C.sailDark], [6, 11, 34, 1, C.sailDark],
+    [10, 4, 6, 4, C.patchA], [25, 8, 6, 3, C.patchB], [25, 4, 4, 2, C.patchC], [14, 9, 4, 2, C.patchD],
+    [20, 3, 1, 9, t.main], [21, 3, 1, 9, t.dark],
+    [15, 14, 18, 1, C.woodLight], [15, 16, 18, 1, t.main], [18, 15, 1, 1, C.glass], [22, 15, 1, 1, C.glass], [26, 15, 1, 1, C.glass],
+    [16, 13, 1, 1, C.O], [31, 13, 1, 1, C.O], [41, 6, 1, 1, C.O],
+  ]);
+  // Stitches around the patches
+  g.fillStyle = C.O;
+  for (const [x, y, w] of [[10, 3, 6], [10, 8, 6], [25, 7, 6], [25, 3, 4], [14, 8, 4]]) for (let i = 0; i < w; i += 2) g.fillRect(x + i, y, 1, 1);
+  emblem(g, 33, 5);
+  return { c, ax: 24, ay: 16 };
+}
+
+const buildSoldier = (type, f, frame) => (pirate(f) ? pirateSoldier : shogunSoldier)(type, f, frame);
+const buildRickshaw = (f, frame) => (pirate(f) ? pirateHog : shogunRickshaw)(f, frame);
+const buildBeetle = (f, frame) => (pirate(f) ? pirateGalleon : shogunBeetle)(f, frame);
+const buildMortar = (f, frame) => (pirate(f) ? pirateWagon : shogunMortar)(f, frame);
+const buildTengu = (f) => (pirate(f) ? pirateGyro : shogunTengu)(f);
+const buildKoi = (f) => (pirate(f) ? pirateZeppelin : shogunKoi)(f);
+
 // Flapping brass wings and a spinning prop for the tengu; a wagging tail and
 // propellers for the koi.
 function rotor(ctx, u, x, y) {
   const tick = Math.floor(performance.now() / 70);
   const s = u.facing;
+  if (pirate(u.faction)) {
+    if (u.type === 'helicopter') {
+      // Gyro rotor above the mast and a pusher prop behind the tail
+      const mx = s > 0 ? x - 1 : x;
+      if (tick % 2) rect(ctx, mx - 14, y - 13, 29, 1, C.ironLight);
+      else { rect(ctx, mx - 6, y - 13, 13, 1, C.iron); rect(ctx, mx, y - 14, 1, 1, C.brass); }
+      const px = s > 0 ? x - 16 : x + 15;
+      if (tick % 2) rect(ctx, px, y - 9, 1, 5, C.ironLight); else rect(ctx, px, y - 7, 1, 2, C.iron);
+    } else {
+      // Tail propeller and a fluttering pennant
+      const px = s > 0 ? x - 25 : x + 24;
+      if (tick % 2) rect(ctx, px, y - 12, 1, 7, C.ironLight); else rect(ctx, px, y - 9, 1, 2, C.iron);
+    }
+    return;
+  }
   if (u.type === 'helicopter') {
     const up = Math.floor(performance.now() / 140) % 2 === 0;
     for (let i = 0; i < 10; i++) {
@@ -375,6 +598,178 @@ const BUILD = {
     g.fillStyle = C.stoneLight; for (let y = 0; y < 16; y += 4) g.fillRect(0, y, 16, 1);
     g.fillStyle = C.O; g.fillRect(0, 0, 1, 16); g.fillRect(15, 0, 1, 16);
     g.fillStyle = t.main; g.fillRect(2, 1, 3, 2);
+  },
+};
+
+// ── Sky Pirate buildings ───────────────────────────────────────────────────
+function planks(g, x, y, w, h, col = C.wood) {
+  outlined(g, [[x, y, w, h, col]], [[x, y, w, 1, C.woodLight]]);
+  g.fillStyle = C.woodDark;
+  for (let yy = y + 3; yy < y + h; yy += 3) g.fillRect(x, yy, w, 1);
+  for (let yy = y + 1, r = 0; yy < y + h; yy += 3, r++) for (let xx = x + (r % 2 ? 5 : 11); xx < x + w; xx += 13) g.fillRect(xx, yy, 1, 2);
+}
+
+function porthole(g, cx, cy) {
+  disc(g, cx, cy, 3, C.O); disc(g, cx, cy, 2, C.brass); disc(g, cx, cy, 1, C.glass);
+}
+
+function flag(g, x, y, w, h, t, pole = 6) {
+  g.fillStyle = C.O; g.fillRect(x - 2, y - 1, 3, h + pole + 1); g.fillRect(x, y - 1, w + 1, h + 2);
+  g.fillStyle = C.woodDark; g.fillRect(x - 1, y, 1, h + pole);
+  g.fillStyle = t.main; g.fillRect(x, y, w, h);
+  g.fillStyle = t.light; g.fillRect(x, y, w, 1);
+}
+
+function patch(g, x, y, w, h, col) {
+  g.fillStyle = col; g.fillRect(x, y, w, h);
+  g.fillStyle = C.O;
+  for (let i = 0; i < w; i += 2) { g.fillRect(x + i, y - 1, 1, 1); g.fillRect(x + i, y + h, 1, 1); }
+  for (let i = 1; i < h; i += 2) { g.fillRect(x - 1, y + i, 1, 1); g.fillRect(x + w, y + i, 1, 1); }
+}
+
+function barrel(g, x, y, w, h, band) {
+  outlined(g, [[x, y, w, h, C.wood]], [[x + 1, y, w - 2, 1, C.woodLight], [x + 2, y + 1, 1, h - 2, C.woodLight]]);
+  g.fillStyle = C.woodDark; for (let xx = x + 4; xx < x + w - 1; xx += 3) g.fillRect(xx, y + 1, 1, h - 2);
+  g.fillStyle = C.iron; g.fillRect(x, y + 1, w, 1); g.fillRect(x, y + h - 2, w, 1);
+  if (band) { g.fillStyle = band; g.fillRect(x, y + Math.floor(h / 2), w, 1); }
+}
+
+const PIRATE_BUILD = {
+  hq(g, t) {
+    // Pirate Cove: a crashed patchwork zeppelin flopped on a beached ship hull,
+    // a stove pipe, portholes and the team's cog-and-spanners flag up the mast
+    planks(g, 4, 31, 56, 17);
+    g.fillStyle = t.main; g.fillRect(4, 34, 56, 1);
+    for (const x of [14, 22, 43, 51]) porthole(g, x, 40);
+    // Raised bow with a bowsprit, and an anchor over the side
+    outlined(g, [[56, 28, 6, 6, C.wood], [58, 26, 6, 1, C.woodDark]], [[56, 28, 6, 1, C.woodLight], [56, 31, 6, 1, t.main]]);
+    g.fillStyle = C.O; g.fillRect(5, 34, 5, 11); g.fillRect(3, 41, 9, 4);
+    g.fillStyle = C.iron; g.fillRect(6, 35, 3, 1); g.fillRect(7, 35, 1, 9); g.fillRect(4, 42, 1, 1); g.fillRect(10, 42, 1, 1); g.fillRect(5, 43, 5, 1);
+    g.fillStyle = C.ironLight; g.fillRect(7, 36, 1, 3);
+    outlined(g, [[27, 37, 10, 11, C.lacquer]], [[27, 37, 10, 1, C.brass], [31, 38, 1, 10, C.O], [29, 42, 1, 1, C.brassLight], [34, 42, 1, 1, C.brassLight]]);
+    g.fillStyle = C.O; for (let x = 4; x < 61; x += 6) g.fillRect(x, 28, 1, 3); g.fillRect(3, 28, 58, 1);
+    // The flopped gasbag
+    outlined(g, [[3, 10, 6, 6, t.main], [8, 13, 46, 15, C.sail], [11, 11, 40, 2, C.sail], [54, 16, 4, 10, C.sail], [5, 16, 3, 11, C.sail]], [
+      [3, 10, 6, 1, t.light], [11, 11, 40, 1, C.white], [8, 26, 46, 2, C.sailDark], [5, 25, 3, 2, C.sailDark], [55, 24, 3, 2, C.sailDark],
+    ]);
+    patch(g, 12, 15, 7, 5, C.patchA); patch(g, 38, 20, 8, 4, C.patchB); patch(g, 46, 13, 5, 4, C.patchC); patch(g, 21, 22, 6, 3, C.patchD);
+    g.fillStyle = t.main; g.fillRect(30, 11, 3, 17);
+    g.fillStyle = t.dark; g.fillRect(32, 11, 1, 17);
+    // A dent where it hit the deck
+    g.fillStyle = C.sailDark; g.fillRect(44, 26, 5, 1); g.fillRect(16, 26, 3, 1);
+    // Stove pipe and mast
+    outlined(g, [[13, 2, 3, 11, C.iron]], [[12, 2, 5, 1, C.ironLight], [15, 3, 1, 9, '#2e2c34']]);
+    outlined(g, [[48, 0, 2, 11, C.woodDark]], []);
+    flag(g, 50, 1, 12, 8, t, 0);
+    emblem(g, 54, 2);
+  },
+  barracks(g, t) {
+    // Grog Hall: a timber tavern with a shingled roof, a foaming-mug sign,
+    // round windows, bunting and a barrel by the door. (It's ginger beer.)
+    planks(g, 4, 14, 40, 18);
+    for (let i = 0; i < 10; i++) {
+      const half = Math.round(10 + (i / 9) * 14);
+      g.fillStyle = C.O; g.fillRect(24 - half - 1, 4 + i, half * 2 + 2, 1);
+      g.fillStyle = i % 2 ? C.redDark : C.lacquerRed; g.fillRect(24 - half, 4 + i, half * 2, 1);
+    }
+    g.fillStyle = C.O; g.fillRect(13, 3, 22, 1);
+    g.fillStyle = C.redDark; for (let x = 16; x < 34; x += 4) g.fillRect(x, 5, 1, 1);
+    chimney(g, 36, 1, 8);
+    // Bunting
+    for (let x = 1; x < 47; x += 4) {
+      g.fillStyle = (x >> 2) % 2 ? C.white : t.main;
+      g.fillRect(x, 14, 3, 1); g.fillRect(x + 1, 15, 1, 1);
+    }
+    // Door, windows and sign
+    outlined(g, [[20, 22, 8, 10, C.lacquer], [21, 21, 6, 1, C.lacquer]], [[23, 22, 1, 10, C.O], [26, 27, 1, 1, C.brassLight]]);
+    for (const x of [11, 37]) { disc(g, x, 23, 3, C.O); disc(g, x, 23, 2, C.glass); g.fillStyle = C.O; g.fillRect(x, 21, 1, 5); g.fillRect(x - 2, 23, 5, 1); }
+    outlined(g, [[17, 16, 14, 4, C.woodLight]], [[17, 16, 14, 1, C.sail]]);
+    outlined(g, [[22, 16, 3, 3, C.gold], [25, 17, 1, 1, C.gold]], [[22, 16, 3, 1, C.white], [21, 16, 1, 1, C.white], [23, 17, 1, 2, C.goldDark]]);
+    barrel(g, 40, 25, 6, 7, t.main);
+    barrel(g, 2, 26, 5, 6, null);
+  },
+  turret(g, t) {
+    // Crow's Nest: a mast with a barrel lookout and a swivel cannon, on crates
+    outlined(g, [[6, 26, 20, 6, C.wood]], [[6, 26, 20, 1, C.woodLight], [15, 26, 1, 6, C.woodDark], [6, 29, 20, 1, C.woodDark]]);
+    outlined(g, [[14, 9, 3, 17, C.woodDark]], [[14, 9, 1, 17, C.wood]]);
+    g.fillStyle = C.sailDark; for (let y = 12; y < 26; y += 3) g.fillRect(17, y, 3, 1);
+    g.fillStyle = C.O; g.fillRect(19, 11, 1, 15);
+    outlined(g, [[11, 3, 4, 3, C.skin], [9, 2, 8, 1, C.lacquer], [11, 0, 4, 2, C.lacquer]], [[11, 1, 4, 1, t.main], [13, 4, 1, 1, C.brass]]);
+    outlined(g, [[8, 6, 16, 7, C.wood]], [[8, 6, 16, 1, C.woodLight], [8, 7, 16, 1, C.iron], [8, 11, 16, 1, C.iron], [8, 9, 16, 1, t.main]]);
+    g.fillStyle = C.woodDark; for (let x = 11; x < 23; x += 3) g.fillRect(x, 8, 1, 3);
+    outlined(g, [[23, 4, 7, 3, C.iron], [29, 3, 2, 5, C.brass]], [[23, 4, 7, 1, C.ironLight], [30, 4, 1, 3, C.O]]);
+  },
+  wall(g, t) {
+    // Barrel stack: three upright barrels lashed together, a team pennant on top
+    barrel(g, 1, 23, 14, 9, null);
+    barrel(g, 1, 14, 14, 9, t.main);
+    barrel(g, 2, 6, 12, 8, null);
+    g.fillStyle = C.sailDark; g.fillRect(0, 18, 1, 9); g.fillRect(15, 18, 1, 9);
+    g.fillStyle = C.O; g.fillRect(6, 0, 1, 6); g.fillRect(7, 0, 6, 4);
+    g.fillStyle = t.main; g.fillRect(7, 1, 5, 2);
+    g.fillStyle = t.light; g.fillRect(7, 1, 5, 1);
+  },
+  mine(g, t) {
+    // Plunder Pile: an open treasure chest and a heap of gold coins, cogs
+    // and gems, with the team flag planted on top
+    for (let i = 0; i < 14; i++) {
+      const half = Math.round(3 + i * 0.75);
+      g.fillStyle = C.O; g.fillRect(21 - half - 1, 17 + i, half * 2 + 2, 1);
+      g.fillStyle = i % 3 === 1 ? C.goldDark : C.gold; g.fillRect(21 - half, 17 + i, half * 2, 1);
+    }
+        g.fillStyle = '#fff2a8';
+    for (let i = 0; i < 9; i++) g.fillRect(12 + Math.floor(hash(i + 4) * 18), 19 + Math.floor(hash(i + 9) * 11), 2, 1);
+    for (const [x, y, col] of [[20, 22, C.red], [26, 27, '#4a8ae8'], [15, 28, C.parrot]]) { g.fillStyle = C.O; g.fillRect(x - 1, y - 1, 4, 4); g.fillStyle = col; g.fillRect(x, y, 2, 2); g.fillStyle = C.white; g.fillRect(x, y, 1, 1); }
+    gear(g, 27, 21, 2);
+    flag(g, 20, 3, 8, 5, t, 9);
+    // The chest
+    outlined(g, [[2, 15, 12, 5, C.wood], [2, 21, 12, 10, C.wood]], [
+      [2, 15, 12, 1, C.woodLight], [2, 18, 12, 1, C.iron], [2, 21, 12, 1, C.gold], [2, 22, 12, 2, C.goldDark],
+      [2, 26, 12, 1, C.iron], [7, 25, 2, 3, C.brass], [7, 26, 2, 1, C.O], [4, 21, 1, 10, C.woodDark], [11, 21, 1, 10, C.woodDark], [2, 28, 12, 1, t.main],
+    ]);
+    g.fillStyle = C.gold; g.fillRect(4, 20, 3, 1); g.fillRect(9, 19, 2, 2);
+  },
+  workshop(g, t) {
+    // Salvage Yard: a patched awning over a heap of scrap, a half-built
+    // robo-parrot and an anvil
+    outlined(g, [[3, 10, 2, 22, C.woodDark], [43, 10, 2, 22, C.woodDark]], []);
+    outlined(g, [[1, 5, 46, 5, C.sail]], [[1, 5, 46, 1, C.white]]);
+    for (let x = 1; x < 47; x += 4) { g.fillStyle = t.main; g.fillRect(x, 10, 2, 2); g.fillStyle = C.O; g.fillRect(x + 2, 10, 2, 1); }
+    patch(g, 9, 6, 6, 3, C.patchA); patch(g, 31, 6, 5, 3, C.patchC);
+    // Scrap heap
+    for (let i = 0; i < 9; i++) {
+      const half = Math.round(4 + i * 1.3);
+      g.fillStyle = C.O; g.fillRect(16 - half - 1, 23 + i, half * 2 + 2, 1);
+      g.fillStyle = i % 2 ? C.iron : C.ironLight; g.fillRect(16 - half, 23 + i, half * 2, 1);
+    }
+    gear(g, 12, 25, 3);
+    outlined(g, [[16, 20, 2, 6, C.copper], [19, 24, 5, 2, C.brassDark]], [[16, 20, 2, 1, C.brassLight]]);
+    // Half-built robo-parrot
+    outlined(g, [[30, 18, 6, 6, C.parrot], [34, 15, 4, 4, C.parrot], [38, 16, 2, 2, C.gold], [31, 24, 1, 4, C.brass], [34, 24, 1, 4, C.brass]], [
+      [30, 19, 3, 3, C.brassDark], [31, 20, 1, 1, C.brassLight], [35, 16, 2, 2, C.brass], [36, 16, 1, 1, C.O], [33, 22, 3, 1, t.main],
+    ]);
+    outlined(g, [[28, 28, 12, 2, C.iron], [31, 30, 6, 2, C.iron]], [[28, 28, 12, 1, C.ironLight]]);
+  },
+  airbase(g, t) {
+    // Sky Harbour: a timber dock, crates and rope, a lattice mooring mast
+    // with a lantern, and a little patched blimp tied up at the top
+    planks(g, 0, 21, 38, 11);
+    outlined(g, [[4, 15, 8, 6, C.woodLight], [13, 17, 6, 4, C.woodLight]], [[4, 17, 8, 1, C.woodDark], [7, 15, 1, 6, C.woodDark], [13, 18, 6, 1, C.woodDark]]);
+    g.fillStyle = t.main; g.fillRect(5, 16, 2, 1); g.fillRect(14, 19, 2, 1);
+    disc(g, 27, 19, 2, C.O); disc(g, 27, 19, 1, C.sailDark);
+    g.fillStyle = C.O; g.fillRect(48, 2, 1, 30); g.fillRect(54, 2, 1, 30); g.fillRect(46, 1, 11, 2);
+    g.fillStyle = C.ironLight;
+    for (let y = 4; y < 32; y += 6) { for (let i = 0; i < 5; i++) { g.fillRect(49 + i, y + i, 1, 1); g.fillRect(53 - i, y + i, 1, 1); } g.fillRect(49, y, 5, 1); }
+    g.fillStyle = C.brass; g.fillRect(47, 1, 9, 1);
+    g.fillStyle = C.O; g.fillRect(56, 6, 5, 6); g.fillStyle = C.red; g.fillRect(57, 7, 3, 4); g.fillStyle = C.glass; g.fillRect(58, 8, 1, 2);
+    // Tether and moored blimp
+    g.fillStyle = C.O; for (let i = 0; i < 8; i++) g.fillRect(40 + i, 6 - Math.floor(i / 3), 1, 1);
+    outlined(g, [[22, 2, 18, 7, C.sail], [20, 3, 2, 5, C.sail], [16, 1, 4, 3, t.main], [16, 7, 4, 3, t.main], [26, 9, 8, 3, C.wood]], [
+      [22, 2, 18, 1, C.white], [22, 8, 18, 1, C.sailDark], [26, 9, 8, 1, C.woodLight], [26, 11, 8, 1, t.main], [28, 10, 1, 1, C.glass], [31, 10, 1, 1, C.glass],
+    ]);
+    patch(g, 25, 4, 4, 3, C.patchB);
+    g.fillStyle = t.main; g.fillRect(33, 2, 2, 7);
+    flag(g, 57, 0, 6, 4, t, 0);
   },
 };
 
@@ -593,6 +988,27 @@ function animate(ctx, b, x, y) {
   const ms = performance.now();
   const tick = Math.floor(ms / 160);
   const t = team(b.faction);
+  if (pirate(b.faction)) {
+    if (b.type === 'hq') {
+      for (let i = 0; i < 2; i++) puff(ctx, x + 13, y + 1, ms, i);
+      rect(ctx, x + 61 + (tick % 2), y + 3 + (tick % 2), 1, 2, t.light);
+    } else if (b.type === 'barracks') {
+      for (let i = 0; i < 2; i++) puff(ctx, x + 36, y, ms + 300, i);
+    } else if (b.type === 'mine') {
+      // Treasure glints
+      const k = tick % 9;
+      if (k < 3) {
+        const gx = x + 12 + Math.floor(hash(Math.floor(tick / 9)) * 16), gy = y + 19 + Math.floor(hash(Math.floor(tick / 9) + 5) * 9);
+        rect(ctx, gx, gy - 1, 1, 3, C.white); rect(ctx, gx - 1, gy, 3, 1, C.white);
+      }
+    } else if (b.type === 'turret') {
+      if (tick % 7 === 0) puff(ctx, x + 31, y + 4, ms, 0);
+    } else if (b.type === 'airbase') {
+      if (tick % 5 < 3) rect(ctx, x + 58, y + 8, 1, 2, C.yellow);
+      rect(ctx, x + 63, y + 1 + (tick % 2), 1, 2, t.light);
+    }
+    return;
+  }
   if (b.type === 'hq') {
     for (let i = 0; i < 2; i++) { puff(ctx, x + 6, y + 20, ms, i); puff(ctx, x + 55, y + 18, ms + 400, i); }
   } else if (b.type === 'mine') {
@@ -658,6 +1074,18 @@ function explode(ctx, x, y, r, k, seed) {
 function corpse(e) {
   const t = team(e.f);
   const [c, g] = canvas(14, 6);
+  if (pirate(e.f)) {
+    if (e.type === 'scout') {
+      // A sprung robo-parrot: feathers, a loose spring and a cog
+      outlined(g, [[3, 2, 7, 3, C.parrot], [10, 3, 2, 2, C.gold], [1, 3, 2, 2, t.main]], [[5, 2, 3, 1, t.main], [7, 4, 1, 1, C.brassDark]]);
+      g.fillStyle = C.brass; g.fillRect(4, 0, 1, 1); g.fillRect(5, 1, 1, 1); g.fillRect(6, 0, 1, 1);
+    } else if (e.type === 'engineer') {
+      outlined(g, [[1, 2, 3, 3, C.fur], [4, 2, 7, 3, C.denim], [11, 3, 2, 2, C.fur]], [[2, 3, 2, 1, C.furLight], [5, 2, 1, 3, t.main]]);
+    } else {
+      outlined(g, [[1, 2, 3, 3, C.skin], [4, 2, 7, 3, e.type === 'heavy' ? C.copper : C.white], [11, 3, 2, 2, C.boot]], [[0, 1, 3, 1, C.lacquer], [5, 3, 5, 1, t.main], [2, 3, 1, 1, C.O]]);
+    }
+    return { c, ax: 7, ay: 5 };
+  }
   outlined(g, [[1, 2, 3, 3, C.skin], [4, 2, 7, 3, e.type === 'heavy' ? C.lacquerRed : C.lacquer], [11, 3, 2, 2, C.boot]], [[0, 1, 2, 2, C.hair], [5, 3, 2, 1, t.main]]);
   return { c, ax: 7, ay: 5 };
 }
@@ -665,13 +1093,34 @@ function corpse(e) {
 export default {
   id: 'steampunk',
   name: 'Steam Shogun',
+  sides: [
+    {
+      id: 'shogunate', name: 'The Shogunate', short: 'Shogunate',
+      blurb: 'Lacquered armour, brass boilers, ninjas in goggles and a castle that runs on steam. Very polite. Very punctual.',
+      win: 'The cherry blossoms fall on a well-earned victory.',
+      lose: 'The castle boiler has gone cold. Time for some tea.',
+    },
+    {
+      id: 'pirates', name: 'The Sky Pirates', short: 'Pirates', plural: true,
+      blurb: 'Goggled air-pirates in patchwork zeppelins, with a clockwork parrot and a monkey who fixes everything. Arr, the sky be theirs!',
+      names: {
+        soldier: 'Deckhand', heavy: 'Boiler-Belly', scout: 'Robo-Parrot', engineer: 'Grease Monkey', sniper: 'Spyglass',
+        jeep: 'Steam Hog', tank: 'Land Galleon', artillery: 'Broadside Wagon', helicopter: 'Gyro-Gull', bomber: 'Patchwork Zeppelin',
+        hq: 'Pirate Cove', barracks: 'Grog Hall', turret: "Crow's Nest", wall: 'Barrel Stack', mine: 'Plunder Pile',
+        workshop: 'Salvage Yard', airbase: 'Sky Harbour', bridge: 'Taiko Bridge', ramp: 'Steps',
+      },
+      icons: { hq: '⚓', barracks: '🥤', turret: '🔭', wall: '🛢️', mine: '💰', workshop: '🔧', airbase: '🎈' },
+      win: 'Arr, the sky be ours! Ginger beer for the whole crew!',
+      lose: 'Abandon zeppelin! Mind the parrot!',
+    },
+  ],
   palette,
   teamBase: ARMOUR,
   roofBase: [0.25, 0.25, 0.3],
   soldier: buildSoldier,
   vehicle: { jeep: buildRickshaw, tank: buildBeetle, artillery: buildMortar },
   aircraft: { helicopter: buildTengu, bomber: buildKoi },
-  buildings: BUILD,
+  buildings: Object.fromEntries(Object.keys(BUILD).map((k) => [k, (g, t, f) => (pirate(f) && PIRATE_BUILD[k] ? PIRATE_BUILD[k] : BUILD[k])(g, t, f)])),
   drawTile,
   surface,
   background,
