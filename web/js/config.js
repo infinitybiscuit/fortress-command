@@ -1,12 +1,13 @@
-// Fortress Command (web) — game constants.
+// Slop the War (web) — game constants.
 // Ported from godot/scripts/autoload/game_config.gd and the STATS tables in
 // unit.gd / building.gd. Gameplay stats for units come from unit.gd (the
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v26 · Warring States';
+export const VERSION = 'v27 · Rebrand';
 
-// Cloudflare Worker (see /relay) that hands out TURN relay credentials, used
+// Cloudflare Worker (see /relay; it keeps its original name, fortress-relay)
+// that hands out TURN relay credentials, used
 // when two phones can't connect directly. Leave empty to connect direct-only.
 export const RELAY_URL = 'https://fortress-relay.tj-coles.workers.dev/';
 

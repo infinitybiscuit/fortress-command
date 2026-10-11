@@ -1,4 +1,4 @@
-// Fortress Command (web) — app shell: camera, touch input, UI panels and main loop.
+// Slop the War (web) — app shell: camera, touch input, UI panels and main loop.
 import {
   WORLD_W, WORLD_H, MAP_W, TILE_SIZE, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
   UNIT_ICONS, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize, ONLINE_LAYOUTS,
@@ -13,6 +13,16 @@ import {
   drawBackground, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
   drawEffects, updateEffects, drawMarker, drawWeather, G, skyTop, setTheme, THEMES, currentTheme, unitIcon,
 } from './render.js';
+
+// The game used to be called Fortress Command: move its saved settings (name,
+// theme, rejoin session) to the new key names once.
+for (const k of ['name', 'theme', 'session']) {
+  try {
+    const old = localStorage.getItem(`fortress-${k}`);
+    if (old != null && localStorage.getItem(`slop-${k}`) == null) localStorage.setItem(`slop-${k}`, old);
+    localStorage.removeItem(`fortress-${k}`);
+  } catch { /* storage unavailable */ }
+}
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('world');
@@ -134,7 +144,7 @@ const LINK_TIMEOUT = 8000; // ms of silence before a connection counts as dead
 const AWAY_GRACE = 45000;  // ms a dropped player's army waits before the CPU steps in
 const REJOIN_WINDOW = 60000; // ms a guest keeps trying to reconnect
 const SLOW_LINK = 64 * 1024; // queued bytes beyond which the host skips an update
-const SESSION_KEY = 'fortress-session';
+const SESSION_KEY = 'slop-session';
 const HOST_WAIT = 'Waiting for the host…';
 const RECONNECTING = 'Connection lost — reconnecting…';
 const NET_STATUS = [HOST_WAIT, RECONNECTING];
@@ -695,7 +705,7 @@ function buildModeButtons() {
 
 // ── Online lobby & session ─────────────────────────────────────────────────
 const esc = (t) => String(t).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-const NAME_KEY = 'fortress-name';
+const NAME_KEY = 'slop-name';
 
 function playerName() {
   const n = $('player-name').value.trim().replace(/\s+/g, ' ').slice(0, 12);
@@ -1189,9 +1199,9 @@ async function keepAwake(on) {
 
 async function shareInvite() {
   const url = `${location.origin}${location.pathname}?join=${net.code}`;
-  const text = `Join my Fortress Command game! Room code: ${net.code}`;
+  const text = `Join my Slop the War game! Room code: ${net.code}`;
   try {
-    if (navigator.share) await navigator.share({ title: 'Fortress Command', text, url });
+    if (navigator.share) await navigator.share({ title: 'Slop the War', text, url });
     else {
       await navigator.clipboard.writeText(`${text}\n${url}`);
       toast('Invite link copied', 'info');
@@ -1389,7 +1399,7 @@ function draw(dt) {
 // ── Themes ─────────────────────────────────────────────────────────────────
 // A look for the battlefield and menus, chosen on the title screen and kept
 // on this device. Purely cosmetic: online opponents can use different themes.
-const THEME_KEY = 'fortress-theme';
+const THEME_KEY = 'slop-theme';
 const TAGLINES = {
   classic: 'Build. Train. Conquer.',
   robots: 'Rise of the Robots. The machines are coming.',
@@ -1417,7 +1427,7 @@ $('btn-theme').addEventListener('click', () => {
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 // Read-only handle for automated browser tests.
-window.__fortress = { get game() { return game; }, cam, net };
+window.__slop = { get game() { return game; }, cam, net };
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 buildModeButtons();
@@ -1436,7 +1446,7 @@ resize();
 }
 requestAnimationFrame(frame);
 
-for (const el of document.querySelectorAll('.version')) el.textContent = `Fortress Command ${VERSION}`;
+for (const el of document.querySelectorAll('.version')) el.textContent = `Slop the War ${VERSION}`;
 
 // Keep the installed app current: check for a new build whenever it's opened,
 // and switch to it as soon as you're back on the title screen.

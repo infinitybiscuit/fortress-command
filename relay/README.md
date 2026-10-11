@@ -1,4 +1,6 @@
-# Fortress Command online services (Cloudflare Worker)
+# Slop the War online services (Cloudflare Worker)
+
+The Worker is deployed as `fortress-relay`, from before the game was renamed. It keeps that name because a renamed Worker is a new Worker without the TURN secrets. Players never see it.
 
 This one Worker does two jobs for online games:
 
@@ -14,7 +16,7 @@ Online games connect the phones directly when they can. Some networks, especiall
 ## Setup (works from the Cloudflare dashboard on a phone)
 
 **1. Create a TURN key**
-- In the Cloudflare dashboard, open **Realtime → TURN Server** and create a key. Name it something like `fortress-command`.
+- In the Cloudflare dashboard, open **Realtime → TURN Server** and create a key. Name it something like `slop-the-war`.
 - Copy the **Turn Token ID** and the **API Token**. The API token is only shown once.
 
 **2. Create the Worker**

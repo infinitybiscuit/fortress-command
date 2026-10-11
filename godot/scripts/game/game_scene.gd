@@ -1,4 +1,4 @@
-## GameScene — Fortress Command Main Game Scene Manager
+## GameScene — Slop the War Main Game Scene Manager
 ## Migrated from HTML5/JS to Godot GDScript
 ## Manages game loop, unit/building spawning, selection, and economy
 
@@ -96,7 +96,7 @@ func _show_title_menu() -> void:
 
 	# Title
 	var title := Label.new()
-	title.text = "FORTRESS COMMAND"
+	title.text = "SLOP THE WAR"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 48)

@@ -6,7 +6,7 @@ import { UNIT_TYPES, BUILDING_TYPES, RELAY_URL, MATCHMAKER_URL } from './config.
 import { Game } from './game.js';
 import { Unit, Building, deathEffect } from './entities.js';
 
-const ID_PREFIX = 'fortress-command-v1-';
+const ID_PREFIX = 'slop-the-war-v1-';
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O or 1/I/L mix-ups
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },

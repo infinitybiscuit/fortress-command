@@ -1,4 +1,4 @@
-## GameRenderer — Fortress Command procedural drawing utility
+## GameRenderer — Slop the War procedural drawing utility
 ## Ports the JS Canvas 2D Renderer to Godot 4 CanvasItem.draw_*() calls.
 ## All methods are static; callers pass the drawing CanvasItem as first argument.
 class_name GameRenderer

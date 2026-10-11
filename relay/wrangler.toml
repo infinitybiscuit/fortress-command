@@ -1,5 +1,7 @@
 # Deployed by .github/workflows/relay.yml whenever relay/ changes on main
 # (or by hand from a computer with `npx wrangler deploy`).
+# Deployed name kept from before the rebrand: renaming would create a new
+# Worker without the TURN secrets.
 name = "fortress-relay"
 main = "src/index.js"
 compatibility_date = "2026-09-01"

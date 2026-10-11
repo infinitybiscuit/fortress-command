@@ -1,4 +1,4 @@
-## Unit — Fortress Command Unit Entity
+## Unit — Slop the War Unit Entity
 ## Migrated from HTML5/JS to Godot GDScript
 ## Handles movement, combat, repair, and state management via CharacterBody2D
 

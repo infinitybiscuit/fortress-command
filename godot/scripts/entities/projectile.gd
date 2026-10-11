@@ -1,4 +1,4 @@
-## Projectile — Fortress Command projectile entity
+## Projectile — Slop the War projectile entity
 ## A lightweight Node2D that flies from a shooter toward a target and applies
 ## damage on impact. Rendered via GameRenderer.draw_projectile in local space
 ## so the active Camera2D handles the world→screen transform.

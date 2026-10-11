@@ -1,4 +1,4 @@
-## GameTileMap — Fortress Command TileMap System
+## GameTileMap — Slop the War TileMap System
 ## Ports the JS TileMap class from index.html to Godot GDScript.
 ## Uses a 2D array (PoolByteArray grid) with String-keyed Maps matching the JS "tx,ty" pattern.
 
