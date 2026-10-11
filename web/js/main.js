@@ -1395,6 +1395,7 @@ const TAGLINES = {
   robots: 'Rise of the Robots. The machines are coming.',
   medieval: 'Raise your banners. Storm the castle.',
   gangster: 'Chicago, 1932. The custard flies at midnight.',
+  warring: 'Seven kingdoms. Only one will rise.',
 };
 function applyTheme(id) {
   const t = setTheme(id);

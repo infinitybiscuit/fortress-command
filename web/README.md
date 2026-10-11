@@ -94,6 +94,33 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
   - **Effects:** shots are custard blobs, cream pies and cakes that land with a SPLAT, and splatted gangsters sit in a puddle of custard.
   - **Menus:** art-deco black, gold and burgundy.
 
+- **Warring States:** China, c. 475–221 BC: seven kingdoms fighting across loess plains.
+  - **Setting:** ink-wash karst peaks in layers of mist, a red sun, cranes, bamboo groves and gnarled pines. The ground is layered yellow loess, and the platforms are grey cliff ledges.
+  - **Infantry:**
+    - Terracotta-army-style **Halberdiers** with dagger-axes (Soldier).
+    - Bronze-helmed **Guardsmen** with painted shields (Heavy).
+    - **Spies** in conical straw hats (Scout).
+    - **Mohist** engineers with mallets (Engineer).
+    - **Crossbow**men (Sniper).
+  - **Vehicles:**
+    - **Chariot** with a horse, a big spoked wheel, a driver, an archer and a team banner (Jeep).
+    - **Bolt Cart**, a giant crossbow on wheels (Tank).
+    - **Stone Thrower**, a traction trebuchet (Artillery).
+  - **Air:**
+    - **War Kite**, a wooden bird with an archer slung below (Helicopter).
+    - **Sky Lantern** dropping fire pots (Bomber).
+  - **Buildings:**
+    - A **Palace** with two-tier upturned roofs on red pillars (HQ).
+    - **Garrison** (Barracks).
+    - **Watchtower** (Turret).
+    - Rammed-earth **Rampart** (Wall).
+    - **Foundry** with a glowing furnace and bronze spade coins (Mine).
+    - **Arsenal** (Workshop).
+    - Bamboo **Kite Tower** (Airbase).
+    - **Bridge** with a vermilion rail, and stone **Steps** (Ramp).
+  - **Effects:** shots are crossbow bolts, great bolts, stones and fire pots.
+  - **Menus:** black lacquer, vermilion and gold.
+
 Each theme is one file in `js/themes/`. A theme can also replace the explosion drawing (`explode`). It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
 
 ## Free-for-All: looping map
@@ -222,7 +249,7 @@ After about 3 minutes the CPU builds an airbase and adds helicopters and bombers
 | `js/game.js` | `game/game_scene.gd` (economy, AI, spawning, win check) |
 | `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` (now theme-driven) |
 | `js/pixel.js` | new: pixel-art toolkit and the active palette |
-| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval and Gangsters artwork |
+| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters and Warring States artwork |
 | `js/main.js` | new: camera, touch input, HUD and panels, overlays, main loop |
 
 ### Differences from the Godot build
