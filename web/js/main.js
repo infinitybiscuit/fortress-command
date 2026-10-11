@@ -771,8 +771,9 @@ function showSidePicker(f, multi, taken, done) {
   $('sides-who').innerHTML = multi
     ? `<span style="color:${colourOf(f)}">${PLAYER_NAMES[f]} player</span>: pick your side`
     : `${esc(th.name)}: whose side are you on?`;
+  $('side-cards').classList.toggle('many', sides.length > 4);
   $('side-cards').innerHTML = sides.map((s) => `<button class="side-card${s.id === suggest ? ' suggested' : ''}" data-side="${s.id}" style="--team:${colourOf(f)}">
-      <span class="side-icons">${['soldier', 'heavy', 'tank', 'helicopter'].map((t) => `<img src="${sideIcon(s.id, t, f)}" alt="">`).join('')}</span>
+      <span class="side-icons">${(s.preview || ['soldier', 'heavy', 'tank', 'helicopter']).map((t) => `<img src="${sideIcon(s.id, t, f)}" alt="">`).join('')}</span>
       <span class="side-name">${esc(s.name)}</span>
       <span class="side-blurb">${esc(s.blurb || '')}</span>
     </button>`).join('');
@@ -829,7 +830,8 @@ function renderLobby() {
   const isHost = net.role === 'host';
   if (isHost) ensureSides();
   const sides = themeSides();
-  $('lobby-war').innerHTML = `War: <b>${esc(currentTheme().name)}</b>${sides ? ` · ${sides.map((x) => esc(x.short)).join(' vs ')}` : ''}`;
+  const sideList = !sides ? '' : sides.length > 4 ? ` · ${sides.length} sides` : ` · ${sides.map((x) => esc(x.short)).join(' vs ')}`;
+  $('lobby-war').innerHTML = `War: <b>${esc(currentTheme().name)}</b>${sideList}`;
   $('btn-lobby-theme').classList.toggle('hidden', !isHost);
   const order = seated(net.slots).map((sl) => sl.slot);
   $('lobby-slots').innerHTML = net.slots.map((sl, i) => {
@@ -1574,7 +1576,8 @@ function applyTheme(id, persist = true) {
   $('btn-theme').textContent = `Theme: ${t.name}`;
   $('tagline').textContent = TAGLINES[t.id] || TAGLINES.classic;
   const sides = themeSides(t);
-  $('theme-sides').textContent = sides ? `⚔️ ${sides.map((x) => x.short).join(' vs ')}: you pick a side` : '';
+  $('theme-sides').textContent = !sides ? '' : sides.length > 4 ? `⚔️ ${sides.length} sides: you pick one`
+    : `⚔️ ${sides.map((x) => x.short).join(' vs ')}: you pick a side`;
   panelKey = '';
   if (persist) try { localStorage.setItem(THEME_KEY, t.id); } catch { /* storage unavailable */ }
 }

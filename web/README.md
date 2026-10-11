@@ -142,6 +142,14 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
     - **Bridge** with a vermilion rail, and stone **Steps** (Ramp).
   - **Effects:** shots are crossbow bolts, great bolts, stones and fire pots.
   - **Menus:** black lacquer, vermilion and gold.
+  - **Sides:** all seven kingdoms, each with its own colours, headgear, signature units, palace, barracks and income building. Free-for-All can field any four.
+    - **Qin** (everything above): standard axles, standard coins, a Terracotta Guard and a Coin Foundry. Even the jokes are regulation length.
+    - **Chu:** black-and-red lacquer, an antlered **Shaman**, a **Dragon Boat** on wheels, a **Zongzi Lobber** and a steaming Zongzi Kitchen.
+    - **Qi:** salt and iron by the sea. A **Debater** who fires speech bubbles, a **Land Junk**, Salt Pans and the **Jixia Academy**, where two tiny scholars argue forever.
+    - **Zhao:** King Wuling's trousers reform. **Horse Archers**, a **Not-a-Chariot**, Stables and a **Trouser Tailor**.
+    - **Yan:** the frozen north. Fur hats, a **Horse Sled**, a **Snowball Engine**, its own Northern Wall and a Snow Palace with a snowman.
+    - **Wei:** Wuzu infantry in full iron with three days' food on their backs, a **Ration Runner**, the **Iron Tortoise** and a Canal Toll.
+    - **Han:** the smallest kingdom and nervous about it. A **Nervous Lookout**, the **Best Crossbow**, a **Triple Crossbow** cart and a **Tiny Palace** squeezed between two huge walls.
 
 - **Steam Shogun:** Japanese steampunk: an Edo-period Japan powered by brass boilers and clockwork.
   - **Setting:** a sunset sky with a great red sun, Mount Fuji, koi airships drifting past, and a far town of pagodas and smoking factories. Cherry trees and torii gates stand in front, and blossom petals drift across everything. Brass pipes run through the earth, and the platforms are brass girders.
@@ -169,6 +177,10 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
     - Red **Taiko Bridge** and **Steps** (Ramp).
   - **Effects:** shots are brass slugs, fused bombs, firework shells and cannonballs. Explosions burst like hanabi fireworks.
   - **Menus:** black lacquer, brass and vermilion.
+  - **Sides:** play as **the Shogunate** (everything above) or **the Sky Pirates**, a rowdy crew of goggled air-pirates. The pirates have:
+    - **Deckhands** with propeller tricorns, a **Boiler-Belly** brute, a clockwork **Robo-Parrot**, a **Grease Monkey** (an actual monkey) and a **Spyglass** sharpshooter.
+    - A pig-nosed **Steam Hog**, a **Land Galleon** on cog wheels, the **Broadside Wagon**, the **Gyro-Gull** and a **Patchwork Zeppelin**.
+    - A crashed-zeppelin **Pirate Cove**, the **Grog Hall** (ginger beer only), a **Crow's Nest**, a **Barrel Stack**, a **Plunder Pile**, a **Salvage Yard** and a **Sky Harbour**.
 
 - **Winter War:** Finland, 1939–40: ski troops in white snowsuits fighting at minus forty in the spruce forests, where motti tactics, Molotov cocktails and sisu held off a giant.
   - **Setting:** a starry night under shimmering northern lights and a crescent moon. Snowy hills and dark spruce forest roll away, birches and snow-laden spruces stand in front, and now and then a little sauna cabin puffs smoke. Snow falls steadily. The ground is frozen earth under deep snow, and the platforms are snow-capped granite ledges.
@@ -340,13 +352,13 @@ Each theme is one file in `js/themes/`. A theme can also replace the explosion d
 
 ## Choosing sides
 
-Some themes split their armies into **sides**: the Union or the Confederacy in Civil War, Finns or Soviets in Winter War, the Cartel or the Cops in Cartel Wars, the Mob or the Feds in Gangsters, Knights or Vikings in Medieval, Humans or Machines in Rise of the Robots, and the USA, China, Canada or the EU in Trade Wars. Under the **Theme** button, the title screen shows which sides a theme has.
+Some themes split their armies into **sides**: the Union or the Confederacy in Civil War, Finns or Soviets in Winter War, the Cartel or the Cops in Cartel Wars, the Mob or the Feds in Gangsters, Knights or Vikings in Medieval, Humans or Machines in Rise of the Robots, the USA, China, Canada or the EU in Trade Wars, the Shogunate or the Sky Pirates in Steam Shogun, and any of the seven kingdoms in Warring States. Under the **Theme** button, the title screen shows which sides a theme has.
 
 - **Offline:** tapping a mode opens **Choose your side**. Each card previews that side's troops and vehicles in your team colour. **🎲 Surprise me** picks at random. In **1 vs 1 Local**, Blue picks first and then Red, and Red is steered towards the other side. CPUs take whichever sides are left, sharing them round in Free-for-All. Your last pick is remembered for each theme, and **Restart** keeps everyone's sides.
 - **Online:** the host's theme is the room's war for everyone, shown at the top of the lobby, and the host can change it with **Change ▸**. Each seat shows its side. Tap your own side to switch it; the host can also set each CPU's side. Guests see the host's war while they're in the room, and their own theme comes back when they leave.
 - **Cosmetic only:** sides look, sound and are named differently, but every side has the same units, costs and stats. Your **team colour** (Blue, Red, Green or Yellow) still marks your army, so two players can fight on the same side and still tell each other apart.
 
-**For theme authors:** list `sides: [{ id, name, short, blurb, names?, icons?, win?, lose? }]` on the theme. Sprite and building painters call `sideOf(f)` (from `pixel.js`) to draw a faction's side, building painters receive the faction as a third argument, and `background` receives the viewing player's side. A theme with fewer than two sides never shows the picker.
+**For theme authors:** list `sides: [{ id, name, short, blurb, names?, icons?, win?, lose?, preview? }]` (`preview` picks which units the side's picker card shows) on the theme. Sprite and building painters call `sideOf(f)` (from `pixel.js`) to draw a faction's side, building painters receive the faction as a third argument, and `background` receives the viewing player's side. A theme with fewer than two sides never shows the picker.
 
 ## Free-for-All: looping map
 

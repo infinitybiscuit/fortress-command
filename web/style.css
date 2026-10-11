@@ -336,6 +336,12 @@ button {
 .side-icons img { zoom: 2; image-rendering: pixelated; }
 .side-name { font-family: var(--pixel); font-size: 13px; color: var(--gold); text-shadow: 2px 2px 0 #000; }
 .side-blurb { font-size: 13px; line-height: 1.35; color: var(--dim); }
+.side-cards.many { gap: 8px; }
+.side-cards.many .side-card { padding: 8px 10px 9px; gap: 4px; }
+.side-cards.many .side-icons { min-height: 36px; }
+.side-cards.many .side-icons img { zoom: 1.5; }
+.side-cards.many .side-name { font-size: 11px; }
+.side-cards.many .side-blurb { font-size: 12px; line-height: 1.3; }
 
 /* The room's war, in the online lobby */
 .lobby-war { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 10px; font-family: var(--pixel); font-size: 9px; color: var(--dim); line-height: 1.6; }
