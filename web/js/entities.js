@@ -368,21 +368,14 @@ export class Unit {
       const tx = Math.floor((newX + dir * halfW) / ts);
       const tyTop = Math.floor((this.y - h + 2) / ts);
       const tyBot = Math.floor((this.y - 2) / ts);
-      const tyFeet = Math.floor(this.y / ts);
-      const txFeetL = Math.floor((this.x - halfW + 2) / ts);
-      const txFeetR = Math.floor((this.x + halfW - 2) / ts);
       let blocked = false;
       for (let ty = tyTop; ty <= tyBot; ty++) {
-        if (!map.isSolidForFaction(tx, ty, this.faction)) continue;
-        // Lemmings-style staircase: step up onto a ramp tile when grounded,
-        // and from the top ramp onto whatever it leads to.
-        const onRamp = this.onGround && (map.isRamp(txFeetL, tyFeet) || map.isRamp(txFeetR, tyFeet));
-        if (this.onGround && (map.isRamp(tx, ty) || (onRamp && map.enemyWallAt(tx, ty, this.faction) == null))
-          && !map.isSolidForFaction(tx, ty - 1, this.faction)) {
-          this.y -= ts;
-          this.vy = 0;
-          break;
-        }
+        // Ramps are slopes, not blocks: walk straight onto them.
+        if (map.isRamp(tx, ty) || !map.isSolidForFaction(tx, ty, this.faction)) continue;
+        // Coming up a ramp, a wide unit's front reaches the platform at the
+        // top before its middle does: let it overlap that ledge.
+        if (this.onGround && map.isRamp(tx - dir, ty) && map.rampDir(tx - dir, ty) === dir
+          && map.enemyWallAt(tx, ty, this.faction) == null) continue;
         blocked = true;
         const wallId = map.enemyWallAt(tx, ty, this.faction);
         if (wallId != null) this.blockedBy = this.game.buildingById(wallId);
@@ -397,15 +390,21 @@ export class Unit {
     this.x = this.game.normX(newX);
 
     let newY = this.y + this.vy * dt;
-    const txL = Math.floor((this.x - halfW + 2) / ts);
-    const txR = Math.floor((this.x + halfW - 2) / ts);
+    // On a ramp the slope under the unit's middle decides its height, so
+    // wide vehicles don't hop as their wheels cross onto the ground or deck.
+    const cx = Math.floor(this.x / ts);
+    const onSlope = map.isRamp(cx, Math.floor((this.y - 1) / ts)) || map.isRamp(cx, Math.floor(this.y / ts));
+    const txL = onSlope ? cx : Math.floor((this.x - halfW + 2) / ts);
+    const txR = onSlope ? cx : Math.floor((this.x + halfW - 2) / ts);
+    const wasGrounded = this.onGround;
     this.onGround = false;
     if (this.vy >= 0) {
       const oldFeet = Math.floor(this.y / ts);
       const newFeet = Math.floor(newY / ts);
       outer: for (let ty = oldFeet; ty <= newFeet; ty++) {
+        if (ty * ts < this.y - 14) continue; // a ledge we're already deep inside
         for (let tx = txL; tx <= txR; tx++) {
-          if (map.isSolid(tx, ty)) {
+          if (map.isSolid(tx, ty) && !map.isRamp(tx, ty)) {
             newY = ty * ts;
             this.vy = 0;
             this.onGround = true;
@@ -416,10 +415,32 @@ export class Unit {
     } else {
       const headTy = Math.floor((newY - h) / ts);
       for (let tx = txL; tx <= txR; tx++) {
-        if (map.isSolid(tx, headTy)) { newY = (headTy + 1) * ts + h; this.vy = 0; break; }
+        if (map.isSolid(tx, headTy) && !map.isRamp(tx, headTy)) { newY = (headTy + 1) * ts + h; this.vy = 0; break; }
       }
     }
+    if (this.vy >= 0) newY = this.rideRamp(map, newY, wasGrounded);
     this.y = newY;
+  }
+
+  // Stand on the slope of a ramp under the unit's middle: step up it (at most
+  // one sub-step's climb), follow it down while walking, or land on it.
+  rideRamp(map, newY, wasGrounded) {
+    const ts = TILE_SIZE;
+    const STEP = 14;
+    const tx = Math.floor(this.x / ts);
+    const snapDown = wasGrounded && !this.onGround ? Math.max(STEP, this.w / 2 + 4) : 0;
+    let best = null;
+    for (let ty = Math.floor((this.y - STEP) / ts); ty <= Math.floor((newY + snapDown) / ts); ty++) {
+      if (!map.isRamp(tx, ty)) continue;
+      const s = map.rampSurface(tx, ty, this.x);
+      if (s < this.y - STEP || s > newY + snapDown) continue;
+      if (this.onGround && s >= newY) continue; // already standing higher
+      if (best == null || s < best) best = s;
+    }
+    if (best == null) return newY;
+    this.vy = 0;
+    this.onGround = true;
+    return best;
   }
 
   takeDamage(amount, source) {

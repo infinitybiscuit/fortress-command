@@ -637,7 +637,7 @@ function renderPanel() {
   if (mode === 'place') {
     const d = BUILDING_TYPES[pendingBuild];
     const tip = pendingBuild === 'bridge' ? 'Extend sideways from a platform or another bridge.'
-      : pendingBuild === 'ramp' ? 'Start on the ground, then go diagonally up a step at a time.'
+      : pendingBuild === 'ramp' ? 'Start on the ground or beside a platform, then add pieces diagonally.'
         : 'Must sit on solid ground or a platform.';
     const zoneTip = ' Build inside the green zone near your base.';
     panel.innerHTML = `
@@ -677,7 +677,7 @@ function renderPanel() {
         turret: 'Fires at enemy units in range, and at aircraft from much further away.',
         wall: 'Blocks enemy units. Your troops walk through.',
         bridge: 'Walkable span. Extend it to cross gaps.',
-        ramp: 'A diagonal stair step. Units climb it and step off the top.',
+        ramp: 'A diagonal bridge. Units walk up and down it.',
       }[b.type] || '';
       body = `<div class="hint">${info}</div>`;
     }
