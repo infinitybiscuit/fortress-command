@@ -56,6 +56,17 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
   - **Buildings:** Command tower, Bunker, Pulse Gun, Barrier, Reactor, Factory, Skyport, Girder and Ramp.
   - **Effects:** buildings go up behind a holographic frame, shots are plasma bolts and missiles, and fallen machines leave chrome scrap.
   - **Menus:** the interface switches to dark steel and neon, and units appear as their own pixel-art sprites.
+  - **Sides:** the army is split in two.
+    - **The Resistance** (Humans) has:
+      - **Rebel**, a taped-up **Gunner**, **Runner**, **Tech** and **Enforcer**.
+      - The spinner **Cruiser**, a **Scrap Truck**, a **Rocket Pickup**, a **Gunship** and a **Patchwork VTOL**.
+      - A ruined-block **Bunker HQ** with a barking guard dog, a **Sewer Den**, a coughing **Scrap Generator** and a **Scrapyard**.
+      - A frankly worrying amount of duct tape.
+    - **The Machines** have:
+      - Chrome **Troopers**, the **Endo**, **Spider-Bots**, **Repair-Bots** and the **Infiltrator**, whose human disguise (wig, sunglasses at night, moustache, coat too short for its chrome shins) fools nobody.
+      - A **Prowler** bike, the **Hunter**, **Walker**, **Drone** and **Dropship**.
+      - **The Core** (a server ziggurat with a throbbing red eye), an **Assembly Line**, a **Power Plant**, a **Sensor Tower**, a **Firewall** that is literally on fire, and a **Robot Factory**.
+      - Machines fall as chrome scrap.
 
 - **Medieval:** castles and siege engines on rolling green hills, with blue mountains, distant castles, a village with turning windmills, and birds overhead.
   - **Infantry:**
@@ -74,6 +85,11 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
   - **Buildings:** Castle, Barracks, Tower, Wall, Well (with a bucket going up and down), Siege Works, Aerie, Bridge and Steps.
   - **Effects:** arrows, boulders and fireballs, and timber scaffolding while building.
   - **Menus:** oak, parchment and royal red.
+  - **Sides:** play as **the Kingdom** (Knights: everything above) or **the Vikings**. Historians say real Vikings never wore horned helmets; nobody told these ones. The Vikings have:
+    - **Shieldmaidens**, **Berserkers**, a **Speedy Skald** singing as he runs, a **Shipwright** and an **Axe Flinger**.
+    - A **Goat Cart**, a **Landlubber Longship** on wheels, the **Mead-a-Pult**, a **Raven Rider** and a **Flying Longship** whose crew rows thin air.
+    - A dragon-gabled **Mead Hall**, a turf-roofed **Longhouse**, a frothing **Mead Brewery**, a **Shield Wall** and a **Boathouse**.
+    - Ammunition is spinning hand-axes, mead barrels and herring.
 
 - **Gangsters:** 1930s Chicago at dusk with a Bugsy Malone-style twist: the guns splurge custard, and nobody gets hurt, they just get splatted.
   - **Setting:** an art-deco skyline under a premiere spotlight, brick tenements with water towers and billboards, an elevated railway with a train rattling past, and streetlamps. The pavement has fire hydrants and dropped newspapers, and the platforms are L-train girders.
@@ -95,6 +111,10 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
     - **Pool Hall**, a water-tower **Lookout**, stacked **Crates**, a **Bakery** for income, a **Garage**, a blimp **Air Dock**, a **Fire Escape** and **Stairs**.
   - **Effects:** shots are custard blobs, cream pies and cakes that land with a SPLAT, and splatted gangsters sit in a puddle of custard.
   - **Menus:** art-deco black, gold and burgundy.
+  - **Sides:** play as **the Mob** (everything above) or **the Feds**, who fire custard too. The Feds have:
+    - **G-Men** in trench coats, a **Dry Agent** with a seized-barrel custard cannon, a **Stool Pigeon** in a tiny fedora, the **Accountant** (the Feds' secret weapon: the Mob always slips up on the tax forms) and a **Marksman**.
+    - A **Squad Car**, a barred **Paddy Wagon**, a **Pie Trebuchet**, a float **Seaplane** and the **Bureau Blimp**.
+    - The marble **Bureau**, an **Academy**, a **Tax Office** that spits out forms, a **Roadblock**, an **Evidence Locker** and a **Searchlight** tower.
 
 - **Warring States:** China, c. 475–221 BC: seven kingdoms fighting across loess plains.
   - **Setting:** ink-wash karst peaks in layers of mist, a red sun, cranes, bamboo groves and gnarled pines. The ground is layered yellow loess, and the platforms are grey cliff ledges.
@@ -265,6 +285,20 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
     - **Burned Bridge** (Bridge) and **Price Ramp**, where everything only goes up (Ramp).
   - **Effects:** blasts burst into red, white, blue and gold confetti.
   - **Menus:** gold, red and navy. Tagline: "The other countries pay. Believe me."
+  - **Sides:** a four-way trade war, made for Free-for-All. Only the USA has a caricature: the other sides satirise policies and products, not people.
+    - **The USA:** everything above.
+    - **China:**
+      - **Dock Hands**, a **Magnet Gunner** firing rare-earth magnets, a **Panda**, a **Solar Fitter** and a **Bullet Trainer**.
+      - An **EV Runabout**, a **Container Crawler**, the **Soy Return Catapult** (soybeans, returned to sender), a **Delivery Drone** and a **Dragon Kite**.
+      - A **Mega Factory**, a **Night Shift Dorm**, a **Solar Sentry**, a **Container Wall**, a **Rare Earth Mine**, an **EV Gigaplant** and a **Container Port**.
+    - **Canada** (elbows up):
+      - **Mounties**, a **Goalie**, a **Moose**, a **Lumberjack** and a **Slapshooter**.
+      - A **Zamboni**, a **Syrup Tanker**, a **Puck Launcher**, the **Honk Patrol** (a goose) and a **Bush Beaver** plane.
+      - **Maple Parliament**, a **Log Cabin**, a **Goal Net**, a **Beaver Dam**, the **Syrup Reserve**, the **Bourbon-Free Shop** and a **Borrowed Helipad**.
+    - **The EU:**
+      - **Eurocrats**, a **Rubber Stamper**, a rolling **Brie Runner**, a **Regulator** and a **Sommelier**.
+      - A **Vespa Patrol**, a filing-cabinet **Regulation Tank**, a **Champagne Cannon**, a **Red Tape Copter** and a paper-plane **Directive Glider**.
+      - The **Berlaymont**, ringed with gold-star flags, a **Committee Room**, an **Approval Desk**, **Red Tape**, a **Fines Office**, a **Factory (Pending)** and a **Shared Helipad**.
 
 - **Civil War:** 1861–65, played for laughs, and the first theme where you **choose a side**. The Confederate battle flag is left out: both sides fly flags in their team colour. Fallen soldiers are just knocked flat, with their hat beside them.
   - **Setting:** a summer sky over rolling Virginia farmland with red barns, white churches and zig-zag split-rail fences. Distant cannon smoke puffs up, and picnickers watch from the hill with a parasol and a hamper, as spectators really did at Bull Run. Gunsmoke drifts across the field. The ground is grassy earth, and the platforms are rocky ridges.
@@ -306,7 +340,7 @@ Each theme is one file in `js/themes/`. A theme can also replace the explosion d
 
 ## Choosing sides
 
-Some themes split their armies into **sides**: the Union or the Confederacy in Civil War, Finns or Soviets in Winter War, the Cartel or the Cops in Cartel Wars. Under the **Theme** button, the title screen shows which sides a theme has.
+Some themes split their armies into **sides**: the Union or the Confederacy in Civil War, Finns or Soviets in Winter War, the Cartel or the Cops in Cartel Wars, the Mob or the Feds in Gangsters, Knights or Vikings in Medieval, Humans or Machines in Rise of the Robots, and the USA, China, Canada or the EU in Trade Wars. Under the **Theme** button, the title screen shows which sides a theme has.
 
 - **Offline:** tapping a mode opens **Choose your side**. Each card previews that side's troops and vehicles in your team colour. **🎲 Surprise me** picks at random. In **1 vs 1 Local**, Blue picks first and then Red, and Red is steered towards the other side. CPUs take whichever sides are left, sharing them round in Free-for-All. Your last pick is remembered for each theme, and **Restart** keeps everyone's sides.
 - **Online:** the host's theme is the room's war for everyone, shown at the top of the lobby, and the host can change it with **Change ▸**. Each seat shows its side. Tap your own side to switch it; the host can also set each CPU's side. Guests see the host's war while they're in the room, and their own theme comes back when they leave.

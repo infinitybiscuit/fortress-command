@@ -2,7 +2,7 @@
 // tommy guns splurge custard, the artillery lobs cream pies, and nobody gets
 // hurt, they just get splatted. Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -21,8 +21,15 @@ const palette = {
   metal: '#8e9296', metalLight: '#c4c8cc', metalDark: '#55595e', chrome: '#d8dcdf',
   glass: '#ffd890', glassDark: '#c89a50', neon: '#ff5a8a',
   dirt: '#4a3a30', dirtMid: '#3c2e26', dirtDeep: '#2e231c', pebble: '#6a5a4a', pebbleDark: '#221a14',
+  // The Feds: marble, trench coats, ledgers and slate-grey government steel
+  marble: '#e8e4da', marbleShade: '#c4beb0', marbleDark: '#8e887c', bronze: '#9a6a2a',
+  trench: '#b09c74', trenchDark: '#82714e', fedHat: '#5a5040', bowler: '#24242a',
+  navy: '#2a3450', navyLight: '#3e4a6a', slate: '#4a5268', slateLight: '#6a7490', slateDark: '#343a4c',
+  eyeshade: '#3a9a5a', ledger: '#2a5a3a', paper: '#f4f0e0', ink: '#3a3a4a', siren: '#ff3a3a',
+  pigeon: '#8a8c9a', pigeonLight: '#b0b2be', pigeonDark: '#62646e', pigeonNeck: '#4a8a7a', pink: '#e08080',
   shadow: 'rgba(0,0,0,0.3)',
 };
+const feds = (f) => sideOf(f) === 'feds';
 const PINSTRIPE = [0.2, 0.2, 0.25];
 
 // ── Infantry ───────────────────────────────────────────────────────────────
@@ -32,7 +39,7 @@ function fedora(parts, details, t, col = C.hat) {
   details.push([6, 2, 6, 1, t.main], [7, 0, 4, 1, C.suitLight]);
 }
 
-function buildSoldier(type, f, frame) {
+function mobSoldier(type, f, frame) {
   const t = team(f);
   const [c, g] = canvas(20, 17);
   const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
@@ -113,7 +120,7 @@ function whitewall(g, x, y, r, frame) {
 
 // Getaway car: a long-nosed black sedan, running board, spare wheel, and a
 // hood leaning out of the window.
-function buildCar(f, frame) {
+function mobCar(f, frame) {
   const t = team(f);
   const [c, g] = canvas(28, 15);
   outlined(g, [
@@ -130,7 +137,7 @@ function buildCar(f, frame) {
 }
 
 // Pie wagon: a bakery delivery truck with a custard cannon on the roof.
-function buildPieWagon(f, frame) {
+function mobPieWagon(f, frame) {
   const t = team(f);
   const [c, g] = canvas(34, 19);
   outlined(g, [
@@ -147,7 +154,7 @@ function buildPieWagon(f, frame) {
 }
 
 // Pie lobber: a flatbed truck with a spring-loaded pie catapult.
-function buildPieLobber(f, frame) {
+function mobPieLobber(f, frame) {
   const t = team(f);
   const [c, g] = canvas(30, 19);
   outlined(g, [
@@ -164,7 +171,7 @@ function buildPieLobber(f, frame) {
 }
 
 // Autogyro: a little open-cockpit flyer (rotor and propeller spin live).
-function buildAutogyro(f) {
+function mobAutogyro(f) {
   const t = team(f);
   const [c, g] = canvas(30, 15);
   outlined(g, [
@@ -178,7 +185,7 @@ function buildAutogyro(f) {
 }
 
 // Blimp: a silver airship in team stripes with a gondola (props spin live).
-function buildBlimp(f) {
+function mobBlimp(f) {
   const t = team(f);
   const [c, g] = canvas(42, 19);
   outlined(g, [
@@ -192,11 +199,199 @@ function buildBlimp(f) {
   return { c, ax: 21, ay: 15 };
 }
 
+// ── The Feds: Prohibition-era G-men (still firing custard) ─────────────────
+function fedSoldier(type, f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(20, 17);
+  const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
+  const shoes = frame ? [[5, 15, 3, 1], [9, 15, 3, 1]] : [[4, 15, 3, 1], [10, 15, 3, 1]];
+  let parts;
+  let details;
+  if (type === 'scout') {
+    // Stool Pigeon: a tip-off pigeon in a tiny fedora, note in its beak
+    const pl = frame ? [[7, 13, 1, 2], [10, 13, 1, 2]] : [[6, 13, 1, 2], [9, 13, 1, 2]];
+    parts = [
+      ...pl.map((l) => [...l, C.pink]), ...pl.map(([x]) => [x - 1, 15, 3, 1, C.pink]),
+      [1, 9, 4, 2, C.pigeonDark], [4, 7, 9, 6, C.pigeon], [10, 3, 5, 6, C.pigeon],
+      [15, 5, 2, 1, '#d8b48a'], [15, 6, 3, 2, C.paper], [9, 2, 7, 1, C.fedHat], [11, 0, 4, 2, C.fedHat],
+    ];
+    details = [
+      [13, 4, 1, 1, C.O], [10, 6, 3, 2, C.pigeonNeck], [11, 7, 2, 1, '#8a6aa8'], [10, 8, 3, 1, t.main],
+      [5, 8, 5, 1, C.pigeonLight], [5, 10, 6, 1, C.pigeonDark], [6, 11, 4, 1, C.pigeonDark], [1, 9, 4, 1, C.pigeon],
+      [11, 1, 4, 1, t.main], [16, 7, 1, 1, C.ink], [pl[0][0], 13, 1, 1, t.main],
+    ];
+    outlined(g, parts, details);
+    return { c, ax: 8, ay: 16 };
+  }
+  if (type === 'heavy') {
+    // Dry Agent: bowler hat, braces, a confiscated barrel turned custard cannon, axe on his back
+    parts = [
+      ...legs.map((l) => [...l, '#3a3a44']), ...shoes.map((b) => [...b, C.boot]),
+      [2, 4, 1, 8, C.woodLight], [1, 3, 3, 2, C.metal],
+      [4, 8, 9, 4, C.shirt], [6, 3, 6, 5, C.skin], [7, 0, 4, 1, C.bowler], [6, 1, 6, 2, C.bowler], [5, 3, 8, 1, C.bowler],
+      [11, 8, 6, 4, C.wood], [17, 9, 2, 2, C.metal],
+    ];
+    details = [
+      [10, 5, 1, 1, C.O], [7, 6, 5, 2, C.skinDark], [9, 6, 3, 1, '#4a3a30'], [6, 2, 6, 1, t.main],
+      [6, 8, 1, 4, t.main], [10, 8, 1, 4, t.main], [4, 9, 2, 2, C.skinDark],
+      [11, 9, 6, 1, C.woodLight], [12, 8, 1, 4, C.metalDark], [15, 8, 1, 4, C.metalDark],
+      [18, 9, 1, 1, C.custard], [18, 11, 1, 1, C.custard], [1, 3, 3, 1, C.metalLight],
+    ];
+  } else if (type === 'engineer') {
+    // The Accountant: green eyeshade, specs, bow tie, ledger and a very sharp pencil
+    parts = [
+      ...legs.map((l) => [...l, '#4a4a52']), ...shoes.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.shirt], [6, 3, 6, 5, C.skin], [6, 1, 6, 2, '#4a3a30'], [5, 2, 7, 1, C.eyeshade], [11, 3, 3, 1, C.eyeshade],
+      [2, 8, 3, 5, C.ledger], [11, 9, 6, 1, C.yellow],
+    ];
+    details = [
+      [9, 5, 3, 1, '#2a2a2a'], [10, 5, 1, 1, '#bfe0f0'], [7, 7, 4, 1, C.skinDark],
+      [6, 8, 5, 4, '#6a6a78'], [8, 8, 1, 4, C.shirt], [7, 8, 3, 1, t.main], [6, 11, 5, 1, '#55555f'],
+      [2, 10, 3, 1, t.main], [2, 8, 1, 5, C.paper], [11, 9, 1, 1, C.jam], [16, 9, 1, 1, C.woodLight],
+      [5, 2, 7, 1, C.eyeshade], [6, 2, 5, 1, '#5ac07a'],
+    ];
+  } else if (type === 'sniper') {
+    // Marksman: navy suit, star badge, campaign hat, scoped custard rifle
+    parts = [
+      ...legs.map((l) => [...l, C.navy]), ...shoes.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.navy], [6, 3, 6, 5, C.skin], [7, 9, 4, 2, C.wood], [11, 9, 8, 1, C.gun], [12, 8, 4, 1, C.metalDark],
+      [3, 3, 12, 1, C.trench], [6, 0, 6, 3, C.trench],
+    ];
+    details = [
+      [10, 5, 1, 1, C.O], [7, 7, 4, 1, C.skinDark], [6, 8, 3, 1, C.navyLight], [6, 10, 1, 1, C.yellow],
+      [5, 11, 7, 1, t.main], [6, 2, 6, 1, t.main], [8, 0, 2, 1, C.trenchDark], [15, 8, 1, 1, '#bfe0f0'],
+      [18, 9, 1, 1, C.custard], [7, 9, 4, 1, C.woodLight],
+    ];
+  } else {
+    // G-Man: tan trench coat, team belt, gold badge, custard tommy gun
+    parts = [
+      ...legs.map((l) => [...l, C.suitDark]), ...shoes.map((b) => [...b, C.boot]),
+      [4, 8, 8, 5, C.trench], [6, 3, 6, 5, C.skin], [11, 9, 7, 1, C.gun], [12, 10, 3, 2, C.metalDark], [17, 8, 1, 2, C.gun],
+    ];
+    details = [
+      [10, 5, 1, 1, C.O], [7, 7, 4, 1, C.skinDark], [6, 8, 1, 2, C.trenchDark], [9, 8, 2, 2, C.trenchDark],
+      [7, 8, 2, 1, C.shirt], [4, 11, 8, 1, t.main], [7, 9, 1, 1, C.yellow], [8, 12, 1, 1, C.trenchDark],
+      [13, 10, 1, 1, C.custard], [11, 9, 1, 1, C.woodLight], [17, 8, 1, 1, C.custard],
+    ];
+    fedora(parts, details, t, C.fedHat);
+  }
+  outlined(g, parts, details);
+  return { c, ax: 8, ay: 16 };
+}
+
+// Plain steel government wheels (the Feds don't do whitewalls).
+function steelWheel(g, x, y, r, frame) {
+  disc(g, x, y, r, C.O);
+  disc(g, x, y, r - 1, '#1c1c1c');
+  disc(g, x, y, Math.max(1, r - 2), C.metalDark);
+  g.fillStyle = C.metal; g.fillRect(x, y, 1, 1);
+  g.fillStyle = C.metalLight; g.fillRect(x + (frame ? 1 : -1), y + (frame ? -1 : 1), 1, 1);
+}
+
+// Squad car: a black Ford with white doors, a red siren and an agent at the wheel.
+function fedSquadCar(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(28, 15);
+  outlined(g, [
+    [2, 6, 23, 4, '#16161c'], [6, 2, 10, 5, '#16161c'], [16, 5, 9, 2, '#16161c'], [1, 6, 3, 3, C.metalDark],
+    [3, 10, 21, 1, C.metalDark], [24, 6, 2, 2, C.chrome], [10, 0, 2, 2, C.siren],
+  ], [
+    [7, 3, 4, 3, C.glassDark], [12, 3, 3, 3, C.glassDark], [12, 4, 3, 2, C.skin], [12, 3, 3, 1, C.fedHat],
+    [7, 6, 9, 3, C.white], [2, 8, 23, 1, t.main], [11, 7, 2, 1, C.yellow], [16, 5, 9, 1, '#34343e'],
+    [25, 7, 1, 1, C.glass], [6, 2, 10, 1, '#34343e'], [10, 0, 1, 1, '#ffb0b0'],
+  ]);
+  steelWheel(g, 7, 11, 3, frame);
+  steelWheel(g, 20, 11, 3, frame);
+  return { c, ax: 13, ay: 14 };
+}
+
+// Paddy wagon: an armoured navy van with barred windows and a custard cannon on the roof.
+function fedPaddyWagon(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(34, 19);
+  outlined(g, [
+    [2, 4, 20, 10, C.navy], [22, 8, 8, 6, C.navy], [23, 6, 6, 3, C.navy], [30, 10, 2, 3, C.chrome], [3, 14, 28, 1, C.metalDark],
+    [7, 1, 6, 3, C.metalDark], [12, 1, 13, 2, C.gun], [26, 5, 2, 1, C.siren],
+  ], [
+    [2, 4, 20, 1, C.navyLight], [2, 11, 20, 1, t.main], [2, 12, 20, 1, t.dark],
+    [4, 6, 5, 4, '#14141a'], [5, 6, 1, 4, C.metal], [7, 6, 1, 4, C.metal], [12, 6, 5, 4, '#14141a'], [13, 6, 1, 4, C.metal], [15, 6, 1, 4, C.metal],
+    [18, 6, 3, 3, C.yellow], [19, 7, 1, 1, C.yellowDark], [3, 8, 1, 2, C.chrome],
+    [24, 9, 4, 3, C.glassDark], [24, 9, 4, 1, C.glass], [22, 12, 8, 1, t.main], [31, 11, 1, 1, C.glass],
+    [8, 1, 4, 1, C.metal], [24, 1, 1, 2, C.custard], [12, 1, 13, 1, '#4a4038'],
+  ]);
+  steelWheel(g, 8, 15, 3, frame);
+  steelWheel(g, 25, 15, 3, frame);
+  return { c, ax: 15, ay: 18 };
+}
+
+// Pie trebuchet: a flatbed with a wooden throwing arm, counterweighted by an evidence safe.
+function fedTrebuchet(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(32, 20);
+  outlined(g, [
+    [2, 11, 20, 3, C.wood], [21, 7, 7, 7, C.navy], [28, 10, 2, 3, C.chrome], [3, 14, 26, 1, C.metalDark],
+    [7, 6, 2, 5, C.woodDark], [12, 6, 2, 5, C.woodDark],
+    [2, 2, 3, 1, C.woodLight], [4, 3, 2, 1, C.woodLight], [6, 4, 2, 1, C.woodLight], [8, 5, 4, 1, C.woodLight], [12, 6, 2, 1, C.woodLight],
+    [13, 7, 5, 4, C.metalDark], [1, 0, 4, 2, C.tin],
+  ], [
+    [2, 11, 20, 1, C.woodLight], [22, 8, 4, 3, C.glassDark], [22, 8, 4, 1, C.glass], [21, 12, 7, 1, t.main],
+    [9, 5, 2, 1, C.metal], [13, 7, 5, 1, C.metal], [15, 8, 2, 2, '#3a3e42'], [16, 8, 1, 1, C.yellow], [13, 10, 5, 1, t.main],
+    [1, 0, 4, 1, C.cream], [2, 0, 1, 1, C.jam], [7, 12, 7, 1, t.dark],
+  ]);
+  steelWheel(g, 7, 16, 3, frame);
+  steelWheel(g, 23, 16, 3, frame);
+  return { c, ax: 14, ay: 19 };
+}
+
+// Seaplane: a navy float biplane (the nose propeller spins live).
+function fedSeaplane(f) {
+  const t = team(f);
+  const [c, g] = canvas(32, 16);
+  outlined(g, [
+    [2, 1, 4, 5, C.navy], [1, 6, 7, 2, C.navy], [6, 5, 21, 4, C.navy], [27, 4, 3, 5, C.metalDark],
+    [7, 3, 3, 2, C.skin], [11, 2, 13, 2, t.main],
+    [12, 9, 1, 3, C.metalDark], [21, 9, 1, 3, C.metalDark], [9, 12, 17, 2, C.marble],
+  ], [
+    [6, 5, 21, 1, C.navyLight], [6, 7, 21, 1, t.main], [15, 6, 2, 2, C.yellow], [3, 2, 2, 2, t.main],
+    [7, 3, 3, 1, '#6a4a2a'], [9, 4, 1, 1, '#bfe0f0'], [11, 2, 13, 1, t.light], [28, 5, 1, 3, C.metal],
+    [9, 13, 17, 1, C.marbleShade], [24, 12, 2, 1, C.white], [26, 8, 1, 1, C.custard],
+  ]);
+  return { c, ax: 16, ay: 13 };
+}
+
+// Bureau blimp: a slate-grey government airship with a gold star and a searchlight.
+function fedBlimp(f) {
+  const t = team(f);
+  const [c, g] = canvas(42, 19);
+  outlined(g, [
+    [6, 2, 30, 9, C.slate], [3, 4, 4, 5, C.slate], [35, 4, 4, 5, C.slate], [1, 1, 4, 4, t.dark], [1, 8, 4, 4, t.dark],
+    [15, 11, 12, 4, C.navy], [20, 15, 3, 1, C.metalDark],
+  ], [
+    [6, 2, 30, 1, C.slateLight], [8, 3, 26, 1, '#5a6280'], [6, 6, 30, 2, t.main], [6, 10, 30, 1, C.slateDark],
+    [18, 3, 1, 6, C.slateDark], [24, 3, 1, 6, C.slateDark], [19, 3, 5, 3, C.yellow], [20, 6, 3, 2, C.yellow], [21, 8, 1, 1, C.yellow],
+    [21, 4, 1, 3, t.dark], [19, 3, 5, 1, '#fff0a0'],
+    [16, 12, 2, 1, C.glass], [19, 12, 2, 1, C.glass], [22, 12, 2, 1, C.glass], [25, 12, 1, 1, C.glass], [15, 14, 12, 1, t.main],
+    [21, 15, 1, 1, C.glass],
+  ]);
+  return { c, ax: 21, ay: 15 };
+}
+
+const buildSoldier = (type, f, frame) => (feds(f) ? fedSoldier : mobSoldier)(type, f, frame);
+const buildCar = (f, frame) => (feds(f) ? fedSquadCar : mobCar)(f, frame);
+const buildPieWagon = (f, frame) => (feds(f) ? fedPaddyWagon : mobPieWagon)(f, frame);
+const buildPieLobber = (f, frame) => (feds(f) ? fedTrebuchet : mobPieLobber)(f, frame);
+const buildAutogyro = (f) => (feds(f) ? fedSeaplane : mobAutogyro)(f);
+const buildBlimp = (f) => (feds(f) ? fedBlimp : mobBlimp)(f);
+
 // Spinning rotor and propellers, drawn live.
 function rotor(ctx, u, x, y) {
   const tick = Math.floor(performance.now() / 50);
   const s = u.facing;
-  if (u.type === 'helicopter') {
+  if (u.type === 'helicopter' && feds(u.faction)) {
+    // Seaplane nose propeller
+    const px = s > 0 ? x + 14 : x - 15;
+    rect(ctx, px, y - 10 + (tick % 2 ? 0 : 2), 1, tick % 2 ? 7 : 3, '#d8d2c4');
+  } else if (u.type === 'helicopter') {
     const half = tick % 2 ? 13 : 6;
     rect(ctx, x - half, y - 12, half * 2, 1, '#e8e2d4');
     const px = s > 0 ? x + 12 : x - 13;
@@ -354,6 +549,116 @@ const BUILD = {
     for (let y = 0; y < 16; y += 4) g.fillRect(0, y, 16, 1);
     g.fillStyle = C.O; g.fillRect(0, 0, 1, 16); g.fillRect(15, 0, 1, 16);
     g.fillStyle = t.main; g.fillRect(2, 1, 3, 1);
+  },
+};
+
+// Striped plank for the Feds' roadblock.
+function stripedPlank(g, x, y, w, t) {
+  g.fillStyle = C.O; g.fillRect(x - 1, y - 1, w + 2, 5);
+  for (let i = 0; i < w; i++) {
+    g.fillStyle = Math.floor((i + 8) / 3) % 2 ? C.white : t.main;
+    g.fillRect(x + i, y, 1, 3);
+  }
+}
+
+const FEDS_BUILD = {
+  hq(g, t) {
+    // The Bureau: a marble temple of paperwork, columns, gold seal and a flag
+    outlined(g, [[0, 44, 64, 4, C.marbleShade], [2, 41, 60, 3, C.marble], [4, 16, 56, 25, C.marbleDark], [2, 12, 60, 4, C.marble]], [
+      [0, 44, 64, 1, C.marble], [2, 41, 60, 1, C.white], [2, 12, 60, 1, C.white], [3, 14, 58, 1, t.main], [2, 15, 60, 1, C.marbleShade],
+      [4, 16, 56, 2, '#6e695f'],
+    ]);
+    for (let i = 0; i < 10; i++) {
+      const w = 60 - (9 - i) * 6;
+      g.fillStyle = C.O; g.fillRect(32 - w / 2 - 1, 2 + i, w + 2, 1);
+      g.fillStyle = i === 9 ? C.marbleShade : C.marble; g.fillRect(32 - w / 2, 2 + i, w, 1);
+    }
+    g.fillStyle = C.O; g.fillRect(31, 1, 2, 1);
+    disc(g, 32, 8, 3, C.O); disc(g, 32, 8, 2, C.yellow);
+    g.fillStyle = t.main; g.fillRect(31, 7, 3, 3);
+    g.fillStyle = C.yellowDark; g.fillRect(32, 8, 1, 1);
+    // Colonnade
+    for (const x of [6, 13, 20, 41, 48, 55]) {
+      outlined(g, [[x, 18, 3, 23, C.marble], [x - 1, 17, 5, 1, C.marble]], [[x + 2, 18, 1, 23, C.marbleShade], [x, 18, 1, 23, C.white]]);
+    }
+    // Bronze doors under a plaque
+    outlined(g, [[25, 20, 14, 3, C.bronze]], [[25, 20, 14, 1, '#c89a4a'], [27, 21, 10, 1, '#5a3e18']]);
+    outlined(g, [[27, 26, 10, 15, C.bronze]], [[31, 26, 2, 15, C.O], [27, 26, 10, 1, '#c89a4a'], [30, 33, 1, 1, C.yellow], [33, 33, 1, 1, C.yellow],
+      [28, 28, 2, 4, '#7a5220'], [34, 28, 2, 4, '#7a5220']]);
+    // Flagpole on the roof corner
+    g.fillStyle = C.O; g.fillRect(56, 0, 3, 12);
+    g.fillStyle = C.metalLight; g.fillRect(57, 0, 1, 12);
+    outlined(g, [[59, 1, 4, 3, t.main]], [[59, 2, 4, 1, C.white]]);
+  },
+  barracks(g, t) {
+    // Training Academy: a stone school with a pennant and a pie-splatted target range
+    outlined(g, [[2, 8, 30, 24, C.marbleShade], [0, 5, 34, 3, C.marbleDark]], [[0, 5, 34, 1, C.marble], [2, 8, 30, 1, C.marbleDark]]);
+    g.fillStyle = C.marbleDark;
+    for (let y = 12; y < 32; y += 4) g.fillRect(2, y, 30, 1);
+    lit(g, 5, 13, 6, 6); lit(g, 23, 13, 6, 6);
+    g.fillStyle = C.O; g.fillRect(7, 13, 1, 6); g.fillRect(25, 13, 1, 6);
+    outlined(g, [[13, 20, 8, 12, '#3a2216']], [[14, 21, 6, 4, C.glassDark], [19, 26, 1, 1, C.yellow], [16, 20, 1, 12, C.O]]);
+    outlined(g, [[11, 9, 12, 3, t.dark]], [[12, 10, 10, 1, t.main], [13, 10, 1, 1, C.white], [16, 10, 1, 1, C.white], [19, 10, 1, 1, C.white]]);
+    g.fillStyle = C.O; g.fillRect(4, 0, 3, 6);
+    g.fillStyle = C.metalLight; g.fillRect(5, 0, 1, 6);
+    outlined(g, [[7, 0, 5, 3, t.main]], [[7, 1, 3, 1, C.white]]);
+    // Target range
+    outlined(g, [[38, 18, 1, 14, C.wood], [44, 18, 1, 14, C.wood]]);
+    disc(g, 41, 13, 7, C.O); disc(g, 41, 13, 6, C.white); disc(g, 41, 13, 4, C.red); disc(g, 41, 13, 2, C.white);
+    g.fillStyle = C.red; g.fillRect(41, 13, 1, 1);
+    g.fillStyle = C.custard; g.fillRect(42, 11, 3, 2); g.fillRect(43, 13, 1, 2); g.fillRect(37, 15, 2, 2);
+    g.fillStyle = C.cream; g.fillRect(42, 11, 1, 1);
+  },
+  mine(g, t) {
+    // Tax Office: a narrow stone office, a "$" sign, stacks of forms and a mailbox
+    outlined(g, [[3, 9, 26, 23, C.marble], [1, 6, 30, 3, C.marbleShade]], [[1, 6, 30, 1, C.white], [1, 8, 30, 1, t.main], [3, 9, 26, 1, C.marbleShade]]);
+    outlined(g, [[8, 0, 16, 6, C.ledger]], [[9, 1, 14, 4, '#3a7a50'], [11, 0, 1, 6, C.yellow],
+      [10, 1, 3, 1, C.yellow], [10, 2, 1, 1, C.yellow], [10, 3, 3, 1, C.yellow], [12, 4, 1, 1, C.yellow], [10, 5, 3, 1, C.yellow],
+      [15, 1, 7, 1, C.paper], [15, 3, 6, 1, C.paper], [15, 5, 4, 1, t.main]]);
+    g.fillStyle = C.O; g.fillRect(9, 5, 1, 1); g.fillRect(22, 5, 1, 1);
+    lit(g, 5, 13, 12, 8);
+    for (const [x, h] of [[6, 3], [9, 5], [12, 2], [14, 4]]) { g.fillStyle = C.paper; g.fillRect(x, 20 - h, 2, h); g.fillStyle = C.marbleShade; g.fillRect(x, 20 - h + 1, 2, 1); }
+    g.fillStyle = C.wood; g.fillRect(5, 20, 12, 1);
+    outlined(g, [[20, 17, 7, 15, '#3a2216']], [[21, 18, 5, 4, C.glassDark], [21, 19, 5, 1, C.paper], [25, 25, 1, 1, C.yellow]]);
+    outlined(g, [[5, 25, 6, 7, '#3a5a8a'], [4, 24, 8, 2, '#3a5a8a']], [[6, 27, 4, 1, C.O], [4, 24, 8, 1, '#5a7aaa'], [6, 29, 4, 1, t.main]]);
+  },
+  wall(g, t) {
+    // Roadblock: confiscated barrels and striped sawhorses, a lantern on top
+    const barrel = (x) => outlined(g, [[x, 22, 7, 10, '#6a4a2c']], [[x, 24, 7, 1, C.metalDark], [x, 29, 7, 1, C.metalDark], [x + 1, 22, 5, 1, '#8a6a44'], [x + 3, 26, 1, 2, C.custard]]);
+    barrel(1); barrel(8);
+    outlined(g, [[2, 17, 1, 5, C.woodDark], [13, 17, 1, 5, C.woodDark], [3, 11, 1, 5, C.woodDark], [12, 11, 1, 5, C.woodDark]]);
+    stripedPlank(g, 0, 16, 16, t);
+    stripedPlank(g, 1, 9, 14, t);
+    outlined(g, [[6, 4, 4, 4, C.siren], [7, 2, 2, 2, C.metalDark]], [[6, 4, 1, 4, '#ffa0a0'], [6, 7, 4, 1, C.redDark]]);
+  },
+  workshop(g, t) {
+    // Evidence Locker: a concrete strongroom, a caged door full of seized barrels, a filing cabinet
+    outlined(g, [[2, 8, 38, 24, C.concrete], [0, 5, 42, 4, C.concreteDark]], [[0, 5, 42, 1, C.concreteLight], [2, 8, 38, 1, C.concreteDark]]);
+    g.fillStyle = C.concreteDark;
+    for (let y = 13; y < 32; y += 5) for (let x = 2 + ((y / 5) % 2 ? 0 : 4); x < 40; x += 8) g.fillRect(x, y, 1, 4);
+    outlined(g, [[10, 14, 22, 18, '#1a1a20']]);
+    for (const x of [11, 17, 23]) { g.fillStyle = '#6a4a2c'; g.fillRect(x, 24, 5, 8); g.fillStyle = C.metalDark; g.fillRect(x, 26, 5, 1); g.fillRect(x, 29, 5, 1); }
+    g.fillStyle = C.tin; g.fillRect(12, 21, 6, 2); g.fillStyle = C.cream; g.fillRect(12, 20, 6, 1); g.fillStyle = C.jam; g.fillRect(14, 20, 1, 1);
+    g.fillStyle = C.paper; g.fillRect(24, 20, 6, 3); g.fillStyle = C.ink; g.fillRect(25, 21, 4, 1);
+    g.fillStyle = C.metal;
+    for (let x = 10; x < 32; x += 3) g.fillRect(x, 14, 1, 18);
+    g.fillRect(10, 14, 22, 1); g.fillRect(10, 22, 22, 1);
+    g.fillStyle = C.yellow; g.fillRect(29, 23, 2, 2);
+    outlined(g, [[12, 7, 18, 5, t.dark]], [[13, 8, 16, 3, t.main], [14, 9, 14, 1, C.white]]);
+    outlined(g, [[41, 14, 6, 18, '#6a7268']], [[41, 14, 6, 1, '#8a948a'], [41, 20, 6, 1, C.O], [41, 26, 6, 1, C.O],
+      [43, 16, 2, 1, C.chrome], [43, 22, 2, 1, C.chrome], [43, 28, 2, 1, C.chrome], [42, 17, 4, 1, C.paper]]);
+    outlined(g, [[3, 25, 6, 7, C.wood]], [[3, 25, 6, 1, C.woodLight], [4, 23, 3, 2, C.paper], [5, 24, 1, 1, t.main]]);
+  },
+  turret(g, t) {
+    // Searchlight tower: a lattice tower with a big lamp and a custard gun
+    outlined(g, [[9, 12, 2, 20, C.metalDark], [21, 12, 2, 20, C.metalDark]]);
+    g.fillStyle = C.metalDark;
+    for (let y = 14; y < 32; y += 6) for (let i = 0; i < 10; i++) { g.fillRect(11 + i, y + Math.floor(i / 2), 1, 1); g.fillRect(20 - i, y + Math.floor(i / 2), 1, 1); }
+    outlined(g, [[4, 10, 24, 3, C.metal], [6, 2, 9, 7, C.slate], [15, 2, 2, 6, C.chrome], [17, 8, 14, 2, C.gun]], [
+      [4, 10, 24, 1, t.main], [4, 12, 24, 1, C.metalDark], [6, 2, 9, 1, C.slateLight], [6, 5, 9, 1, t.main],
+      [15, 3, 2, 4, C.glass], [16, 3, 1, 2, C.white], [30, 8, 1, 2, C.custard], [17, 8, 14, 1, '#4a4038'], [8, 4, 1, 1, C.slateDark], [11, 4, 1, 1, C.slateDark],
+    ]);
+    g.fillStyle = C.O; g.fillRect(9, 9, 2, 1);
   },
 };
 
@@ -602,6 +907,34 @@ function animate(ctx, b, x, y) {
   const ms = performance.now();
   const tick = Math.floor(ms / 140);
   const t = team(b.faction);
+  if (feds(b.faction)) {
+    if (b.type === 'hq') {
+      // The flag flutters
+      const k = tick % 4;
+      rect(ctx, x + 63, y + 1 + (k < 2 ? 0 : 1), 1, 2, t.main);
+      if (k === 1 || k === 2) rect(ctx, x + 63, y + 3, 1, 1, t.dark);
+    } else if (b.type === 'mine') {
+      // Tax forms flutter out of the office
+      for (let i = 0; i < 3; i++) {
+        const k = (ms / 2200 + i / 3) % 1;
+        ctx.globalAlpha = 0.9 * (1 - k);
+        const px = x + 26 + Math.round(Math.sin(k * 7 + i * 2) * 3);
+        const py = y + 4 - Math.round(k * 14);
+        rect(ctx, px, py, 3, 2, C.paper); rect(ctx, px, py + 1, 2, 1, C.marbleShade);
+        ctx.globalAlpha = 1;
+      }
+    } else if (b.type === 'turret') {
+      // The searchlight sweeps the sky
+      ctx.globalAlpha = 0.18;
+      const sw = Math.sin(ms / 1100) * 5;
+      for (let i = 0; i < 14; i++) rect(ctx, x + 18 + i, y + 4 - i - Math.round(sw * i / 14), 1, 2 + Math.floor(i / 3), '#fff2c8');
+      ctx.globalAlpha = 1;
+      if (tick % 8 === 0) rect(ctx, x + 31, y + 8, 1, 2, C.cream);
+    } else if (b.type === 'airbase') {
+      if (tick % 6 < 3) rect(ctx, x + 49, y, 1, 1, C.red);
+    }
+    return;
+  }
   if (b.type === 'hq') {
     // Chasing marquee bulbs
     for (let i = 0; i < 15; i++) rect(ctx, x + 16 + i * 2, y + 29, 1, 1, (i + tick) % 3 === 0 ? C.white : C.yellowDark);
@@ -660,7 +993,28 @@ function explode(ctx, x, y, r, k, seed) {
 
 // Nobody gets hurt: a splatted gangster sits in a puddle of custard.
 function corpseKey() { return 'splat'; }
+function fedCorpse(e) {
+  const t = team(e.f);
+  const [c, g] = canvas(16, 8);
+  g.fillStyle = C.custard; g.fillRect(0, 6, 16, 2); g.fillRect(2, 5, 12, 1);
+  if (e.type === 'scout') {
+    // A splatted stool pigeon, feet in the air, hat rolled away
+    outlined(g, [[4, 3, 8, 3, C.pigeon], [11, 2, 3, 3, C.pigeon], [6, 1, 1, 2, C.pink], [9, 1, 1, 2, C.pink], [1, 4, 3, 1, C.fedHat]], [
+      [11, 4, 3, 1, C.pigeonNeck], [12, 3, 1, 1, C.O], [5, 4, 5, 1, C.cream], [2, 4, 1, 1, t.main], [8, 3, 2, 1, C.custard],
+    ]);
+    return { c, ax: 8, ay: 7 };
+  }
+  const coat = { soldier: C.trench, heavy: C.shirt, engineer: '#6a6a78', sniper: C.navy }[e.type] ?? C.trench;
+  const hat = { heavy: C.bowler, engineer: C.eyeshade, sniper: C.trench }[e.type] ?? C.fedHat;
+  outlined(g, [[5, 3, 6, 3, coat], [6, 0, 4, 3, C.skin]], [
+    [5, 0, 6, 1, hat], [5, 5, 6, 1, t.main], [6, 1, 4, 1, C.cream], [9, 2, 1, 1, C.custard],
+  ]);
+  g.fillStyle = C.cream; g.fillRect(4, 3, 2, 1); g.fillRect(10, 4, 2, 1);
+  return { c, ax: 8, ay: 7 };
+}
+
 function corpse(e) {
+  if (feds(e.f)) return fedCorpse(e);
   const t = team(e.f);
   const [c, g] = canvas(16, 8);
   g.fillStyle = C.custard; g.fillRect(0, 6, 16, 2); g.fillRect(2, 5, 12, 1);
@@ -674,13 +1028,34 @@ function corpse(e) {
 export default {
   id: 'gangster',
   name: 'Gangsters',
+  sides: [
+    {
+      id: 'mob', name: 'The Mob', short: 'Mob',
+      blurb: 'Pinstripes, spats and tommy guns full of custard. The bakery is just a bakery. Honest.',
+      win: 'Pie for everyone. On the house.',
+      lose: 'Somebody squealed. Probably that pigeon.',
+    },
+    {
+      id: 'feds', name: 'The Feds', short: 'Feds', plural: true,
+      blurb: 'Trench coats, custard tommy guns and the deadliest weapon of all: an accountant with a sharp pencil.',
+      names: {
+        soldier: 'G-Man', heavy: 'Dry Agent', scout: 'Stool Pigeon', engineer: 'Accountant', sniper: 'Marksman',
+        jeep: 'Squad Car', tank: 'Paddy Wagon', artillery: 'Pie Trebuchet', helicopter: 'Seaplane', bomber: 'Bureau Blimp',
+        hq: 'The Bureau', barracks: 'Academy', turret: 'Searchlight', wall: 'Roadblock', mine: 'Tax Office',
+        workshop: 'Evidence Locker', airbase: 'Air Dock', bridge: 'Fire Escape', ramp: 'Stairs',
+      },
+      icons: { hq: '🏛️', barracks: '🎯', turret: '🔦', wall: '🚧', mine: '🧾', workshop: '🗄️' },
+      win: 'We got him on the tax forms.',
+      lose: 'The paperwork got lost. All of it. In triplicate.',
+    },
+  ],
   palette,
   teamBase: PINSTRIPE,
   roofBase: [0.3, 0.3, 0.32],
   soldier: buildSoldier,
   vehicle: { jeep: buildCar, tank: buildPieWagon, artillery: buildPieLobber },
   aircraft: { helicopter: buildAutogyro, bomber: buildBlimp },
-  buildings: BUILD,
+  buildings: Object.fromEntries(Object.keys(BUILD).map((k) => [k, (g, t, f) => (feds(f) && FEDS_BUILD[k] ? FEDS_BUILD[k] : BUILD[k])(g, t, f)])),
   drawTile,
   surface,
   background,

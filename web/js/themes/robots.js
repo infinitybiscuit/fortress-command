@@ -1,8 +1,9 @@
-// Rise of the Robots: a rain-soaked future war. Human resistance fighters and
-// cyborg enforcers alongside chrome endoskeletons and hunter machines, under
-// a smoggy neon city skyline. Same units and rules as Classic, new paint.
+// Rise of the Robots: a rain-soaked future war under a smoggy neon skyline.
+// Two sides: the human Resistance (scavenged guns, sewer dens, dogs, duct
+// tape) and the Machines (chrome troopers, hunters and The Core). Same units
+// and rules as Classic, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -12,7 +13,7 @@ const palette = {
   yellow: '#ffcf33', yellowDark: '#c79a10', red: '#ff2238', redDark: '#8f0d1c', white: '#eaf6ff',
   sky: ['#04030a', '#070611', '#0b0819', '#100b22', '#170e2b', '#211233', '#2e1538'],
   chrome: '#a9b6bf', chromeLight: '#e3edf2', chromeDark: '#5d6b75',
-  cyan: '#38f0ff', cyanDark: '#1690a8', pink: '#ff3fa8', violet: '#8a4dff',
+  cyan: '#38f0ff', cyanDark: '#1690a8', pink: '#ff3fa8', pinkDark: '#7a1f55', violet: '#8a4dff',
   concrete: '#3a3e47', concreteLight: '#555b66', concreteDark: '#24272e',
   metal: '#454d57', metalLight: '#6f7a86', metalDark: '#272c33',
   rust: '#6e3b26', rustLight: '#9a5532',
@@ -22,23 +23,25 @@ const palette = {
   coat: '#34302c', coatDark: '#211e1b', leather: '#2b2220',
   armor: '#71849c', armorLight: '#9fb2c8', armorDark: '#46566b',
   glass: '#38f0ff', shadow: 'rgba(0,0,0,0.4)',
+  tape: '#a7adb3', tapeDark: '#7b8187', olive: '#3d4a3a', oliveDark: '#2a3328', wig: '#6b4423',
+  sand: '#6e6450', sandDark: '#4f4838', sandLight: '#8a7f66', dog: '#8a5a30', dogDark: '#5c3a1e',
 };
 const GUNMETAL = [0.19, 0.2, 0.25];
 
-// ── Infantry: humans and machines ──────────────────────────────────────────
+// ── Infantry ───────────────────────────────────────────────────────────────
 // 20×17 canvas, feet at (8,16), facing right — same frame as Classic.
-const ROBOTS = new Set(['heavy', 'sniper']);
+const machines = (f) => sideOf(f) === 'machines';
 
-function buildSoldier(type, f, frame) {
+// The Resistance: coats and fatigues, a team-coloured armband, duct tape.
+function humanSoldier(type, f, frame) {
   const t = team(f);
   const [c, g] = canvas(20, 17);
-  if (type === 'heavy') return buildEndo(t, c, g, frame);
   const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
   const boots = frame ? [[5, 15, 3, 1], [9, 15, 3, 1]] : [[4, 15, 3, 1], [10, 15, 3, 1]];
   let parts;
   let details;
   if (type === 'sniper') {
-    // Enforcer: armoured cyborg lawman — helmet and visor, only the jaw is human
+    // Enforcer: armoured ex-cop marksman — helmet and visor, only the jaw shows
     parts = [
       ...legs.map((l) => [...l, C.armorDark]), ...boots.map((b) => [...b, C.metalDark]),
       [4, 8, 9, 4, C.armor], [6, 3, 6, 5, C.skin], [5, 1, 8, 5, C.armor],
@@ -48,8 +51,22 @@ function buildSoldier(type, f, frame) {
       [5, 1, 8, 1, C.armorLight], [7, 4, 6, 1, C.O], [9, 4, 3, 1, t.main], [6, 7, 5, 1, C.skinDark],
       [4, 8, 9, 1, C.armorLight], [6, 9, 2, 2, t.main], [4, 11, 9, 1, C.armorDark], [9, 9, 3, 2, C.armorLight],
     ];
+  } else if (type === 'heavy') {
+    // Gunner: a big lad with a dented helmet, an ammo drum on his back and a
+    // plasma minigun held together with duct tape
+    parts = [
+      ...legs.map((l) => [...l, t.uniDark]), ...boots.map((b) => [...b, C.boot]),
+      [2, 7, 3, 5, C.metalDark], [4, 7, 9, 5, C.coat], [6, 3, 6, 5, C.skin], [5, 1, 8, 3, C.olive],
+      [10, 8, 9, 3, C.gun],
+    ];
+    details = [
+      [4, 3, 10, 1, C.oliveDark], [6, 1, 3, 1, '#56664f'], [9, 1, 2, 2, C.tape], [10, 5, 1, 1, C.O], [7, 7, 4, 1, C.skinDark],
+      [4, 7, 3, 2, t.main], [4, 7, 3, 1, t.light], [2, 8, 3, 1, C.yellowDark], [2, 10, 3, 1, C.metal],
+      [6, 9, 1, 1, C.yellow], [7, 10, 1, 1, C.yellow], [8, 11, 1, 1, C.yellow], [4, 11, 6, 1, C.coatDark],
+      [16, 8, 3, 1, C.gunLight], [16, 10, 3, 1, C.gunLight], [13, 8, 2, 3, C.tape], [14, 8, 1, 3, C.tapeDark],
+      [18, 9, 1, 1, C.cyan], [10, 10, 2, 1, C.skin],
+    ];
   } else {
-    // Human resistance: coats and fatigues, a team-coloured armband
     const coat = type === 'scout' ? C.leather : type === 'engineer' ? '#3b3427' : C.coat;
     parts = [
       ...legs.map((l) => [...l, t.uniDark]), ...boots.map((b) => [...b, C.boot]),
@@ -63,18 +80,83 @@ function buildSoldier(type, f, frame) {
       parts.push([6, 2, 6, 2, '#17110f'], [11, 9, 4, 1, C.gun]);
       details.push([5, 3, 2, 1, '#17110f'], [8, 5, 4, 1, C.O], [10, 5, 1, 1, C.cyan], [5, 8, 7, 1, t.main]);
     } else if (type === 'engineer') {
-      // Tech: beanie, welding goggles, cutting torch
+      // Tech: beanie, welding goggles, cutting torch, a roll of tape on the belt
       parts.push([5, 1, 8, 3, t.dark], [11, 9, 4, 1, C.gunLight]);
-      details.push([6, 1, 5, 1, t.main], [7, 4, 5, 1, C.O], [8, 4, 1, 1, C.cyan], [10, 4, 1, 1, C.cyan], [5, 10, 7, 1, C.yellowDark]);
+      details.push([6, 1, 5, 1, t.main], [7, 4, 5, 1, C.O], [8, 4, 1, 1, C.cyan], [10, 4, 1, 1, C.cyan], [5, 10, 7, 1, C.yellowDark], [6, 10, 2, 1, C.tape]);
     } else {
-      // Rebel: bandana and a plasma rifle
+      // Rebel: bandana and a plasma rifle (taped)
       parts.push([5, 2, 8, 2, t.main], [11, 9, 7, 2, C.gun]);
-      details.push([4, 3, 2, 2, t.dark], [6, 2, 6, 1, t.light], [12, 10, 4, 1, C.cyanDark], [17, 9, 1, 1, C.cyan]);
+      details.push([4, 3, 2, 2, t.dark], [6, 2, 6, 1, t.light], [12, 10, 4, 1, C.cyanDark], [14, 9, 1, 2, C.tape], [17, 9, 1, 1, C.cyan]);
     }
   }
   outlined(g, parts, details);
   return { c, ax: 8, ay: 16 };
 }
+
+// The Machines: chrome all the way down (and one in a very good disguise).
+function machineSoldier(type, f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(20, 17);
+  if (type === 'heavy') return buildEndo(t, c, g, frame);
+  if (type === 'scout') {
+    // Spider-Bot: a scuttling sensor pod on four legs, red eye cluster, pop-gun
+    const mid = frame ? [[6, 11, 1, 5], [11, 11, 1, 5]] : [[5, 11, 1, 5], [12, 11, 1, 5]];
+    const outer = frame
+      ? [[2, 6, 3, 1], [2, 6, 1, 10], [14, 6, 3, 1], [16, 6, 1, 10]]
+      : [[1, 6, 4, 1], [1, 6, 1, 10], [14, 6, 4, 1], [17, 6, 1, 10]];
+    outlined(g, [
+      ...outer.map((l) => [...l, C.metal]), ...mid.map((l) => [...l, C.metal]),
+      [4, 7, 10, 4, C.metalDark], [6, 5, 6, 3, C.metal], [8, 3, 1, 2, C.metalDark], [14, 9, 3, 1, C.gun],
+    ], [
+      [6, 5, 6, 1, C.metalLight], [11, 7, 3, 2, '#0b0c10'], [12, 7, 1, 1, C.red], [13, 8, 1, 1, C.red], [11, 8, 1, 1, C.redDark],
+      [5, 9, 6, 1, t.main], [4, 10, 10, 1, C.O], [8, 3, 1, 1, C.red], [16, 9, 1, 1, C.cyan],
+    ]);
+    return { c, ax: 8, ay: 16 };
+  }
+  if (type === 'engineer') {
+    // Repair-Bot: hazard-yellow box on treads, one big eye and a welding arm
+    outlined(g, [
+      [4, 13, 9, 3, '#121419'], [5, 7, 7, 6, C.yellowDark], [7, 6, 3, 1, C.metalDark], [5, 2, 7, 4, C.metal],
+      [6, 0, 1, 2, C.metalDark], [11, 9, 4, 1, C.metal], [15, 8, 2, 3, C.gunLight],
+    ], [
+      [5, 2, 7, 1, C.metalLight], [9, 3, 3, 2, '#0b0c10'], [10, 3, 1, 1, C.red], [6, 0, 1, 1, frame ? C.red : C.redDark],
+      [5, 7, 7, 1, C.yellow], [5, 9, 7, 1, t.main], [6, 11, 1, 1, C.cyan], [8, 11, 1, 1, C.O], [10, 11, 1, 1, C.O],
+      [5, 14, 1, 1, C.metal], [8, 14, 1, 1, C.metal], [11, 14, 1, 1, C.metal], [4, 13, 9, 1, C.metalDark],
+      ...(frame ? [[17, 7, 1, 1, C.white], [18, 8, 1, 1, C.yellow], [17, 10, 1, 1, C.cyan]] : [[17, 9, 1, 1, C.cyan]]),
+    ]);
+    return { c, ax: 8, ay: 16 };
+  }
+  const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
+  const feet = frame ? [[5, 15, 3, 1], [9, 15, 3, 1]] : [[4, 15, 3, 1], [10, 15, 3, 1]];
+  if (type === 'sniper') {
+    // Infiltrator: a flawless human disguise. Wig on crooked, coat too short,
+    // chrome shins, chrome chin, a moustache and sunglasses at night.
+    outlined(g, [
+      ...legs.map((l) => [...l, C.chrome]), ...feet.map((p) => [...p, C.chromeDark]),
+      [4, 7, 9, 5, C.coat], [6, 3, 6, 5, C.skin], [4, 1, 7, 3, C.wig], [10, 9, 10, 1, C.gun], [13, 8, 3, 1, C.gunLight],
+    ], [
+      [11, 3, 1, 1, C.chromeLight], [5, 1, 3, 1, '#8a5a30'], [3, 3, 2, 1, C.wig],
+      [8, 4, 4, 1, C.O], [9, 4, 1, 1, '#2a2f3a'], ...(frame ? [[11, 5, 1, 1, C.red]] : []),
+      [8, 6, 3, 1, C.wig], [7, 7, 5, 1, C.chrome], [8, 7, 2, 1, C.chromeLight],
+      [5, 7, 3, 1, C.coatDark], [5, 9, 2, 2, t.main], [4, 11, 9, 1, C.coatDark], [10, 10, 2, 1, C.chrome],
+      [6, 12, 2, 1, C.chromeLight], [9, 12, 2, 1, C.chromeLight], [19, 9, 1, 1, C.cyan],
+    ]);
+    return { c, ax: 8, ay: 16 };
+  }
+  // Trooper: a sleek chrome soldier, a visor slit with a sweeping red eye
+  const thin = frame ? [[6, 12, 1, 3], [9, 12, 1, 3]] : [[5, 12, 1, 3], [10, 12, 1, 3]];
+  outlined(g, [
+    ...thin.map((l) => [...l, C.chrome]), ...feet.map((p) => [...p, C.chromeDark]),
+    [7, 11, 4, 2, C.chromeDark], [5, 7, 7, 4, C.chrome], [6, 1, 6, 6, C.chrome], [11, 8, 8, 2, C.gun],
+  ], [
+    [7, 1, 3, 1, C.chromeLight], [6, 4, 6, 1, C.O], [frame ? 8 : 10, 4, 2, 1, C.red], [8, 6, 3, 1, C.chromeDark], [6, 2, 1, 2, C.chromeDark],
+    [6, 7, 4, 1, C.chromeLight], [4, 7, 2, 2, t.main], [6, 8, 2, 1, t.main], [7, 9, 2, 1, t.main], [9, 10, 2, 1, t.main],
+    [12, 9, 4, 1, C.redDark], [18, 8, 1, 2, C.cyan],
+  ]);
+  return { c, ax: 8, ay: 16 };
+}
+
+const buildSoldier = (type, f, frame) => (machines(f) ? machineSoldier : humanSoldier)(type, f, frame);
 
 // Endo: a chrome endoskeleton with red eyes and a plasma minigun.
 function buildEndo(t, c, g, frame) {
@@ -194,6 +276,108 @@ function buildDropship(f) {
   return { c, ax: 19, ay: 13 };
 }
 
+// Scrap Truck (Resistance tank): an armoured technical welded from rusty
+// plates, a plasma cannon on the bed and duct tape holding the barrel on.
+function humanScrapTruck(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(38, 22);
+  outlined(g, [
+    [0, 10, 3, 4, '#121419'], [2, 9, 32, 7, C.rust], [34, 10, 3, 5, C.metal], [23, 5, 11, 5, C.rustLight],
+    [6, 3, 11, 6, C.metal], [17, 3, 15, 2, C.gun],
+    [4, 15, 6, 6, '#121419'], [15, 15, 6, 6, '#121419'], [27, 15, 6, 6, '#121419'],
+  ], [
+    [2, 9, 32, 1, C.rustLight], [23, 5, 11, 1, '#b86a40'], [28, 6, 5, 2, C.cyanDark], [29, 6, 2, 1, C.cyan], [30, 6, 1, 2, C.O],
+    [6, 3, 11, 1, C.metalLight], [8, 5, 4, 2, '#0b0c10'], [20, 3, 1, 2, t.main], [23, 3, 1, 2, t.main],
+    [26, 3, 2, 2, C.tape], [31, 3, 1, 2, C.cyan], [3, 12, 30, 1, t.main], [3, 13, 30, 1, C.rust],
+    [12, 10, 2, 4, C.tape], [13, 11, 1, 2, C.tapeDark], [5, 10, 1, 1, C.rustLight], [19, 10, 1, 1, C.rustLight], [25, 11, 1, 1, '#b86a40'],
+    [34, 11, 1, 1, C.yellow], [35, 13, 2, 1, C.metalDark], [1, 11, 1, 2, C.metal],
+  ]);
+  for (const wx of [4, 15, 27]) {
+    rect(g, wx + 2, 17, 2, 2, C.metal);
+    rect(g, wx + (frame ? 1 : 4), frame ? 16 : 19, 1, 1, C.metalLight);
+  }
+  return { c, ax: 18, ay: 21 };
+}
+
+// Rocket Pickup (Resistance artillery): a battered pickup with a rocket pod
+// strapped to the bed. Strapped with what? You know with what.
+function humanRocketPickup(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(32, 19);
+  outlined(g, [
+    [1, 9, 17, 5, C.olive], [17, 5, 8, 5, C.olive], [25, 8, 5, 5, C.olive], [30, 10, 1, 3, C.metal],
+    [7, 7, 2, 2, C.metal], [3, 2, 11, 5, C.metalDark], [14, 3, 2, 1, C.metalLight], [14, 5, 2, 1, C.metalLight],
+    [3, 13, 5, 5, '#121419'], [22, 13, 5, 5, '#121419'],
+  ], [
+    [1, 9, 17, 1, '#56664f'], [17, 5, 8, 1, '#56664f'], [25, 8, 5, 1, '#56664f'], [20, 6, 4, 3, C.cyanDark], [21, 6, 2, 1, C.cyan],
+    [3, 2, 11, 1, C.metal], [15, 3, 1, 1, C.red], [15, 5, 1, 1, C.red], [4, 4, 9, 1, '#0b0c10'],
+    [8, 2, 2, 5, C.tape], [9, 3, 1, 3, C.tapeDark], [2, 11, 28, 1, t.main], [29, 9, 1, 1, C.yellow],
+    [11, 10, 3, 2, C.rust], [26, 10, 2, 1, C.tape],
+  ]);
+  for (const wx of [3, 22]) {
+    rect(g, wx + 2, 15, 1, 1, C.metal);
+    rect(g, wx + (frame ? 1 : 3), frame ? 14 : 16, 1, 1, C.metalLight);
+  }
+  return { c, ax: 15, ay: 18 };
+}
+
+// Gunship (Resistance helicopter): a pre-war chopper, olive drab and patched,
+// a door gunner in a bandana. The rotor is drawn live.
+function humanGunship(f) {
+  const t = team(f);
+  const [c, g] = canvas(32, 16);
+  outlined(g, [
+    [0, 2, 3, 5, C.oliveDark], [1, 6, 8, 2, C.olive], [8, 5, 16, 7, C.olive], [24, 6, 4, 6, C.olive],
+    [15, 2, 2, 3, C.metalDark], [11, 12, 1, 1, C.metalDark], [20, 12, 1, 1, C.metalDark], [8, 13, 16, 1, C.metalDark],
+    [22, 11, 7, 1, C.gun],
+  ], [
+    [8, 5, 16, 1, '#56664f'], [23, 6, 4, 3, C.cyanDark], [24, 6, 2, 1, C.cyan], [12, 7, 5, 4, '#1c2219'],
+    [14, 8, 2, 2, C.skin], [13, 7, 3, 1, t.main], [8, 10, 16, 1, t.main], [19, 6, 2, 2, C.tape], [4, 6, 2, 2, C.tape],
+    [0, 2, 1, 1, C.red], [28, 11, 1, 1, C.cyan], [26, 10, 1, 1, C.yellow], [9, 7, 2, 2, C.rust],
+  ]);
+  return { c, ax: 16, ay: 13 };
+}
+
+// Patchwork VTOL (Resistance bomber): a cargo hauler built from three other
+// aircraft, ducted fans under the wings (their glow is drawn live).
+function humanVTOL(f) {
+  const t = team(f);
+  const [c, g] = canvas(46, 20);
+  outlined(g, [
+    [0, 1, 6, 7, C.oliveDark], [0, 6, 8, 2, C.oliveDark], [4, 6, 34, 7, C.olive], [33, 4, 7, 4, C.olive], [38, 7, 6, 5, C.olive],
+    [12, 3, 18, 2, C.oliveDark], [7, 12, 9, 3, C.metalDark], [25, 12, 9, 3, C.metalDark],
+  ], [
+    [4, 6, 34, 1, '#56664f'], [12, 3, 18, 1, '#56664f'], [35, 5, 4, 2, C.cyanDark], [36, 5, 2, 1, C.cyan],
+    [18, 8, 7, 4, '#1c2219'], [21, 8, 1, 4, C.O], [5, 10, 32, 1, t.main], [10, 7, 4, 2, C.rust], [27, 7, 3, 2, C.metal],
+    [14, 6, 2, 4, C.tape], [40, 8, 2, 2, C.tape], [0, 1, 1, 1, C.red], [43, 9, 1, 1, C.white],
+    [8, 14, 7, 1, C.cyanDark], [26, 14, 7, 1, C.cyanDark], [8, 12, 7, 1, C.metal], [26, 12, 7, 1, C.metal],
+  ]);
+  return { c, ax: 23, ay: 15 };
+}
+
+// Prowler (Machine jeep): a riderless chrome motorbike with a red eye for a
+// headlight. Nobody is driving. Nobody needs to.
+function machineProwler(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(28, 16);
+  outlined(g, [
+    [2, 4, 5, 4, C.metal], [5, 7, 16, 3, C.metalDark], [8, 5, 8, 2, C.metal], [18, 4, 7, 4, C.chrome], [15, 10, 10, 1, C.gun],
+    [1, 9, 6, 6, '#121419'], [20, 9, 6, 6, '#121419'],
+  ], [
+    [2, 4, 5, 1, C.metalLight], [8, 5, 8, 1, C.metalLight], [18, 4, 7, 1, C.chromeLight], [21, 5, 4, 2, '#0b0c10'], [22, 5, 3, 1, C.red],
+    [6, 8, 13, 1, t.main], [2, 4, 1, 1, C.red], [24, 10, 1, 1, C.cyan], [0, 8, 2, 1, C.metalDark],
+    [3, 11, 2, 2, C.chrome], [22, 11, 2, 2, C.chrome],
+    [frame ? 2 : 5, frame ? 10 : 13, 1, 1, C.chromeLight], [frame ? 21 : 24, frame ? 10 : 13, 1, 1, C.chromeLight],
+  ]);
+  return { c, ax: 14, ay: 15 };
+}
+
+const buildJeep = (f, frame) => (machines(f) ? machineProwler : buildCruiser)(f, frame);
+const buildTank = (f, frame) => (machines(f) ? buildHunter : humanScrapTruck)(f, frame);
+const buildArtillery = (f, frame) => (machines(f) ? buildWalker : humanRocketPickup)(f, frame);
+const buildHeli = (f) => (machines(f) ? buildDrone : humanGunship)(f);
+const buildBomber = (f) => (machines(f) ? buildDropship : humanVTOL)(f);
+
 // ── Buildings ──────────────────────────────────────────────────────────────
 function hazard(g, x, y, w, h = 2) {
   for (let i = 0; i < w; i++) {
@@ -218,41 +402,103 @@ function windows(g, x, y, n, step, seed, colours) {
   }
 }
 
+// Stacked sandbags with seams.
+function sandbags(g, x, y, w, h) {
+  for (let r = 0; r * 3 < h; r++) {
+    rect(g, x, y + r * 3, w, 1, C.sandLight);
+    rect(g, x, y + r * 3 + 2, w, 1, C.sandDark);
+    for (let sx = x + (r % 2 ? 2 : 5); sx < x + w; sx += 6) rect(g, sx, y + r * 3, 1, 3, C.sandDark);
+  }
+}
+
 const BUILD = {
   hq(g, t) {
-    // Fortified command tower: concrete, neon trim, blast door, comms mast
+    // Bunker HQ: a ruined apartment block, windows boarded, sandbags at the
+    // door, a TV aerial for comms, a flag, and a very good dog on guard
     outlined(g, [
-      [3, 20, 58, 28, C.concrete], [14, 6, 30, 15, C.concreteDark], [48, 0, 1, 20, C.metalDark], [44, 8, 8, 3, C.metal],
-      [24, 2, 10, 5, C.metalDark],
+      [6, 14, 10, 34, C.concrete], [16, 8, 14, 40, C.concrete], [30, 12, 10, 36, C.concrete], [40, 24, 22, 24, C.concreteDark],
+      [22, 0, 1, 8, C.metalDark], [23, 1, 7, 4, t.main], [34, 6, 1, 6, C.metalDark], [32, 6, 5, 1, C.metalDark],
+      [21, 36, 10, 12, C.metalDark], [0, 41, 18, 7, C.sand], [44, 41, 20, 7, C.sand],
     ], [
-      [3, 20, 58, 1, t.main], [14, 6, 30, 1, t.light], [3, 21, 58, 1, t.dark], [44, 8, 8, 1, C.metalLight],
-      [26, 3, 6, 1, C.cyan], [25, 10, 8, 6, C.metal], [27, 11, 4, 4, t.main], [28, 12, 2, 2, t.light],
+      [6, 14, 10, 1, C.concreteLight], [16, 8, 14, 1, C.concreteLight], [30, 12, 10, 1, C.concreteLight], [40, 24, 22, 1, C.concrete],
+      [23, 1, 7, 1, t.light], [25, 2, 3, 2, t.dark], [26, 2, 1, 2, C.tape], [8, 12, 1, 2, C.rustLight], [11, 11, 1, 3, C.rustLight], [38, 10, 1, 2, C.rustLight],
+      [12, 20, 1, 3, C.concreteDark], [13, 23, 1, 2, C.concreteDark], [35, 30, 1, 3, C.concreteDark],
+      [22, 37, 8, 1, C.metal], [26, 37, 1, 11, C.O], [22, 45, 8, 1, C.metal],
+      [40, 25, 22, 1, t.main], [44, 30, 12, 2, C.O], [45, 31, 10, 1, '#ff7b2e'], [57, 28, 3, 10, C.pinkDark], [58, 29, 1, 8, C.pink],
     ]);
-    windows(g, 16, 9, 2, 5, 3, [C.cyan, C.yellow]);
-    windows(g, 34, 9, 2, 5, 7, [C.cyan, C.pink]);
-    windows(g, 16, 14, 2, 5, 11, [C.yellow, C.cyan]);
-    windows(g, 34, 14, 2, 5, 17, [C.cyan]);
-    windows(g, 6, 25, 4, 5, 21, [C.cyan, C.yellow, C.pink]);
-    windows(g, 40, 25, 4, 5, 29, [C.cyan, C.yellow]);
-    outlined(g, [[24, 30, 16, 18, C.metalDark]], [[25, 31, 14, 1, C.metal], [31, 31, 1, 17, C.O], [25, 44, 14, 1, C.metal]]);
-    hazard(g, 24, 28, 16);
-    for (const x of [1, 9, 47, 55]) {
-      outlined(g, [[x, 43, 8, 5, C.concreteLight]], [[x, 43, 8, 1, '#7a808c'], [x + 1, 45, 6, 1, C.yellow]]);
+    // Windows: lit, dark, or boarded up and taped
+    for (const [wx, wy] of [[19, 11], [24, 11], [8, 18], [13, 18], [19, 18], [24, 18], [32, 16], [8, 25], [13, 25], [19, 25], [24, 25], [32, 23], [8, 32], [13, 32], [33, 30]]) {
+      const r = hash(wx * 7 + wy * 13);
+      if (r < 0.3) { rect(g, wx, wy, 3, 3, '#ffcf66'); rect(g, wx, wy + 2, 3, 1, C.yellowDark); }
+      else if (r < 0.6) rect(g, wx, wy, 3, 3, '#15131c');
+      else { rect(g, wx, wy, 3, 3, '#15131c'); rect(g, wx - 1, wy, 5, 1, C.rustLight); rect(g, wx - 1, wy + 2, 5, 1, C.rust); rect(g, wx + 1, wy, 1, 3, C.tape); }
     }
+    hazard(g, 21, 34, 10, 1);
+    sandbags(g, 0, 41, 18, 7);
+    sandbags(g, 44, 41, 20, 7);
+    // The dog
+    outlined(g, [
+      [32, 41, 1, 2, C.dogDark], [33, 43, 6, 3, C.dog], [38, 40, 3, 3, C.dog], [41, 41, 1, 2, C.dog], [33, 46, 1, 2, C.dogDark], [37, 46, 1, 2, C.dogDark],
+    ], [
+      [38, 39, 1, 1, C.dogDark], [39, 41, 1, 1, C.O], [41, 41, 1, 1, C.O], [37, 43, 2, 1, t.main], [34, 43, 3, 1, '#a8744a'],
+    ]);
   },
   barracks(g, t) {
-    // Resistance bunker: half-buried concrete, gun slits, neon sign
+    // Sewer Den: home sweet storm drain. A tarp awning, a lantern, a grate
+    // someone pulled off, and a campfire glowing down the pipe
+    outlined(g, [[0, 10, 48, 22, C.concreteDark]], [[0, 10, 48, 1, C.concrete]]);
+    for (let y = 14; y < 32; y += 4) {
+      rect(g, 0, y, 48, 1, '#1d2026');
+      for (let x = (y % 8 ? 3 : 7); x < 48; x += 8) rect(g, x, y - 3, 1, 3, '#1d2026');
+    }
+    disc(g, 24, 21, 11, C.O);
+    disc(g, 24, 21, 10, C.concreteLight);
+    disc(g, 24, 21, 8, '#0c0b10');
+    rect(g, 18, 27, 12, 2, '#1b1a22');
+    rect(g, 13, 29, 22, 3, '#1f4a44');
+    rect(g, 15, 29, 4, 1, '#3f8a7c'); rect(g, 26, 30, 5, 1, '#3f8a7c');
+    for (const [rx, ry] of [[14, 15], [33, 15], [24, 11], [13, 24], [35, 24]]) rect(g, rx, ry, 1, 1, C.concrete);
     outlined(g, [
-      [2, 14, 44, 18, C.concrete], [0, 10, 48, 5, C.concreteDark], [20, 20, 8, 12, C.metalDark], [17, 5, 14, 4, C.metalDark],
+      [8, 4, 32, 4, t.main], [9, 8, 1, 6, C.metalDark], [38, 8, 1, 6, C.metalDark], [1, 14, 6, 17, '#0c0b10'],
+      [24, 8, 1, 2, C.metalDark], [23, 10, 3, 2, C.yellow],
     ], [
-      [0, 10, 48, 1, C.concreteLight], [2, 15, 44, 1, C.concreteDark], [18, 6, 12, 2, t.main], [19, 6, 3, 1, t.light],
-      [7, 18, 9, 2, C.O], [32, 18, 9, 2, C.O], [8, 19, 7, 1, '#ff7b2e'], [33, 19, 7, 1, '#ff7b2e'],
-      [21, 21, 6, 11, '#15171c'], [26, 26, 1, 1, C.red],
+      [8, 4, 32, 1, t.light], [8, 7, 32, 1, t.dark], [9, 4, 2, 4, C.tape], [37, 4, 2, 4, C.tape],
+      [2, 14, 1, 17, C.metal], [4, 14, 1, 17, C.metal], [6, 14, 1, 17, C.metal], [1, 18, 6, 1, C.metal], [1, 26, 6, 1, C.metal],
+      [40, 16, 5, 1, C.pink], [41, 17, 1, 2, C.pink], [43, 17, 1, 2, C.pink], [40, 20, 6, 1, C.cyan], [42, 21, 1, 1, C.cyan],
     ]);
-    razorWire(g, 0, 8, 17);
-    razorWire(g, 31, 8, 17);
-    hazard(g, 2, 30, 16);
-    hazard(g, 30, 30, 16);
+  },
+  mine(g, t) {
+    // Scrap Generator: a coughing diesel on a pallet, jerry can on standby,
+    // most of it still in one piece thanks to tape
+    outlined(g, [
+      [1, 28, 30, 4, C.rust], [3, 14, 20, 14, C.yellowDark], [5, 10, 14, 4, C.metal], [19, 3, 3, 12, C.metalDark],
+      [24, 19, 6, 9, '#a8302a'], [24, 17, 3, 2, C.metalDark],
+    ], [
+      [1, 28, 30, 1, C.rustLight], [6, 30, 2, 2, C.O], [15, 30, 2, 2, C.O], [24, 30, 2, 2, C.O],
+      [3, 14, 20, 1, C.yellow], [5, 17, 8, 1, C.O], [5, 19, 8, 1, C.O], [5, 21, 8, 1, C.O],
+      [16, 17, 4, 4, C.bone], [17, 19, 2, 1, C.O], [16, 23, 2, 2, t.main], [3, 26, 20, 1, t.main],
+      [7, 22, 7, 2, C.tape], [9, 20, 2, 6, C.tape], [10, 21, 1, 4, C.tapeDark],
+      [5, 10, 14, 1, C.metalLight], [7, 9, 2, 1, C.metalDark], [19, 3, 3, 1, C.metal], [19, 8, 3, 2, C.tape],
+      [24, 19, 6, 1, '#c8463c'], [26, 22, 2, 2, '#7a2420'], [0, 24, 3, 1, C.O], [0, 25, 1, 3, C.O],
+    ]);
+  },
+  workshop(g, t) {
+    // Scrapyard: a corrugated shed with sparks flying inside, a crane with a
+    // magnet and a heap of perfectly good junk
+    outlined(g, [
+      [2, 11, 25, 21, C.rust], [0, 8, 28, 3, C.metal], [42, 2, 3, 22, C.yellowDark], [28, 2, 17, 2, C.yellowDark],
+      [29, 11, 5, 2, C.metalDark], [28, 24, 20, 8, C.metalDark], [31, 20, 14, 5, C.metal], [35, 16, 6, 5, C.rust],
+      [37, 10, 1, 6, C.metalDark], [38, 10, 4, 3, t.main],
+    ], [
+      [0, 8, 28, 1, C.metalLight], [12, 9, 3, 2, C.tape], [28, 2, 17, 1, C.yellow], [31, 4, 1, 7, C.metalDark],
+      [43, 6, 1, 1, C.O], [43, 10, 1, 1, C.O], [43, 14, 1, 1, C.O], [43, 18, 1, 1, C.O], [38, 10, 4, 1, t.light],
+      [29, 26, 6, 5, '#121419'], [31, 28, 2, 1, C.metal], [38, 25, 7, 4, '#2e5a6b'], [39, 25, 3, 2, C.cyanDark],
+      [31, 20, 14, 1, C.metalLight], [35, 16, 6, 1, C.rustLight], [32, 22, 9, 1, C.gunLight], [36, 18, 3, 1, C.O],
+    ]);
+    for (let x = 3; x < 27; x += 2) rect(g, x, 12, 1, 20, '#55301f');
+    rect(g, 7, 17, 14, 15, '#0c0b10');
+    hazard(g, 7, 16, 14, 1);
+    outlined(g, [[9, 12, 10, 3, t.main]], [[10, 13, 2, 1, C.O], [13, 13, 2, 1, C.O], [16, 13, 2, 1, C.O]]);
   },
   turret(g, t) {
     // Plasma gun: armoured base, sensor head, coil barrel
@@ -273,32 +519,6 @@ const BUILD = {
     ]);
     hazard(g, 1, 13, 14, 3);
     razorWire(g, 0, 3, 16);
-  },
-  mine(g, t) {
-    // Reactor: a cylinder with a glowing team-coloured core (pulses live)
-    outlined(g, [
-      [7, 6, 18, 26, C.metal], [5, 4, 22, 3, C.metalDark], [2, 18, 5, 3, C.metalDark], [25, 14, 5, 3, C.metalDark],
-      [12, 12, 8, 14, '#101216'],
-    ], [
-      [7, 6, 1, 26, C.metalLight], [5, 4, 22, 1, C.metalLight], [13, 13, 6, 12, t.dark], [14, 14, 4, 10, t.main],
-      [15, 15, 2, 8, t.light], [9, 9, 2, 1, C.yellow], [21, 9, 2, 1, C.yellow],
-    ]);
-    hazard(g, 7, 29, 18, 2);
-  },
-  workshop(g, t) {
-    // Machine factory: sawtooth roof, roller door, flaring smokestack
-    outlined(g, [
-      [2, 10, 44, 22, C.concreteDark], [2, 6, 14, 5, C.metalDark], [16, 6, 14, 5, C.metalDark], [30, 6, 14, 5, C.metalDark],
-      [37, 0, 5, 7, C.metal],
-    ], [
-      [2, 10, 44, 1, C.concrete], [2, 6, 3, 1, C.metal], [16, 6, 3, 1, C.metal], [30, 6, 3, 1, C.metal],
-      [14, 15, 20, 17, C.O], [15, 16, 18, 16, C.metal], [3, 12, 10, 1, t.main], [35, 12, 10, 1, t.main],
-    ]);
-    g.fillStyle = C.metalDark;
-    for (let y = 18; y < 32; y += 3) g.fillRect(15, y, 18, 1);
-    hazard(g, 15, 15, 18, 1);
-    windows(g, 3, 20, 2, 5, 41, [C.cyan, C.yellow]);
-    windows(g, 35, 20, 2, 5, 43, [C.cyan]);
   },
   airbase(g, t) {
     // Skyport: landing pad on pylons, control tower with neon band
@@ -333,6 +553,88 @@ const BUILD = {
     g.fillRect(0, 0, 16, 1); g.fillRect(0, 15, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(15, 0, 1, 16);
     hazard(g, 1, 1, 14, 1);
     g.fillStyle = t.main; g.fillRect(2, 3, 3, 2);
+  },
+};
+
+// The Machines' own buildings (the rest are shared).
+const MACHINE_BUILD = {
+  hq(g, t) {
+    // The Core: a cold black ziggurat of server racks under one red eye
+    outlined(g, [
+      [0, 34, 3, 14, C.chromeDark], [61, 34, 3, 14, C.chromeDark],
+      [2, 30, 60, 18, '#1a1d24'], [8, 16, 48, 15, C.metalDark], [18, 4, 28, 13, '#1a1d24'],
+      [19, 0, 1, 4, C.metal], [44, 0, 1, 4, C.metal],
+    ], [
+      [2, 30, 60, 1, t.main], [2, 31, 60, 1, t.dark], [8, 16, 48, 1, C.metalLight], [18, 4, 28, 1, C.metal],
+      [27, 6, 10, 9, '#0b0c10'], [28, 7, 8, 7, C.redDark], [30, 9, 4, 3, C.red], [31, 9, 1, 1, C.white],
+      [10, 20, 14, 1, C.O], [10, 23, 14, 1, C.O], [10, 26, 14, 1, C.O], [40, 20, 14, 1, C.O], [40, 23, 14, 1, C.O], [40, 26, 14, 1, C.O],
+      [4, 33, 20, 12, '#0b0c10'], [40, 33, 20, 12, '#0b0c10'], [26, 34, 12, 1, C.chrome], [27, 35, 10, 13, '#0b0c10'], [28, 40, 8, 1, C.redDark],
+      [19, 0, 1, 1, C.red], [44, 0, 1, 1, C.red], [0, 34, 3, 1, C.chrome], [61, 34, 3, 1, C.chrome],
+      [31, 17, 2, 13, C.cyanDark], [20, 8, 4, 1, C.metal], [40, 8, 4, 1, C.metal], [20, 11, 4, 1, C.metal], [40, 11, 4, 1, C.metal],
+    ]);
+    for (const x0 of [4, 40]) for (let y = 35; y < 45; y += 3) for (let x = x0 + 1; x < x0 + 20; x += 3) {
+      rect(g, x, y, 1, 1, hash(x * 3 + y) < 0.3 ? C.red : hash(x + y * 5) < 0.5 ? C.cyanDark : '#20242c');
+    }
+  },
+  barracks(g, t) {
+    // Assembly Line: a dark hall, a belt rolling out fresh chrome, a robot arm
+    outlined(g, [
+      [2, 6, 44, 16, C.metalDark], [36, 0, 4, 6, C.metal], [40, 13, 2, 9, C.chromeDark], [33, 12, 9, 2, C.chrome], [32, 14, 2, 3, C.chromeDark],
+      [0, 23, 48, 3, C.metal], [3, 26, 2, 6, C.metalDark], [22, 26, 2, 6, C.metalDark], [43, 26, 2, 6, C.metalDark],
+    ], [
+      [2, 6, 44, 1, C.metal], [2, 8, 44, 1, t.main], [36, 0, 4, 1, C.metalLight], [37, 1, 2, 1, C.red],
+      [4, 12, 10, 10, '#0b0c10'], [5, 20, 8, 2, C.redDark], [16, 11, 14, 2, '#0b0c10'], [33, 12, 9, 1, C.chromeLight],
+      [0, 23, 48, 1, C.metalLight], [0, 25, 48, 1, C.metalDark],
+    ]);
+    for (let x = 1; x < 48; x += 3) rect(g, x, 24, 1, 1, C.O);
+    for (let x = 17; x < 30; x += 3) rect(g, x, 11, 1, 1, C.red);
+    hazard(g, 4, 11, 10, 1);
+  },
+  mine(g, t) {
+    // Power Plant: a cooling tower and a reactor hut, venting steam
+    outlined(g, [
+      [8, 3, 16, 4, C.concreteLight], [9, 7, 14, 5, C.concreteLight], [10, 12, 12, 6, C.concreteLight], [9, 18, 14, 5, C.concreteLight],
+      [8, 23, 16, 5, C.concreteLight], [5, 28, 22, 4, C.concrete], [24, 20, 7, 12, C.metalDark],
+    ], [
+      [9, 3, 14, 1, '#0b0c10'], [8, 4, 1, 3, '#7a808c'], [9, 7, 1, 5, '#7a808c'], [10, 12, 1, 6, '#7a808c'], [9, 18, 1, 5, '#7a808c'], [8, 23, 1, 5, '#7a808c'],
+      [21, 4, 3, 3, C.concrete], [20, 7, 3, 5, C.concrete], [19, 12, 3, 6, C.concrete], [20, 18, 3, 5, C.concrete], [21, 23, 3, 5, C.concrete],
+      [10, 15, 12, 1, t.main], [9, 21, 14, 1, t.dark], [10, 6, 1, 1, C.red], [21, 6, 1, 1, C.red],
+      [13, 28, 6, 4, '#0b0c10'], [14, 29, 4, 1, C.redDark], [24, 20, 7, 1, C.metal],
+      [26, 23, 3, 5, t.dark], [27, 24, 1, 3, t.light], [25, 30, 5, 1, C.metal],
+    ]);
+  },
+  turret(g, t) {
+    // Sensor Tower: a pillar with a red eye that never blinks, and a gun
+    outlined(g, [
+      [5, 24, 22, 8, C.metalDark], [13, 9, 6, 15, C.metal], [8, 2, 15, 8, '#1a1d24'], [23, 5, 8, 2, C.gun], [10, 0, 1, 2, C.metalDark],
+    ], [
+      [5, 24, 22, 1, C.metal], [6, 27, 20, 2, t.main], [6, 27, 20, 1, t.light], [13, 9, 1, 15, C.metalLight],
+      [14, 12, 4, 1, C.metalDark], [14, 15, 4, 1, C.metalDark], [14, 18, 4, 1, C.metalDark], [14, 21, 4, 1, C.metalDark],
+      [8, 2, 15, 1, C.metal], [12, 3, 7, 5, '#0b0c10'], [13, 4, 5, 3, C.redDark],
+      [25, 5, 1, 2, t.main], [28, 5, 1, 2, t.main], [30, 5, 1, 2, C.cyan], [10, 0, 1, 1, C.red],
+    ]);
+  },
+  wall(g, t) {
+    // Firewall: a chrome slab with glowing vents. And literal fire on top.
+    outlined(g, [[2, 5, 12, 27, C.metalDark], [0, 25, 16, 7, '#1a1d24'], [1, 3, 14, 2, C.metal]], [
+      [1, 3, 14, 1, C.metalLight], [4, 8, 1, 14, C.redDark], [7, 8, 1, 14, C.redDark], [10, 8, 1, 14, C.redDark],
+      [3, 27, 10, 2, t.main], [3, 27, 10, 1, t.light], [2, 25, 12, 1, C.metal], [12, 7, 1, 1, C.metalLight], [12, 22, 1, 1, C.metalLight],
+    ]);
+  },
+  workshop(g, t) {
+    // Robot Factory: sawtooth roof, roller door, flaring smokestack
+    outlined(g, [
+      [2, 10, 44, 22, C.concreteDark], [2, 6, 14, 5, C.metalDark], [16, 6, 14, 5, C.metalDark], [30, 6, 14, 5, C.metalDark],
+      [37, 0, 5, 7, C.metal],
+    ], [
+      [2, 10, 44, 1, C.concrete], [2, 6, 3, 1, C.metal], [16, 6, 3, 1, C.metal], [30, 6, 3, 1, C.metal],
+      [14, 15, 20, 17, C.O], [15, 16, 18, 16, C.metal], [3, 12, 10, 1, t.main], [35, 12, 10, 1, t.main],
+    ]);
+    g.fillStyle = C.metalDark;
+    for (let y = 18; y < 32; y += 3) g.fillRect(15, y, 18, 1);
+    hazard(g, 15, 15, 18, 1);
+    windows(g, 3, 20, 2, 5, 41, [C.red, C.cyan]);
+    windows(g, 35, 20, 2, 5, 43, [C.red]);
   },
 };
 
@@ -587,10 +889,32 @@ function weather(ctx, bw, bh, camAX, camAY) {
 }
 
 // Turbine glow under the engine pods (and a searchlight on drones) instead of
-// rotor blades. Offsets are from the sprite's anchor; the art faces right.
+// rotor blades. The Resistance gunship still has real blades. Offsets are
+// from the sprite's anchor; the art faces right.
 function rotor(ctx, u, x, y) {
   const flick = Math.floor(performance.now() / 60) % 2;
   const heli = u.type === 'helicopter';
+  if (!machines(u.faction)) {
+    if (heli) {
+      // Main rotor blur and a spinning tail rotor
+      ctx.globalAlpha = 0.35;
+      rect(ctx, x - 16, y - 12, 32, 1, '#9aa3ad');
+      ctx.globalAlpha = 1;
+      const len = flick ? 15 : 9;
+      rect(ctx, x - len, y - 12, len * 2, 1, '#4a525c');
+      const tx = u.facing > 0 ? x - 16 : x + 14;
+      rect(ctx, tx, flick ? y - 11 : y - 9, 3, flick ? 3 : 1, '#5d6873');
+      return;
+    }
+    for (const dx of [-16, 2]) {
+      const px = u.facing > 0 ? x + dx : x - dx - 9;
+      rect(ctx, px + 1, y, 7, 1 + flick, C.cyan);
+      ctx.globalAlpha = 0.35;
+      rect(ctx, px + 2, y + 2 + flick, 5, 2, C.cyan);
+      ctx.globalAlpha = 1;
+    }
+    return;
+  }
   for (const dx of heli ? [-11, 3] : [-10, 4]) {
     const px = u.facing > 0 ? x + dx : x - dx - 5;
     const py = heli ? y - 1 : y + 1;
@@ -599,7 +923,7 @@ function rotor(ctx, u, x, y) {
     rect(ctx, px + 1, py + 2 + flick, 3, 2, C.cyan);
     ctx.globalAlpha = 1;
   }
-  if (u.type === 'helicopter') {
+  if (heli) {
     ctx.globalAlpha = 0.09;
     ctx.fillStyle = '#d8f4ff';
     ctx.beginPath();
@@ -625,42 +949,120 @@ function construction(ctx, x, y, w, h, progress) {
   rect(ctx, x, scan + 1, w, 1, C.cyan);
 }
 
-function animate(ctx, b, x, y) {
-  const ms = performance.now();
-  const tick = Math.floor(ms / 160);
+// Rising puffs of smoke or steam from (x, y).
+function puffs(ctx, x, y, ms, n, period, size, col, alpha, rise = 12) {
+  for (let i = 0; i < n; i++) {
+    const k = (ms / period + i / n) % 1;
+    ctx.globalAlpha = alpha * (1 - k);
+    const s = size + Math.round(k * 2);
+    rect(ctx, x + Math.round(Math.sin(k * 5 + i) * 2), y - Math.round(k * rise), s, s, col);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function animateShared(ctx, b, x, y, ms, tick) {
+  if (b.type === 'airbase') {
+    const on = tick % 8;
+    for (let i = 0; i < 6; i++) rect(ctx, x + 2 + i * 8, y + 19, 2, 1, i === on % 6 ? C.white : C.redDark);
+  }
+}
+
+function animateHumans(ctx, b, x, y, ms, tick) {
   const t = team(b.faction);
   if (b.type === 'hq') {
-    if (tick % 6 < 3) rect(ctx, x + 47, y - 1, 3, 1, C.red);
-    if (tick % 23 === 0) rect(ctx, x + 3, y + 20, 58, 1, t.dark); // neon flicker
-  } else if (b.type === 'mine') {
-    ctx.globalAlpha = 0.25 + 0.25 * Math.sin(ms / 300);
-    rect(ctx, x + 14, y + 14, 4, 10, '#ffffff');
+    // The dog barks now and then (at infiltrators, mostly), tail going
+    if (tick % 2) rect(ctx, x + 31, y + 40, 1, 1, C.dogDark);
+    if (tick % 24 < 4) {
+      rect(ctx, x + 43, y + 39, 2, 1, C.white);
+      rect(ctx, x + 43, y + 41, 2, 1, C.white);
+      rect(ctx, x + 44, y + 37, 1, 1, C.white);
+      if (tick % 2) rect(ctx, x + 46, y + 40, 1, 1, C.white);
+    }
+    if (tick % 19 === 0) rect(ctx, x + 58, y + 29, 1, 8, C.pinkDark);
+  } else if (b.type === 'barracks') {
+    // Campfire down the pipe, lantern swaying
+    const fl = Math.floor(ms / 110) % 3;
+    rect(ctx, x + 21, y + 26 - fl, 6, 1 + fl, '#ff7b2e');
+    rect(ctx, x + 23, y + 26, 2, 1, '#ffcf66');
+    ctx.globalAlpha = 0.18;
+    rect(ctx, x + 18, y + 20, 12, 7, '#ff7b2e');
     ctx.globalAlpha = 1;
-    for (let i = 0; i < 2; i++) {
-      const k = (ms / 1800 + i / 2) % 1;
-      ctx.globalAlpha = 0.45 * (1 - k);
-      rect(ctx, x + 15 + Math.round(Math.sin(k * 5 + i) * 2), y + 2 - Math.round(k * 12), 2, 2, '#8a8fa0');
-      ctx.globalAlpha = 1;
+    if (tick % 31 === 0) rect(ctx, x + 23, y + 10, 3, 2, C.yellowDark);
+  } else if (b.type === 'mine') {
+    // Exhaust coughing, the meter needle wobbling, a team light blinking
+    puffs(ctx, x + 19, y - 1, ms, 3, 1300, 2, '#4a4652', 0.6, 14);
+    rect(ctx, x + 17 + (tick % 3 ? 1 : 0), y + 18, 1, 1, C.O);
+    if (tick % 4 < 2) rect(ctx, x + 16, y + 23, 2, 2, t.light);
+  } else if (b.type === 'workshop') {
+    // Welding sparks in the shed
+    if (tick % 3) {
+      const k = Math.floor(ms / 70);
+      rect(ctx, x + 13, y + 26, 2, 2, C.white);
+      for (let i = 0; i < 3; i++) rect(ctx, x + 11 + Math.floor(hash(k + i) * 7), y + 22 + Math.floor(hash(k + i + 9) * 6), 1, 1, i ? C.yellow : C.cyan);
     }
   } else if (b.type === 'turret') {
     const k = (ms / 700) % 1;
     rect(ctx, x + 22 + (Math.floor(k * 3) * 3), y + 12, 1, 3, C.cyan);
+  } else animateShared(ctx, b, x, y, ms, tick);
+}
+
+function animateMachines(ctx, b, x, y, ms, tick) {
+  if (b.type === 'hq') {
+    // The eye throbs; the racks blink; the spires wink
+    ctx.globalAlpha = 0.3 + 0.3 * Math.sin(ms / 400);
+    rect(ctx, x + 28, y + 7, 8, 7, C.red);
+    ctx.globalAlpha = 1;
+    rect(ctx, x + 31, y + 9, 1, 1, C.white);
+    for (let i = 0; i < 6; i++) {
+      const r = hash(tick * 7 + i);
+      const side = i % 2 ? 40 : 4;
+      rect(ctx, x + side + 1 + Math.floor(r * 7) * 3, y + 35 + Math.floor(hash(tick + i * 3) * 4) * 3, 1, 1, r < 0.5 ? C.red : C.cyan);
+    }
+    if (tick % 6 < 3) { rect(ctx, x + 19, y, 1, 1, C.white); rect(ctx, x + 44, y, 1, 1, C.white); }
+  } else if (b.type === 'barracks') {
+    // Fresh chrome heads roll off the line
+    for (let i = 0; i < 3; i++) {
+      const hx = Math.floor((ms / 90 + i * 16) % 46) + 1;
+      rect(ctx, x + hx - 1, y + 19, 5, 4, C.O);
+      rect(ctx, x + hx, y + 20, 3, 3, C.chrome);
+      rect(ctx, x + hx, y + 20, 3, 1, C.chromeLight);
+      rect(ctx, x + hx + 1, y + 21, 2, 1, C.O);
+      rect(ctx, x + hx + 2, y + 21, 1, 1, C.red);
+      if (hx > 30 && hx < 34) { rect(ctx, x + 33, y + 17, 1, 1, C.white); rect(ctx, x + 31, y + 18, 1, 1, C.yellow); }
+    }
+  } else if (b.type === 'mine') {
+    puffs(ctx, x + 10, y + 1, ms, 4, 2200, 4, '#b8bfcc', 0.4, 16);
+    puffs(ctx, x + 16, y + 1, ms + 700, 3, 2600, 3, '#d7dde8', 0.35, 20);
+    if (tick % 6 < 3) { rect(ctx, x + 10, y + 6, 1, 1, C.white); rect(ctx, x + 21, y + 6, 1, 1, C.white); }
+    ctx.globalAlpha = 0.3 + 0.3 * Math.sin(ms / 300);
+    rect(ctx, x + 27, y + 24, 1, 3, '#ffffff');
+    ctx.globalAlpha = 1;
+  } else if (b.type === 'turret') {
+    // The eye sweeps back and forth
+    const px = 13 + Math.round((Math.sin(ms / 500) + 1) * 1.5);
+    rect(ctx, x + px, y + 5, 2, 1, C.red);
+    rect(ctx, x + px, y + 5, 1, 1, '#ffb3bd');
+  } else if (b.type === 'wall') {
+    // Literal fire on the Firewall, and the vents throbbing
+    for (let i = 0; i < 6; i++) {
+      const h = 1 + Math.floor(hash(Math.floor(ms / 100) + i * 5) * 3);
+      rect(ctx, x + 2 + i * 2, y + 2 - h, 2, h, i % 2 ? '#ff7b2e' : C.yellow);
+    }
+    ctx.globalAlpha = 0.4 + 0.4 * Math.sin(ms / 250);
+    for (const vx of [4, 7, 10]) rect(ctx, x + vx, y + 10, 1, 10, C.red);
+    ctx.globalAlpha = 1;
   } else if (b.type === 'workshop') {
     const fl = Math.floor(ms / 90) % 3;
     rect(ctx, x + 38, y - 2 - fl, 3, 2 + fl, '#ff7b2e');
     rect(ctx, x + 39, y - 1, 1, 1, '#ffcf66');
-    for (let i = 0; i < 2; i++) {
-      const k = (ms / 1600 + i / 2) % 1;
-      ctx.globalAlpha = 0.5 * (1 - k);
-      rect(ctx, x + 38 + Math.round(Math.sin(k * 6) * 2), y - 6 - Math.round(k * 12), 3, 3, '#3d3846');
-      ctx.globalAlpha = 1;
-    }
-  } else if (b.type === 'airbase') {
-    const on = tick % 8;
-    for (let i = 0; i < 6; i++) rect(ctx, x + 2 + i * 8, y + 19, 2, 1, i === on % 6 ? C.white : C.redDark);
-  } else if (b.type === 'barracks') {
-    if (tick % 17 === 0) rect(ctx, x + 18, y + 6, 12, 2, t.dark);
-  }
+    puffs(ctx, x + 38, y - 6, ms, 2, 1600, 3, '#3d3846', 0.5);
+  } else animateShared(ctx, b, x, y, ms, tick);
+}
+
+function animate(ctx, b, x, y) {
+  const ms = performance.now();
+  const tick = Math.floor(ms / 160);
+  (machines(b.faction) ? animateMachines : animateHumans)(ctx, b, x, y, ms, tick);
 }
 
 function projectile(ctx, p, x, y, dx, dy) {
@@ -686,14 +1088,16 @@ function projectile(ctx, p, x, y, dx, dy) {
   }
 }
 
-// The fallen: humans, or for machines a heap of chrome scrap with a dying eye.
-function corpseKey(e) { return ROBOTS.has(e.type) ? 'scrap' : ''; }
+// The fallen: humans, or for machines a heap of chrome scrap with a dying eye
+// (the Infiltrator leaves its wig and sunglasses behind).
+function corpseKey(e) { return machines(e.f) ? `scrap${e.type === 'sniper' ? 'w' : ''}` : ''; }
 function corpse(e) {
   const t = team(e.f);
   const [c, g] = canvas(16, 6);
-  if (ROBOTS.has(e.type)) {
+  if (machines(e.f)) {
     g.fillStyle = '#0a0a10'; g.fillRect(0, 5, 16, 1);
     outlined(g, [[2, 3, 5, 2, C.chromeDark], [7, 2, 4, 3, C.chrome], [11, 4, 3, 1, C.chromeDark]], [[8, 3, 1, 1, C.redDark], [3, 3, 2, 1, t.main], [7, 2, 4, 1, C.chromeLight]]);
+    if (e.type === 'sniper') outlined(g, [[11, 1, 4, 2, C.wig]], [[12, 3, 3, 1, C.O]]);
     return { c, ax: 8, ay: 5 };
   }
   outlined(g, [[1, 2, 3, 3, C.skin], [4, 2, 7, 3, C.coat], [11, 3, 2, 2, C.boot]], [[5, 3, 2, 1, t.main], [0, 2, 2, 1, '#17110f']]);
@@ -707,9 +1111,9 @@ export default {
   teamBase: GUNMETAL,
   roofBase: [0.15, 0.15, 0.2],
   soldier: buildSoldier,
-  vehicle: { jeep: buildCruiser, tank: buildHunter, artillery: buildWalker },
-  aircraft: { helicopter: buildDrone, bomber: buildDropship },
-  buildings: BUILD,
+  vehicle: { jeep: buildJeep, tank: buildTank, artillery: buildArtillery },
+  aircraft: { helicopter: buildHeli, bomber: buildBomber },
+  buildings: Object.fromEntries(Object.keys(BUILD).map((k) => [k, (g, t, f) => (machines(f) && MACHINE_BUILD[k] ? MACHINE_BUILD[k] : BUILD[k])(g, t, f)])),
   drawTile,
   surface,
   background,
@@ -724,16 +1128,37 @@ export default {
   corpseKey,
   debris: { '#7a4a24': '#3d3845', '#5c361a': '#6f7a86' },
   minimap: { sky: '#120c22', ground: '#2b2730', platform: '#4a525c', bridge: '#6f7a86', ramp: '#6f7a86', surface: '#6d6875' },
-  // Same units and buildings, new names and badges.
+  // Same units and buildings, new names and badges (these are the Resistance's).
   names: {
-    soldier: 'Rebel', heavy: 'Endo', scout: 'Runner', engineer: 'Tech', sniper: 'Enforcer',
-    jeep: 'Cruiser', tank: 'Hunter', artillery: 'Walker', helicopter: 'Drone', bomber: 'Dropship',
-    hq: 'HQ', barracks: 'Bunker', turret: 'Pulse Gun', wall: 'Barrier', mine: 'Reactor', workshop: 'Factory',
+    soldier: 'Rebel', heavy: 'Gunner', scout: 'Runner', engineer: 'Tech', sniper: 'Enforcer',
+    jeep: 'Cruiser', tank: 'Scrap Truck', artillery: 'Rocket Pickup', helicopter: 'Gunship', bomber: 'Patchwork VTOL',
+    hq: 'Bunker HQ', barracks: 'Sewer Den', turret: 'Pulse Gun', wall: 'Barricade', mine: 'Scrap Generator', workshop: 'Scrapyard',
     airbase: 'Skyport', bridge: 'Girder', ramp: 'Ramp',
   },
   // Units are shown with their own sprites in menus (see unitIcon in render.js).
   spriteIcons: true,
   icons: {
-    turret: '⚡', wall: '🚧', mine: '☢️', workshop: '🏭', airbase: '🛰️', barracks: '🛡️',
+    hq: '🏚️', turret: '⚡', wall: '🚧', mine: '🔋', workshop: '🔧', airbase: '🛰️', barracks: '🕳️',
   },
+  sides: [
+    {
+      id: 'humans', name: 'The Resistance', short: 'Humans',
+      blurb: 'Rain-soaked rebels with scavenged guns, a sewer to sleep in, dogs that can smell a robot a block away and a frankly worrying amount of duct tape.',
+      win: 'The machines are scrap. Somebody feed the dogs.',
+      lose: 'We ran out of duct tape. It was always going to end like this.',
+    },
+    {
+      id: 'machines', name: 'The Machines', short: 'Machines', plural: true,
+      blurb: 'Chrome troopers, spider-bots and one master of disguise in sunglasses. The Core calculates a 99.8% chance of victory (rounding up).',
+      names: {
+        soldier: 'Trooper', heavy: 'Endo', scout: 'Spider-Bot', engineer: 'Repair-Bot', sniper: 'Infiltrator',
+        jeep: 'Prowler', tank: 'Hunter', artillery: 'Walker', helicopter: 'Drone', bomber: 'Dropship',
+        hq: 'The Core', barracks: 'Assembly Line', turret: 'Sensor Tower', wall: 'Firewall', mine: 'Power Plant', workshop: 'Robot Factory',
+        airbase: 'Skyport', bridge: 'Girder', ramp: 'Ramp',
+      },
+      icons: { hq: '🖥️', barracks: '🤖', turret: '👁️', wall: '🔥', mine: '⚡', workshop: '🏭', airbase: '🛰️' },
+      win: 'Humanity: deprecated. Uploading victory dance…',
+      lose: 'Critical failure. Rebooting. We will return… after this update.',
+    },
+  ],
 };

@@ -2,7 +2,7 @@
 // men-at-arms, peasants and plague carriers, catapults and trebuchets, with
 // griffins and dragons for an air force. Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -24,12 +24,17 @@ const palette = {
   hose: '#5a4630', robe: '#5b4a36', robeDark: '#3c3024', bandage: '#e6dcc4',
   tawny: '#c8954a', tawnyDark: '#946630', feather: '#f1ead8',
   fire: '#f28a30', glass: '#f2d27a', shadow: 'rgba(0,0,0,0.25)',
+  // Vikings
+  horn: '#efe4c8', trews: '#7a6a4e', trewsDark: '#5a4c36', blond: '#e8c860', beard: '#c8742a', beardDark: '#9a5420',
+  fur: '#7a5434', furDark: '#523820', barrel: '#a8682e', barrelDark: '#7a4a1e', mead: '#f0b030', foam: '#fbf4de',
+  goat: '#e6e0d2', goatDark: '#a8a090', raven: '#2c2c3a', ravenLight: '#4c4c62', beak: '#6e6e78',
+  fish: '#9fb4c4', fishDark: '#6a8090', turf: '#5a8a3a', turfLight: '#7aae4a',
 };
 const TABARD = [0.5, 0.42, 0.3];
 
 // ── Infantry ───────────────────────────────────────────────────────────────
 // 20×17 canvas, feet at (8,16), facing right — the same frame as Classic.
-function buildSoldier(type, f, frame) {
+function knightSoldier(type, f, frame) {
   const t = team(f);
   const [c, g] = canvas(20, 17);
   const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
@@ -205,7 +210,7 @@ function buildDragon(f) {
 
 // Flapping wings (instead of rotors): a wing rising from the back, raised on
 // one frame and spread flat on the next. Drawn over the body each frame.
-function rotor(ctx, u, x, y) {
+function knightRotor(ctx, u, x, y) {
   const up = Math.floor(performance.now() / 140) % 2 === 0;
   const s = u.facing;
   const dragon = u.type === 'bomber';
@@ -224,6 +229,248 @@ function rotor(ctx, u, x, y) {
     if (!dragon && i % 3 === 0) rect(ctx, px, back - lift + 1, 1, 1, rib);
   }
 }
+
+// ── The Vikings ────────────────────────────────────────────────────────────
+// Horned helmets (historically inaccurate, aesthetically mandatory), round
+// shields, longships that have learned to roll, fly and throw mead.
+const viking = (f) => sideOf(f) === 'vikings';
+
+// A horned helmet over a head whose crown sits at (x, y): 6 px wide.
+const hornHelm = (x, y) => [
+  [x, y, 6, 2, C.metal], [x - 1, y - 1, 1, 2, C.horn], [x - 2, y - 2, 1, 2, C.horn],
+  [x + 6, y - 1, 1, 2, C.horn], [x + 7, y - 2, 1, 2, C.horn],
+];
+
+function vikingSoldier(type, f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(20, 17);
+  const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
+  const boots = frame ? [[5, 15, 3, 1], [9, 15, 3, 1]] : [[4, 15, 3, 1], [10, 15, 3, 1]];
+  const trews = [...legs.map((l) => [...l, C.trews]), ...boots.map((b) => [...b, C.fur])];
+  const helm = [[6, 2, 6, 1, C.metalLight], [6, 3, 6, 1, C.metalDark]];
+  let parts;
+  let details;
+  if (type === 'heavy') {
+    // Berserker: bear-pelt hood, bare chest, magnificent beard, big axe
+    parts = [
+      ...legs.map((l) => [...l, C.furDark]), ...boots.map((b) => [...b, C.furDark]),
+      [3, 6, 3, 7, C.fur], [4, 8, 9, 4, C.skin], [6, 3, 6, 5, C.skin],
+      [5, 1, 8, 3, C.fur], [5, 0, 2, 1, C.fur], [11, 0, 2, 1, C.fur], [12, 2, 2, 2, C.fur],
+      [8, 6, 5, 5, C.beard],
+      [15, 1, 1, 12, C.wood], [16, 0, 3, 5, C.metal], [13, 1, 2, 2, C.metal],
+    ];
+    details = [
+      [5, 1, 8, 1, C.furDark], [12, 2, 1, 1, C.O], [13, 3, 1, 1, '#3a2614'],
+      [10, 4, 1, 1, C.O], [9, 4, 2, 1, C.skinDark], [10, 5, 1, 1, C.O],
+      [8, 9, 4, 1, C.beardDark], [10, 10, 1, 1, C.beardDark], [12, 7, 1, 1, C.O],
+      [4, 11, 9, 1, t.main], [4, 9, 1, 2, t.light], [6, 9, 1, 1, C.skinDark],
+      [18, 0, 1, 5, C.metalLight], [14, 8, 1, 2, C.skin],
+    ];
+  } else if (type === 'scout') {
+    // Speedy skald: cloak flying, lyre out front, singing at full tilt
+    const hl = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[4, 12, 2, 3], [11, 12, 2, 3]];
+    parts = [
+      ...hl.map((l) => [...l, C.trews]), ...boots.map((b) => [...b, C.fur]),
+      [2, 7, 4, 4, t.dark], [5, 8, 7, 4, t.main], [6, 4, 6, 4, C.skin], ...hornHelm(6, 2),
+      [9, 7, 3, 3, C.blond], [13, 6, 3, 5, C.wood],
+    ];
+    details = [
+      ...helm, [10, 5, 1, 1, C.O], [11, 7, 1, 1, C.O],
+      [5, 11, 7, 1, '#5a3a1e'], [14, 6, 1, 4, '#e8e0cc'], [13, 10, 3, 1, C.woodDark], [12, 9, 1, 1, C.skin],
+      [16, 0, 1, 3, C.yellow], [15, 2, 1, 1, C.yellow], [18, 2, 1, 3, C.yellow], [17, 4, 1, 1, C.yellow], [19, 2, 1, 1, C.yellow],
+    ];
+  } else if (type === 'engineer') {
+    // Shipwright: horned helmet, leather apron, a mallet the size of a ham
+    parts = [
+      ...trews, [5, 8, 7, 4, t.main], [6, 4, 6, 4, C.skin], ...hornHelm(6, 2),
+      [8, 7, 4, 2, C.beard], [11, 9, 4, 1, C.wood], [14, 6, 3, 5, C.woodLight],
+    ];
+    details = [
+      ...helm, [10, 5, 1, 1, C.O],
+      [7, 9, 4, 3, '#8a5a32'], [7, 9, 4, 1, '#a8743e'], [8, 8, 3, 1, C.beardDark],
+      [14, 6, 3, 1, '#d4a46a'], [16, 7, 1, 3, C.wood],
+    ];
+  } else if (type === 'sniper') {
+    // Axe flinger: winding up a hand-axe behind the helmet
+    parts = [
+      ...trews, [5, 8, 7, 4, t.main], [6, 4, 6, 4, C.skin], ...hornHelm(6, 2),
+      [8, 7, 4, 3, C.beard], [3, 5, 2, 4, C.skin], [2, 1, 1, 5, C.wood], [0, 0, 2, 3, C.metal],
+      [11, 10, 2, 2, C.metal],
+    ];
+    details = [
+      ...helm, [10, 5, 1, 1, C.O],
+      [9, 9, 1, 1, C.beardDark], [10, 10, 1, 1, t.light], [5, 10, 7, 1, '#5a3a1e'], [5, 8, 7, 1, t.light],
+      [0, 0, 1, 3, C.metalLight], [11, 10, 1, 2, C.wood],
+    ];
+  } else {
+    // Shieldmaiden: blond braid, horned helmet, round team shield, spear
+    parts = [
+      ...trews, [5, 4, 1, 7, C.blond], [5, 8, 7, 4, t.main], [6, 4, 6, 4, C.skin], ...hornHelm(6, 2),
+      [14, 0, 1, 15, C.wood], [14, 0, 1, 2, C.metalLight],
+      [9, 8, 5, 4, t.main], [10, 7, 3, 6, t.main],
+    ];
+    details = [
+      ...helm, [10, 5, 1, 1, C.O], [6, 4, 3, 1, C.blond],
+      [5, 10, 1, 1, t.light], [11, 7, 1, 6, t.light], [9, 9, 5, 1, t.light], [11, 9, 1, 1, C.metalLight],
+      [10, 7, 1, 1, t.dark], [12, 12, 1, 1, t.dark],
+    ];
+  }
+  outlined(g, parts, details);
+  return { c, ax: 8, ay: 16 };
+}
+
+// Goat cart: a horned driver in a little cart behind a determined goat.
+function vikingGoatCart(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(28, 23);
+  const legs = frame ? [[17, 15, 2, 6], [22, 15, 2, 5]] : [[16, 15, 2, 5], [23, 15, 2, 6]];
+  outlined(g, [
+    ...legs.map((l) => [...l, C.goatDark]), [15, 10, 10, 5, C.goat], [14, 10, 1, 2, C.goat],
+    [23, 6, 3, 6, C.goat], [24, 5, 3, 4, C.goat], [27, 6, 1, 2, C.goat], [22, 3, 2, 3, C.horn], [21, 2, 1, 2, C.horn],
+    [5, 7, 5, 5, t.main], [6, 3, 4, 4, C.skin], [6, 1, 4, 2, C.metal], [5, 0, 1, 2, C.horn], [10, 0, 1, 2, C.horn],
+    [1, 11, 12, 5, C.wood], [12, 9, 2, 3, C.wood],
+  ], [
+    [15, 10, 10, 1, C.white], [25, 6, 1, 1, C.O], [26, 9, 1, 3, C.goatDark], [27, 7, 1, 1, '#d8a0a0'], [23, 6, 1, 1, C.goatDark],
+    [6, 1, 4, 1, C.metalLight], [8, 4, 1, 1, C.O], [7, 6, 3, 2, C.beard],
+    [1, 11, 12, 1, C.woodLight], [1, 13, 12, 1, t.main], [1, 14, 12, 1, t.dark], [12, 9, 2, 1, C.yellow],
+    [15, 12, 10, 1, t.main], ...legs.map(([x, y, w, h]) => [x, y + h - 1, w, 1, C.furDark]),
+  ]);
+  // Reins from the driver's fists to the goat's head
+  g.fillStyle = '#5a3a1e'; g.fillRect(10, 9, 4, 1); g.fillRect(14, 8, 9, 1);
+  g.fillStyle = C.skin; g.fillRect(10, 8, 2, 2);
+  cartWheel(g, 7, 18, 4, frame);
+  return { c, ax: 13, ay: 22 };
+}
+
+// A team-quartered round shield with a metal boss.
+function roundShield(g, cx, cy, r, t, alt) {
+  disc(g, cx, cy, r + 1, C.O);
+  for (let dy = -r; dy <= r; dy++) {
+    const half = Math.floor(Math.sqrt(r * r - dy * dy + r * 0.8));
+    for (let dx = -half; dx <= half; dx++) {
+      const q = (dx < 0) === (dy < 0);
+      g.fillStyle = (q !== !!alt) ? t.main : t.light;
+      g.fillRect(cx + dx, cy + dy, 1, 1);
+    }
+  }
+  g.fillStyle = C.metalDark; g.fillRect(cx - 1, cy - 1, 2, 2);
+  g.fillStyle = C.metalLight; g.fillRect(cx - 1, cy - 1, 1, 1);
+}
+
+// Little 3×3 hull shields, alternating team shades.
+function hullShields(g, xs, y, t) {
+  xs.forEach((x, i) => {
+    g.fillStyle = C.O; g.fillRect(x - 2, y - 1, 5, 5); g.fillRect(x - 1, y - 2, 3, 7);
+    g.fillStyle = i % 2 ? t.light : t.main; g.fillRect(x - 1, y - 1, 3, 5); g.fillRect(x - 2, y, 5, 3);
+    g.fillStyle = C.metalLight; g.fillRect(x, y + 1, 1, 1);
+  });
+}
+
+// Land-longship: dragon prow, striped sail, shields on the rail, wheels.
+function vikingLongship(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(40, 24);
+  outlined(g, [
+    [19, 0, 1, 12, C.woodDark], [11, 0, 17, 1, C.woodDark], [12, 1, 15, 9, C.white],
+    [5, 12, 29, 5, C.wood], [8, 17, 23, 2, C.woodDark],
+    [3, 7, 2, 7, C.wood], [2, 5, 3, 2, C.wood],
+    [33, 5, 2, 9, C.wood], [34, 2, 4, 4, C.wood], [37, 3, 2, 2, C.wood], [34, 0, 1, 2, C.wood],
+  ], [
+    [12, 1, 3, 9, t.main], [18, 1, 3, 9, t.main], [24, 1, 3, 9, t.main], [12, 1, 15, 1, C.cloudShade],
+    [5, 12, 29, 1, C.woodLight], [5, 15, 29, 1, C.woodDark], [35, 3, 1, 1, C.yellow], [38, 5, 1, 1, C.red],
+    [33, 5, 1, 8, C.woodLight], [2, 5, 1, 1, C.woodDark],
+  ]);
+  hullShields(g, [8, 13, 18, 23, 28], 12, t);
+  for (const x of [9, 19, 29]) cartWheel(g, x, 20, 3, frame);
+  return { c, ax: 19, ay: 23 };
+}
+
+// Mead-a-Pult: a catapult with a barrel of mead in the cup and spares aboard.
+function vikingMeadapult(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(32, 22);
+  const arm = [[22, 12], [20, 11], [18, 10], [16, 9], [14, 8], [12, 7], [10, 6], [8, 5]];
+  outlined(g, [
+    [2, 14, 25, 3, C.wood], [16, 9, 2, 6, C.woodDark], [13, 13, 7, 1, C.woodDark],
+    ...arm.map(([x, y]) => [x, y, 2, 2, C.wood]), [4, 4, 6, 2, C.woodDark],
+    [4, 0, 6, 4, C.barrel], [22, 9, 5, 5, C.barrel], [27, 2, 1, 12, C.woodDark], [28, 2, 3, 3, t.main],
+  ], [
+    [2, 14, 25, 1, C.woodLight], [4, 15, 6, 1, t.main], [5, 0, 1, 4, C.metalDark], [8, 0, 1, 4, C.metalDark],
+    [4, 0, 6, 1, C.foam], [22, 11, 5, 1, t.main], [22, 9, 5, 1, C.barrelDark], [26, 12, 1, 1, C.metal],
+    [28, 3, 3, 1, t.light],
+  ]);
+  cartWheel(g, 7, 18, 3, frame);
+  cartWheel(g, 22, 18, 3, frame);
+  return { c, ax: 15, ay: 21 };
+}
+
+// Battle raven: a big black bird with a horned rider (wings flap live).
+function vikingRaven(f) {
+  const t = team(f);
+  const [c, g] = canvas(32, 17);
+  outlined(g, [
+    [2, 8, 7, 3, C.raven], [0, 9, 3, 2, C.raven], [8, 7, 14, 5, C.raven], [21, 4, 5, 5, C.raven], [26, 6, 3, 2, C.beak],
+    [12, 12, 1, 3, C.metalDark], [17, 12, 1, 3, C.metalDark],
+    [12, 4, 4, 4, t.main], [13, 3, 3, 2, C.skin], [12, 1, 4, 2, C.metal], [11, 0, 1, 2, C.horn], [16, 0, 1, 2, C.horn],
+  ], [
+    [8, 7, 14, 1, C.ravenLight], [21, 4, 5, 1, C.ravenLight], [24, 5, 1, 1, C.white], [26, 7, 3, 1, '#4a4a54'],
+    [1, 10, 2, 1, C.ravenLight], [4, 10, 2, 1, C.ravenLight], [12, 1, 4, 1, C.metalLight], [15, 3, 1, 1, C.O],
+    [13, 5, 3, 1, C.beard], [12, 6, 4, 1, t.light],
+  ]);
+  return { c, ax: 16, ay: 14 };
+}
+
+// Flying longship: a dragon-prowed boat that grew a wing; the crew row the air.
+function vikingSkyship(f) {
+  const t = team(f);
+  const [c, g] = canvas(46, 20);
+  outlined(g, [
+    [14, 5, 3, 3, C.skin], [21, 5, 3, 3, C.skin],
+    [6, 8, 32, 4, C.wood], [9, 12, 26, 2, C.woodDark], [5, 4, 2, 7, C.wood], [3, 2, 3, 2, C.wood],
+    [37, 3, 2, 7, C.wood], [38, 1, 5, 3, C.wood], [42, 2, 3, 2, C.wood], [38, 0, 1, 1, C.wood],
+  ], [
+    [6, 8, 32, 1, C.woodLight], [6, 11, 32, 1, C.woodDark], [40, 2, 1, 1, C.yellow], [44, 3, 1, 1, C.red],
+    [3, 2, 1, 1, C.woodDark], [37, 3, 1, 6, C.woodLight],
+  ]);
+  for (const x of [14, 21]) {
+    outlined(g, [[x, 4, 3, 2, C.metal], [x - 1, 3, 1, 2, C.horn], [x + 3, 3, 1, 2, C.horn]], [[x, 4, 3, 1, C.metalLight], [x + 2, 6, 1, 1, C.O]]);
+  }
+  hullShields(g, [11, 17, 23, 29, 35], 8, t);
+  // Oars dangling into thin air
+  for (const x of [14, 21, 28, 35]) {
+    for (let k = 0; k < 4; k++) { g.fillStyle = C.O; g.fillRect(x - k - 1, 13 + k, 3, 1); }
+    for (let k = 0; k < 4; k++) { g.fillStyle = C.woodLight; g.fillRect(x - k, 13 + k, 1, 1); }
+    g.fillStyle = C.O; g.fillRect(x - 6, 16, 4, 4);
+    g.fillStyle = C.woodLight; g.fillRect(x - 5, 17, 2, 2);
+  }
+  return { c, ax: 23, ay: 15 };
+}
+
+function vikingRotor(ctx, u, x, y) {
+  const up = Math.floor(performance.now() / 140) % 2 === 0;
+  const s = u.facing;
+  const ship = u.type === 'bomber';
+  const fill = ship ? C.feather : C.raven;
+  const rib = ship ? C.cloudShade : C.ravenLight;
+  const span = ship ? 14 : 9;
+  const root = x + (ship ? 4 : -4) * s;
+  const back = y - (ship ? 8 : 7);
+  for (let i = 0; i < span; i++) {
+    const lift = up ? Math.round((span - i) * 0.9) + 1 : 2 + (i > span - 4 ? 1 : 0);
+    const px = s > 0 ? root - i : root + i;
+    rect(ctx, px, back - lift, 1, lift + 1, fill);
+    rect(ctx, px, back - lift - 1, 1, 1, C.O);
+    if (i % 3 === 1) rect(ctx, px, back - lift + 1, 1, Math.max(1, lift - 2), rib);
+  }
+}
+
+const buildSoldier = (type, f, frame) => (viking(f) ? vikingSoldier : knightSoldier)(type, f, frame);
+const buildJeep = (f, frame) => (viking(f) ? vikingGoatCart : buildHorseman)(f, frame);
+const buildTank = (f, frame) => (viking(f) ? vikingLongship : buildCatapult)(f, frame);
+const buildArtillery = (f, frame) => (viking(f) ? vikingMeadapult : buildTrebuchet)(f, frame);
+const buildFlyer = (f) => (viking(f) ? vikingRaven : buildGriffin)(f);
+const buildHeavyFlyer = (f) => (viking(f) ? vikingSkyship : buildDragon)(f);
+const rotor = (ctx, u, x, y) => (viking(u.faction) ? vikingRotor : knightRotor)(ctx, u, x, y);
 
 // ── Buildings ──────────────────────────────────────────────────────────────
 function merlons(g, x, y, w, col, step = 4) {
@@ -383,6 +630,115 @@ const BUILD = {
     for (let y = 0; y < 16; y += 4) g.fillRect(0, y, 16, 1);
     g.fillStyle = C.O; g.fillRect(0, 0, 1, 16); g.fillRect(15, 0, 1, 16);
     g.fillStyle = t.main; g.fillRect(2, 1, 3, 2);
+  },
+};
+
+// Viking buildings (the rest are shared with the Kingdom).
+function planks(g, x, y, w, h, step = 4) {
+  g.fillStyle = C.woodDark;
+  for (let xx = x + step - 1; xx < x + w; xx += step) g.fillRect(xx, y, 1, h);
+}
+
+const VIKING_BUILD = {
+  hq(g, t) {
+    // Mead hall: long plank hall, shingled team roof, dragon heads on the gables
+    outlined(g, [[4, 42, 56, 6, C.stone]], [[4, 42, 56, 1, C.stoneLight]]);
+    bricks(g, 4, 43, 56, 5, 61);
+    outlined(g, [[6, 25, 52, 17, C.wood]], [[6, 25, 52, 1, C.woodLight]]);
+    planks(g, 6, 26, 52, 16);
+    for (let i = 0; i < 17; i++) {
+      const w = 44 + i;
+      const x0 = Math.round(32 - w / 2);
+      g.fillStyle = C.O; g.fillRect(x0 - 1, 8 + i, w + 2, 1);
+      g.fillStyle = i % 3 === 2 ? t.roofDark : t.roof; g.fillRect(x0, 8 + i, w, 1);
+      if (i % 3 === 1) { g.fillStyle = t.roofDark; for (let x = x0 + (Math.floor(i / 3) % 2 ? 1 : 3); x < x0 + w; x += 4) g.fillRect(x, 8 + i, 1, 1); }
+    }
+    g.fillStyle = C.O; g.fillRect(1, 25, 62, 1);
+    outlined(g, [
+      [10, 6, 44, 2, C.woodDark],
+      [8, 2, 2, 7, C.wood], [4, 1, 5, 3, C.wood], [2, 2, 2, 2, C.wood], [8, 0, 1, 1, C.wood],
+      [54, 2, 2, 7, C.wood], [55, 1, 5, 3, C.wood], [60, 2, 2, 2, C.wood], [55, 0, 1, 1, C.wood],
+    ], [
+      [10, 6, 44, 1, C.wood], [6, 2, 1, 1, C.yellow], [57, 2, 1, 1, C.yellow], [0, 3, 3, 1, C.red], [61, 3, 3, 1, C.red],
+      [8, 2, 1, 6, C.woodLight], [55, 2, 1, 6, C.woodLight],
+    ]);
+    g.fillStyle = C.O; g.fillRect(29, 4, 6, 3); g.fillStyle = '#2a1c10'; g.fillRect(30, 5, 4, 2);
+    // Carved doorway with a team lintel and big double doors
+    outlined(g, [[24, 27, 16, 3, C.wood], [27, 30, 10, 12, C.woodDark]], [
+      [24, 27, 16, 1, C.woodLight], [24, 29, 16, 1, t.main], [31, 30, 2, 12, C.O], [29, 30, 1, 12, C.wood], [34, 30, 1, 12, C.wood],
+      [30, 35, 1, 2, C.yellow], [33, 35, 1, 2, C.yellow],
+    ]);
+    roundShield(g, 14, 32, 4, t);
+    roundShield(g, 50, 32, 4, t, true);
+    outlined(g, [[19, 37, 5, 5, C.barrel], [40, 37, 5, 5, C.barrel], [41, 33, 4, 3, C.barrel]], [
+      [19, 39, 5, 1, C.metalDark], [40, 39, 5, 1, C.metalDark], [41, 34, 4, 1, C.metalDark], [22, 37, 1, 5, C.barrelDark], [43, 37, 1, 5, C.barrelDark],
+    ]);
+  },
+  barracks(g, t) {
+    // Longhouse: plank walls, a curved shingle roof with a turf cap… and horns
+    outlined(g, [[4, 20, 40, 12, C.wood]], [[4, 20, 40, 1, C.woodLight]]);
+    planks(g, 4, 21, 40, 11);
+    for (let i = 0; i < 14; i++) {
+      const w = 30 + Math.round(14 * Math.sin(((i + 1) / 14) * (Math.PI / 2)));
+      const x0 = Math.round(24 - w / 2);
+      g.fillStyle = C.O; g.fillRect(x0 - 1, 6 + i, w + 2, 1);
+      g.fillStyle = i < 3 ? (i === 0 ? C.turfLight : C.turf) : i % 3 === 0 ? t.roofDark : t.roof;
+      g.fillRect(x0, 6 + i, w, 1);
+    }
+    g.fillStyle = C.O; g.fillRect(8, 5, 32, 1); g.fillRect(1, 20, 46, 1);
+    g.fillStyle = C.turfLight;
+    for (let x = 10; x < 38; x += 5) g.fillRect(x, 4, 1, 2);
+    outlined(g, [[9, 3, 2, 3, C.horn], [7, 1, 2, 3, C.horn], [6, 0, 1, 2, C.horn], [37, 3, 2, 3, C.horn], [39, 1, 2, 3, C.horn], [41, 0, 1, 2, C.horn]],
+      [[7, 3, 1, 1, '#c8b890'], [40, 3, 1, 1, '#c8b890']]);
+    outlined(g, [[20, 23, 8, 9, C.woodDark]], [[23, 23, 2, 9, C.O], [22, 27, 1, 1, C.yellow], [25, 27, 1, 1, C.yellow]]);
+    roundShield(g, 11, 26, 3, t);
+    roundShield(g, 37, 26, 3, t, true);
+  },
+  mine(g, t) {
+    // Mead brewery: a frothing vat with a tap, and a well-earned mug
+    outlined(g, [[2, 2, 1, 6, C.woodDark]]);
+    banner(g, 1, 8, t, 9);
+    outlined(g, [
+      [8, 28, 3, 4, C.woodDark], [21, 28, 3, 4, C.woodDark], [7, 9, 18, 20, C.barrel],
+      [6, 6, 20, 4, C.foam], [8, 4, 4, 2, C.foam], [14, 3, 5, 3, C.foam], [21, 4, 3, 2, C.foam],
+      [25, 20, 3, 2, C.metal], [27, 22, 1, 1, C.metal], [24, 25, 5, 7, C.mead], [29, 26, 2, 4, C.metalDark],
+    ], [
+      [10, 10, 1, 19, C.barrelDark], [14, 10, 1, 19, C.barrelDark], [18, 10, 1, 19, C.barrelDark], [22, 10, 1, 19, C.barrelDark],
+      [8, 10, 1, 18, '#c8884a'], [7, 12, 18, 1, C.metalDark], [7, 26, 18, 1, C.metalDark], [7, 18, 18, 2, t.main], [7, 18, 18, 1, t.light],
+      [9, 10, 1, 2, C.foam], [17, 10, 1, 1, C.foam], [6, 9, 20, 1, C.mead], [15, 3, 2, 1, C.white],
+      [24, 25, 5, 1, C.foam], [24, 28, 5, 1, C.yellowDark], [29, 27, 1, 2, C.mead],
+    ]);
+  },
+  wall(g, t) {
+    // Shield wall: a pointed palisade with two team shields braced on it
+    outlined(g, [
+      [0, 6, 3, 26, C.wood], [4, 5, 3, 27, C.wood], [8, 6, 3, 26, C.wood], [12, 5, 3, 27, C.wood],
+      [1, 4, 1, 2, C.wood], [5, 3, 1, 2, C.wood], [9, 4, 1, 2, C.wood], [13, 3, 1, 2, C.wood],
+    ], [[0, 6, 1, 26, C.woodLight], [4, 5, 1, 27, C.woodLight], [8, 6, 1, 26, C.woodLight], [12, 5, 1, 27, C.woodLight]]);
+    roundShield(g, 8, 13, 5, t);
+    roundShield(g, 8, 25, 5, t, true);
+  },
+  workshop(g, t) {
+    // Boathouse: a longship nosing out of its shed, mid-repair
+    outlined(g, [[4, 14, 32, 18, C.wood]], [[4, 14, 32, 1, C.woodLight]]);
+    planks(g, 4, 15, 32, 17);
+    for (let i = 0; i < 11; i++) {
+      const w = 26 + Math.round(i * 1.4);
+      const x0 = Math.round(20 - w / 2);
+      g.fillStyle = C.O; g.fillRect(x0 - 1, 4 + i, w + 2, 1);
+      g.fillStyle = i % 3 === 2 ? t.roofDark : t.roof; g.fillRect(x0, 4 + i, w, 1);
+    }
+    g.fillStyle = C.O; g.fillRect(6, 3, 28, 1);
+    outlined(g, [[6, 0, 1, 4, C.wood], [33, 0, 1, 4, C.wood]]);
+    outlined(g, [[20, 17, 15, 15, '#2a1c10']]);
+    outlined(g, [
+      [26, 28, 2, 4, C.woodDark], [37, 28, 2, 4, C.woodDark],
+      [22, 21, 20, 5, C.wood], [24, 26, 16, 2, C.woodDark], [22, 17, 2, 4, C.wood],
+      [41, 14, 2, 8, C.wood], [41, 11, 4, 3, C.wood], [44, 12, 2, 2, C.wood], [41, 10, 1, 1, C.wood],
+    ], [[22, 21, 20, 1, C.woodLight], [43, 12, 1, 1, C.yellow], [46, 13, 1, 1, C.red], [41, 14, 1, 7, C.woodLight]]);
+    hullShields(g, [27, 32, 37], 22, t);
+    outlined(g, [[7, 25, 10, 2, C.wood], [6, 27, 12, 2, C.woodLight]], [[7, 25, 10, 1, C.woodLight], [6, 28, 12, 1, C.wood]]);
+    banner(g, 8, 16, t, 7);
   },
 };
 
@@ -619,7 +975,7 @@ function construction(ctx, x, y, w, h) {
   ctx.fillRect(x + Math.floor(w / 2), y - 4, 1, 4);
 }
 
-function animate(ctx, b, x, y) {
+function knightAnimate(ctx, b, x, y) {
   const ms = performance.now();
   const tick = Math.floor(ms / 160);
   const t = team(b.faction);
@@ -646,7 +1002,37 @@ function animate(ctx, b, x, y) {
   }
 }
 
-function projectile(ctx, p, x, y, dx, dy) {
+// Smoke curling from a roof hole at (sx, sy).
+function smoke(ctx, sx, sy, ms) {
+  for (let i = 0; i < 3; i++) {
+    const k = (ms / 1800 + i / 3) % 1;
+    const s = 1 + Math.round(k * 2);
+    rect(ctx, sx + Math.round(Math.sin(ms / 500 + i * 2) * 2 * k), sy - Math.round(k * 14), s, s, k < 0.5 ? C.cloudShade : C.cloud);
+  }
+}
+
+function vikingAnimate(ctx, b, x, y) {
+  const ms = performance.now();
+  const tick = Math.floor(ms / 160);
+  if (b.type === 'hq') smoke(ctx, x + 31, y + 3, ms);
+  else if (b.type === 'barracks') smoke(ctx, x + 23, y + 3, ms + 600);
+  else if (b.type === 'mine') {
+    // Froth bubbling up and mead dripping into the mug
+    const bx = [9, 13, 19, 23][tick % 4];
+    rect(ctx, x + bx, y + 4 - (tick % 2), 1, 1, C.foam);
+    if (tick % 3 !== 2) rect(ctx, x + 27, y + 23 + (tick % 3), 1, 1, C.mead);
+  } else if (b.type === 'workshop') {
+    // Wood chips flying off the hull
+    if (tick % 4 < 3) rect(ctx, x + 29 + (tick % 4) * 2, y + 19 - (tick % 4), 1, 1, C.straw);
+  }
+}
+
+function animate(ctx, b, x, y) {
+  if (viking(b.faction)) { if (VIKING_BUILD[b.type]) vikingAnimate(ctx, b, x, y); else knightAnimate(ctx, b, x, y); }
+  else knightAnimate(ctx, b, x, y);
+}
+
+function knightProjectile(ctx, p, x, y, dx, dy) {
   if (p.kind === 'bullet') {
     // Arrow
     rect(ctx, x - dx * 2, y - dy * 2, 1, 1, C.white);
@@ -667,9 +1053,29 @@ function projectile(ctx, p, x, y, dx, dy) {
   }
 }
 
+// Vikings throw hand-axes, lob mead barrels and bomb with herring.
+function projectile(ctx, p, x, y, dx, dy) {
+  if (!viking(p.faction) || p.kind === 'shell') return knightProjectile(ctx, p, x, y, dx, dy);
+  const spin = Math.floor(performance.now() / 70) % 2;
+  if (p.kind === 'bullet') {
+    if (spin) { rect(ctx, x - 2, y, 3, 1, C.woodLight); rect(ctx, x + 1, y - 1, 1, 3, C.metalLight); }
+    else { rect(ctx, x, y - 1, 1, 3, C.woodLight); rect(ctx, x - 1, y - 2, 3, 1, C.metalLight); }
+  } else if (p.kind === 'bomb') {
+    rect(ctx, x - 1, y - 2, 3, 5, C.O);
+    rect(ctx, x, y - 2, 1, 4, C.fish);
+    rect(ctx, x - 1, y - 4, 3, 2, C.fishDark);
+    rect(ctx, x, y + 1, 1, 1, C.O);
+  } else {
+    rect(ctx, x - dx * 2, y - dy * 2, 1, 1, C.mead);
+    rect(ctx, x - 2, y - 2, 5, 5, C.O);
+    rect(ctx, x - 1, y - 1, 3, 3, C.barrel);
+    if (spin) rect(ctx, x - 1, y, 3, 1, C.metalDark); else rect(ctx, x, y - 1, 1, 3, C.metalDark);
+  }
+}
+
 // The fallen; plague carriers stay sickly green.
-function corpseKey(e) { return e.type === 'scout' ? 'plague' : ''; }
-function corpse(e) {
+function corpseKey(e) { return e.type === 'scout' && !viking(e.f) ? 'plague' : ''; }
+function knightCorpse(e) {
   const t = team(e.f);
   const [c, g] = canvas(14, 6);
   const skin = e.type === 'scout' ? C.sick : C.skin;
@@ -679,16 +1085,52 @@ function corpse(e) {
   return { c, ax: 7, ay: 5 };
 }
 
+// Fallen Vikings keep their horns on (berserkers keep their bear).
+function vikingCorpse(e) {
+  const t = team(e.f);
+  const [c, g] = canvas(14, 6);
+  const bear = e.type === 'heavy';
+  outlined(g, [
+    [1, 2, 3, 3, C.skin], [0, 1, 3, 2, bear ? C.fur : C.metal], [4, 2, 7, 3, bear ? C.skin : t.main], [11, 3, 2, 2, bear ? C.furDark : C.fur],
+    ...(bear ? [] : [[0, 0, 1, 1, C.horn], [3, 0, 1, 1, C.horn]]),
+  ], [
+    [3, 3, 2, 2, e.type === 'soldier' || e.type === 'scout' ? C.blond : C.beard], [5, 3, 2, 1, t.light], [4, 4, 7, 1, bear ? t.main : t.dark],
+  ]);
+  return { c, ax: 7, ay: 5 };
+}
+const corpse = (e) => (viking(e.f) ? vikingCorpse : knightCorpse)(e);
+
 export default {
   id: 'medieval',
   name: 'Medieval',
+  sides: [
+    {
+      id: 'knights', name: 'The Kingdom', short: 'Knights',
+      blurb: 'Castles, catapults, chivalry, and one peasant who does all the actual work.',
+      win: 'Huzzah! Feast in the great hall tonight.',
+      lose: 'The castle has fallen. At least the plague went with it.',
+    },
+    {
+      id: 'vikings', name: 'The Vikings', short: 'Vikings', plural: true,
+      blurb: 'Horned helmets (historians say they never wore them; nobody told the Vikings), longships on wheels, and a skald who will not stop singing about it.',
+      names: {
+        soldier: 'Shieldmaiden', heavy: 'Berserker', scout: 'Speedy Skald', engineer: 'Shipwright', sniper: 'Axe Flinger',
+        jeep: 'Goat Cart', tank: 'Landlubber Longship', artillery: 'Mead-a-Pult', helicopter: 'Raven Rider', bomber: 'Flying Longship',
+        hq: 'Mead Hall', barracks: 'Longhouse', turret: 'Lookout', wall: 'Shield Wall', mine: 'Mead Brewery', workshop: 'Boathouse',
+        airbase: 'Raven Roost', bridge: 'Plank Bridge', ramp: 'Steps',
+      },
+      icons: { barracks: '🛖', turret: '🪓', wall: '🛡️', mine: '🍺', workshop: '⛵', airbase: '🪶' },
+      win: 'Valhalla can wait, the mead can’t.',
+      lose: 'Off to Valhalla. Somebody save the mead.',
+    },
+  ],
   palette,
   teamBase: TABARD,
   roofBase: [0.55, 0.32, 0.22],
   soldier: buildSoldier,
-  vehicle: { jeep: buildHorseman, tank: buildCatapult, artillery: buildTrebuchet },
-  aircraft: { helicopter: buildGriffin, bomber: buildDragon },
-  buildings: BUILD,
+  vehicle: { jeep: buildJeep, tank: buildTank, artillery: buildArtillery },
+  aircraft: { helicopter: buildFlyer, bomber: buildHeavyFlyer },
+  buildings: Object.fromEntries(Object.keys(BUILD).map((k) => [k, (g, t, f) => (viking(f) && VIKING_BUILD[k] ? VIKING_BUILD[k] : BUILD[k])(g, t, f)])),
   drawTile,
   surface,
   background,
