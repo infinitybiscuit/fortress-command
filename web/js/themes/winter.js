@@ -3,7 +3,7 @@
 // tactics, Molotov cocktails, captured tanks, and a sauna behind every line.
 // Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -20,13 +20,15 @@ const palette = {
   reindeer: '#7a5a42', reindeerLight: '#a08060', bottle: '#4e8a5a',
   dirt: '#4a4440', dirtMid: '#3c3634', dirtDeep: '#2c2826', pebble: '#7a7672', pebbleDark: '#22201e',
   fire: '#f28a30', glass: '#ffd27a', smoke: '#c8ccd4', aurora: '#5af0a8', auroraLight: '#a8ffd8',
+  khaki: '#7a6a4a', khakiDark: '#544630', khakiLight: '#9a8a62', brass: '#d8a83a', brassLight: '#f2cc6a', leather: '#3a2e26',
+  canvas: '#b8ae8c', canvasShade: '#938a6c',
   shadow: 'rgba(0,0,0,0.3)',
 };
 const GREATCOAT = [0.36, 0.38, 0.32];
 
 // ── Infantry ───────────────────────────────────────────────────────────────
 // 20×17 canvas, feet at (8,16), facing right — the same frame as Classic.
-function buildSoldier(type, f, frame) {
+function finnSoldier(type, f, frame) {
   const t = team(f);
   const [c, g] = canvas(20, 17);
   const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
@@ -95,7 +97,7 @@ function buildSoldier(type, f, frame) {
 
 // ── Vehicles ───────────────────────────────────────────────────────────────
 // Reindeer sled: a reindeer hauling a pulka with a machine gunner aboard.
-function buildSled(f, frame) {
+function finnSled(f, frame) {
   const t = team(f);
   const [c, g] = canvas(30, 17);
   const legs = frame
@@ -119,7 +121,7 @@ function buildSled(f, frame) {
 
 // Trophy tank: a captured T-26, whitewashed, in its new team's colours, with a
 // stovepipe fitted for the cold.
-function buildTank(f, frame) {
+function finnTank(f, frame) {
   const t = team(f);
   const [c, g] = canvas(38, 22);
   outlined(g, [
@@ -140,7 +142,7 @@ function buildTank(f, frame) {
 }
 
 // Motti mortar: a mortar on a ski sledge, with a "motti" of firewood stacked behind.
-function buildMortar(f, frame) {
+function finnMortar(f, frame) {
   const t = team(f);
   const [c, g] = canvas(30, 19);
   outlined(g, [
@@ -162,7 +164,7 @@ function buildMortar(f, frame) {
 }
 
 // Fokker D.XXI on skis: the propeller spins live.
-function buildFokker(f) {
+function finnFokker(f) {
   const t = team(f);
   const [c, g] = canvas(34, 16);
   outlined(g, [
@@ -177,7 +179,7 @@ function buildFokker(f) {
 }
 
 // Bristol Blenheim on skis, glazed nose, dorsal turret.
-function buildBlenheim(f) {
+function finnBlenheim(f) {
   const t = team(f);
   const [c, g] = canvas(48, 20);
   outlined(g, [
@@ -193,6 +195,160 @@ function buildBlenheim(f) {
 }
 
 // Spinning propellers.
+
+// ── The Soviet side ────────────────────────────────────────────────────────
+// Summer-weight greatcoats, pointy budenovka hats, red noses, a brass band
+// brought along for the victory parade, and an awful lot of tanks.
+const soviet = (f) => sideOf(f) === 'soviet';
+
+function sovietSoldier(type, f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(20, 17);
+  const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
+  const boots = frame ? [[5, 15, 3, 1], [9, 15, 3, 1]] : [[4, 15, 3, 1], [10, 15, 3, 1]];
+  const budenovka = (parts, details) => {
+    parts.push([6, 1, 6, 3, C.khakiDark], [8, 0, 2, 1, C.khakiDark]);
+    details.push([8, 1, 2, 2, t.main], [6, 3, 6, 1, C.khaki]);
+  };
+  let parts;
+  let details;
+  if (type === 'heavy') {
+    // Commissar: leather coat, peaked cap, megaphone for motivational shouting
+    parts = [
+      ...legs.map((l) => [...l, C.leather]), ...boots.map((b) => [...b, C.boot]),
+      [4, 7, 9, 5, C.leather], [6, 3, 6, 5, C.skin], [5, 1, 8, 2, C.khakiDark], [10, 3, 3, 1, C.O],
+      [12, 4, 2, 4, C.leather], [13, 2, 4, 4, C.brass], [16, 1, 2, 6, C.brass],
+    ];
+    details = [
+      [5, 2, 8, 1, t.main], [8, 1, 2, 1, C.brassLight], [10, 5, 1, 1, C.O], [10, 6, 2, 1, C.red], [7, 7, 4, 1, C.skinDark],
+      [4, 9, 9, 1, C.boot], [6, 8, 1, 3, C.khakiDark], [14, 3, 2, 1, C.brassLight], [17, 2, 1, 4, C.brassLight],
+    ];
+  } else if (type === 'scout') {
+    // Brass band: a tuba for the victory parade (which keeps getting postponed)
+    parts = [
+      ...legs.map((l) => [...l, C.khakiDark]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.khaki], [6, 3, 6, 5, C.skin], [9, 6, 6, 6, C.brass], [13, 1, 5, 6, C.brass],
+    ];
+    details = [
+      [10, 4, 1, 1, C.O], [11, 5, 1, 1, C.red], [10, 7, 4, 4, C.brassLight], [11, 8, 2, 2, C.brass], [14, 2, 3, 4, C.O], [15, 3, 1, 2, C.brass], [5, 10, 4, 1, t.main],
+    ];
+    budenovka(parts, details);
+  } else if (type === 'engineer') {
+    // Sapper with a pickaxe
+    parts = [
+      ...legs.map((l) => [...l, C.khakiDark]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.khaki], [6, 3, 6, 5, C.skin], [11, 3, 1, 8, C.woodLight], [9, 2, 6, 2, C.gunLight],
+    ];
+    details = [[10, 5, 1, 1, C.O], [11, 6, 1, 1, C.red], [7, 7, 4, 1, C.skinDark], [5, 10, 7, 1, t.main], [9, 2, 6, 1, C.white]];
+    budenovka(parts, details);
+  } else if (type === 'sniper') {
+    // Marksman with a scoped rifle and a scarf (the only warm thing issued)
+    parts = [
+      ...legs.map((l) => [...l, C.khakiDark]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.khaki], [6, 3, 6, 5, C.skin], [9, 9, 10, 1, C.wood], [12, 7, 4, 1, C.gun],
+    ];
+    details = [[10, 5, 1, 1, C.O], [11, 6, 1, 1, C.red], [6, 7, 6, 2, t.main], [12, 8, 1, 1, C.gun], [18, 9, 1, 1, C.O]];
+    budenovka(parts, details);
+  } else {
+    // Comrade: khaki greatcoat, budenovka, Mosin rifle, rosy cold nose
+    parts = [
+      ...legs.map((l) => [...l, C.khakiDark]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.khaki], [6, 3, 6, 5, C.skin], [9, 9, 9, 1, C.wood], [16, 8, 2, 1, C.gun],
+    ];
+    details = [
+      [10, 5, 1, 1, C.O], [11, 6, 1, 1, C.red], [7, 7, 4, 1, C.skinDark], [5, 10, 7, 1, C.khakiDark], [6, 9, 1, 1, t.main], [8, 8, 1, 4, C.khakiLight],
+      [17, 7, 1, 1, C.white],
+    ];
+    budenovka(parts, details);
+  }
+  outlined(g, parts, details);
+  return { c, ax: 8, ay: 16 };
+}
+
+// Aerosan: a propeller-driven snow sled with a gunner.
+function sovietSled(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(30, 17);
+  outlined(g, [
+    [6, 7, 18, 5, C.khaki], [20, 5, 6, 4, C.khaki], [2, 3, 3, 10, C.gun], [10, 3, 5, 4, C.khakiDark], [11, 0, 3, 3, C.skin],
+    [0, 13, 28, 1, C.woodDark], [27, 11, 1, 2, C.woodDark], [14, 4, 8, 1, C.gun],
+  ], [
+    [6, 7, 18, 1, C.khakiLight], [6, 10, 18, 1, t.main], [21, 6, 3, 2, C.ice], [11, 0, 3, 1, C.khakiDark], [12, 1, 1, 1, t.main], [13, 2, 1, 1, C.red],
+    [8, 12, 4, 1, C.gunLight], [18, 12, 4, 1, C.gunLight],
+  ]);
+  g.fillStyle = frame ? C.smoke : C.gunLight;
+  if (frame) g.fillRect(1, 1, 1, 14); else { g.fillRect(0, 7, 5, 1); g.fillRect(1, 2, 1, 2); g.fillRect(1, 12, 1, 2); }
+  return { c, ax: 14, ay: 16 };
+}
+
+// T-28: a land battleship with three turrets, because one is never enough.
+function sovietTank(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(40, 22);
+  outlined(g, [
+    [2, 15, 34, 5, C.gunDark], [3, 9, 32, 6, C.olive], [13, 3, 12, 6, C.olive], [24, 5, 12, 2, C.gun],
+    [4, 6, 6, 3, C.olive], [28, 6, 6, 3, C.olive], [9, 7, 3, 1, C.gun], [33, 7, 4, 1, C.gun],
+  ], [
+    [3, 9, 32, 1, C.oliveLight], [13, 3, 12, 1, C.oliveLight], [4, 12, 30, 1, t.main], [17, 5, 4, 2, t.main], [18, 5, 2, 1, C.white],
+    [4, 6, 6, 1, C.oliveLight], [28, 6, 6, 1, C.oliveLight], [35, 5, 1, 2, C.O],
+  ]);
+  for (let i = 0; i < 7; i++) {
+    const x = 4 + i * 5;
+    g.fillStyle = C.gunLight; g.fillRect(x, 16, 3, 3);
+    g.fillStyle = C.gunDark; g.fillRect(x + (frame ? 1 : 2), 17, 1, 1);
+  }
+  return { c, ax: 18, ay: 21 };
+}
+
+// Field howitzer on a sledge.
+function sovietHowitzer(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(32, 19);
+  outlined(g, [
+    [0, 16, 28, 1, C.woodDark], [3, 11, 20, 4, C.olive], [12, 6, 6, 5, C.olive], [16, 3, 4, 4, C.gun], [19, 1, 6, 3, C.gun], [4, 8, 4, 3, C.gunDark],
+  ], [
+    [3, 11, 20, 1, C.oliveLight], [12, 6, 6, 1, C.oliveLight], [24, 1, 1, 3, C.O], [3, 13, 20, 1, t.main],
+  ]);
+  for (const x of [8, 19]) { disc(g, x, 14, 3, C.O); disc(g, x, 14, 2, C.gunLight); }
+  if (frame) { g.fillStyle = C.snowShade; g.fillRect(29, 15, 1, 1); }
+  return { c, ax: 15, ay: 18 };
+}
+
+// I-16 "Ishak" (the donkey): a stubby barrel of a fighter on skis.
+function sovietIshak(f) {
+  const t = team(f);
+  const [c, g] = canvas(34, 16);
+  outlined(g, [
+    [8, 5, 18, 6, C.olive], [24, 4, 5, 8, C.gun], [3, 3, 6, 6, C.olive], [2, 8, 7, 2, C.olive], [12, 10, 10, 2, C.oliveDark],
+    [15, 3, 5, 2, C.ice], [13, 12, 1, 2, C.gun], [21, 12, 1, 2, C.gun], [11, 14, 6, 1, C.woodLight], [19, 14, 5, 1, C.woodLight],
+  ], [
+    [8, 5, 18, 1, C.oliveLight], [10, 7, 4, 3, t.main], [11, 8, 2, 1, C.white], [3, 3, 2, 6, t.main], [24, 4, 5, 1, C.gunLight], [15, 3, 5, 1, C.iceLight],
+    [26, 7, 1, 1, C.red],
+  ]);
+  return { c, ax: 17, ay: 13 };
+}
+
+// SB "bread basket" bomber: twin engines, glazed nose, skis.
+function sovietBomber(f) {
+  const t = team(f);
+  const [c, g] = canvas(48, 20);
+  outlined(g, [
+    [4, 6, 36, 6, C.olive], [39, 6, 6, 5, C.ice], [2, 1, 5, 6, C.olive], [1, 8, 8, 2, C.olive],
+    [16, 11, 18, 2, C.oliveDark], [24, 8, 9, 5, C.gun], [20, 13, 1, 4, C.gun], [30, 13, 1, 4, C.gun], [17, 17, 16, 1, C.woodLight],
+  ], [
+    [4, 6, 36, 1, C.oliveLight], [12, 7, 4, 4, t.main], [13, 8, 2, 2, C.white], [2, 1, 2, 6, t.main], [41, 6, 1, 5, C.O],
+    [24, 8, 9, 1, C.gunLight], [4, 11, 35, 1, C.snowShade],
+  ]);
+  return { c, ax: 24, ay: 15 };
+}
+
+const buildSoldier = (type, f, frame) => (soviet(f) ? sovietSoldier : finnSoldier)(type, f, frame);
+const buildSled = (f, frame) => (soviet(f) ? sovietSled : finnSled)(f, frame);
+const buildTank = (f, frame) => (soviet(f) ? sovietTank : finnTank)(f, frame);
+const buildMortar = (f, frame) => (soviet(f) ? sovietHowitzer : finnMortar)(f, frame);
+const buildFokker = (f) => (soviet(f) ? sovietIshak : finnFokker)(f);
+const buildBlenheim = (f) => (soviet(f) ? sovietBomber : finnBlenheim)(f);
+
 function rotor(ctx, u, x, y) {
   const tick = Math.floor(performance.now() / 50);
   const s = u.facing;
@@ -340,15 +496,18 @@ const BUILD = {
     outlined(g, [[26, 9, 4, 5, C.gunLight]], [[29, 10, 1, 1, C.O], [26, 9, 4, 1, C.white]]);
     snowbank(g, 0, 29, 32, 3);
   },
-  workshop(g, t) {
+  workshop(g, t, f) {
     // Trophy yard: open log shed, a captured turret on blocks, a hoist, and a
-    // proud tally of tanks taken painted on the wall
+    // proud tally of tanks taken painted on the wall (the Soviet tank depot
+    // has no tally to paint)
     outlined(g, [[3, 12, 3, 18, C.woodDark], [42, 12, 3, 18, C.woodDark]], []);
     snowRoof(g, 24, 2, 48, 9);
     logs(g, 6, 13, 36, 6);
     g.fillStyle = C.white;
-    for (let i = 0; i < 9; i++) g.fillRect(8 + i * 2 + (i >= 5 ? 1 : 0), 14, 1, 4);
-    g.fillRect(8, 16, 10, 1);
+    if (!soviet(f)) {
+      for (let i = 0; i < 9; i++) g.fillRect(8 + i * 2 + (i >= 5 ? 1 : 0), 14, 1, 4);
+      g.fillRect(8, 16, 10, 1);
+    }
     outlined(g, [[16, 22, 14, 6, C.olive], [29, 24, 9, 2, C.gun], [14, 28, 18, 3, C.woodLight]], [
       [16, 22, 14, 1, C.oliveLight], [21, 24, 4, 2, t.main], [22, 24, 2, 1, C.white],
     ]);
@@ -395,6 +554,63 @@ const BUILD = {
     g.fillStyle = C.woodDark; g.fillRect(0, 0, 2, 16); g.fillRect(14, 0, 2, 16);
     g.fillStyle = C.woodLight; g.fillRect(0, 0, 1, 16); g.fillRect(14, 0, 1, 16);
     g.fillStyle = t.main; g.fillRect(2, 1, 3, 2);
+  },
+};
+
+// Soviet buildings; the rest are shared with the Finns.
+const SOVIET_BUILD = {
+  hq(g, t) {
+    // Command izba: a big carved log house with an onion-domed cupola
+    logs(g, 6, 24, 52, 18);
+    snowRoof(g, 32, 8, 58, 14);
+    for (const x of [11, 46]) {
+      windowGlow(g, x, 29, 7, 6);
+      g.fillStyle = C.red; g.fillRect(x - 2, 27, 11, 1); g.fillRect(x - 2, 36, 11, 1); g.fillRect(x - 2, 27, 1, 10); g.fillRect(x + 8, 27, 1, 10);
+    }
+    outlined(g, [[27, 30, 10, 12, C.woodDark]], [[27, 30, 10, 1, C.wood], [32, 30, 1, 12, C.O]]);
+    outlined(g, [[29, 6, 6, 6, C.woodLight]], [[29, 6, 6, 1, C.snow]]);
+    disc(g, 32, 3, 4, C.O); disc(g, 32, 3, 3, C.brass); g.fillStyle = C.brassLight; g.fillRect(31, 1, 1, 3);
+    g.fillStyle = C.O; g.fillRect(31, -1, 2, 2); g.fillStyle = C.brass; g.fillRect(31, 0, 2, 1);
+    disc(g, 32, 17, 3, C.O); disc(g, 32, 17, 2, t.main);
+    stovepipe(g, 48, 6, 8);
+    flag(g, 2, 8, 34, t);
+    snowbank(g, 0, 42, 64, 6);
+  },
+  barracks(g, t) {
+    // Loudspeaker tent: canvas, a pole and a horn for broadcasting surrender appeals
+    for (let i = 0; i < 14; i++) {
+      const half = Math.round(4 + i * 1.5);
+      g.fillStyle = C.O; g.fillRect(22 - half - 1, 15 + i, half * 2 + 2, 1);
+      g.fillStyle = i % 4 === 0 ? C.canvasShade : C.canvas; g.fillRect(22 - half, 15 + i, half * 2, 1);
+    }
+    g.fillStyle = C.snow; for (let i = 0; i < 4; i++) { const half = Math.round(4 + i * 1.5); g.fillRect(22 - half, 15 + i, half * 2, 1); }
+    g.fillStyle = C.O; g.fillRect(18, 21, 8, 8); g.fillStyle = '#2a2420'; g.fillRect(19, 22, 6, 7);
+    g.fillStyle = C.O; g.fillRect(40, 4, 2, 26);
+    g.fillStyle = C.woodLight; g.fillRect(40, 5, 1, 25);
+    outlined(g, [[36, 2, 4, 4, C.gunLight], [33, 1, 3, 6, C.gunLight]], [[33, 1, 1, 6, C.white]]);
+    g.fillStyle = t.main; g.fillRect(42, 8, 5, 3);
+    snowbank(g, 0, 29, 48, 3);
+  },
+  wall(g, t) {
+    // Barbed wire strung on wooden X-frames
+    for (const y of [6, 18]) {
+      g.fillStyle = C.woodDark;
+      for (let i = 0; i < 12; i++) { g.fillRect(2 + i, y + i, 1, 1); g.fillRect(13 - i, y + i, 1, 1); }
+    }
+    g.fillStyle = C.gunLight;
+    for (let y = 8; y < 30; y += 4) for (let x = 0; x < 16; x += 2) g.fillRect(x, y + (x % 4 ? 1 : 0), 1, 1);
+    g.fillStyle = C.gun; for (let y = 8; y < 30; y += 4) for (let x = 1; x < 16; x += 4) { g.fillRect(x, y - 1, 1, 3); g.fillRect(x - 1, y, 3, 1); }
+    g.fillStyle = t.main; g.fillRect(5, 30, 6, 2);
+    g.fillStyle = C.snowShade; g.fillRect(0, 31, 16, 1);
+  },
+  mine(g, t) {
+    // Samovar cart: tea for the troops, on a sledge
+    outlined(g, [[1, 24, 28, 3, C.wood], [8, 10, 14, 14, C.brass], [10, 6, 10, 4, C.brass], [13, 1, 4, 5, C.gun], [22, 16, 5, 2, C.brass]], [
+      [8, 10, 14, 1, C.brassLight], [10, 6, 10, 1, C.brassLight], [10, 12, 2, 10, C.brassLight], [8, 18, 14, 1, t.main], [26, 18, 1, 2, C.brass],
+    ]);
+    g.fillStyle = C.O; g.fillRect(0, 28, 30, 1); g.fillRect(29, 26, 1, 2);
+    outlined(g, [[2, 19, 4, 5, C.white], [24, 20, 4, 4, C.white]], [[2, 19, 4, 1, t.main], [24, 20, 4, 1, t.main]]);
+    snowbank(g, 0, 29, 32, 3);
   },
 };
 
@@ -626,8 +842,16 @@ function animate(ctx, b, x, y) {
   const ms = performance.now();
   const tick = Math.floor(ms / 160);
   const t = team(b.faction);
-  if (b.type === 'hq') {
-    for (let i = 0; i < 2; i++) puff(ctx, x + 44, y + 2, ms, i);
+  if (soviet(b.faction) && b.type === 'barracks') {
+    // Surrender appeals crackling out of the loudspeaker
+    const k = tick % 6;
+    ctx.globalAlpha = 0.6;
+    if (k < 4) { rect(ctx, x + 31 - k * 2, y + 1 - k, 1, 6 + k * 2, C.white); }
+    ctx.globalAlpha = 1;
+  } else if (soviet(b.faction) && b.type === 'mine') {
+    for (let i = 0; i < 2; i++) puff(ctx, x + 15, y, ms, i, C.white);
+  } else if (b.type === 'hq') {
+    for (let i = 0; i < 2; i++) puff(ctx, x + (soviet(b.faction) ? 48 : 44), y + 2, ms, i);
   } else if (b.type === 'barracks') {
     // Löyly: steam pouring from the chimney and round the sauna door
     for (let i = 0; i < 2; i++) { puff(ctx, x + 32, y, ms, i, C.white); puff(ctx, x + 26, y + 20, ms + 700, i, C.white); }
@@ -689,7 +913,11 @@ function explode(ctx, x, y, r, k, seed) {
 function corpse(e) {
   const t = team(e.f);
   const [c, g] = canvas(14, 6);
-  const white = e.type === 'soldier' || e.type === 'sniper';
+  const white = !soviet(e.f) && (e.type === 'soldier' || e.type === 'sniper');
+  if (soviet(e.f)) {
+    outlined(g, [[1, 2, 3, 3, C.skin], [4, 2, 7, 3, e.type === 'heavy' ? C.leather : C.khaki], [11, 3, 2, 2, C.boot]], [[0, 1, 3, 1, C.khakiDark], [5, 3, 2, 1, t.main]]);
+    return { c, ax: 7, ay: 5 };
+  }
   outlined(g, [[1, 2, 3, 3, white ? C.suit : C.fur], [4, 2, 7, 3, white ? C.suit : t.uni], [11, 3, 2, 2, C.boot]], [[1, 3, 2, 1, C.skin], [5, 3, 2, 1, t.main]]);
   return { c, ax: 7, ay: 5 };
 }
@@ -697,13 +925,34 @@ function corpse(e) {
 export default {
   id: 'winter',
   name: 'Winter War',
+  sides: [
+    {
+      id: 'finns', name: 'Finland', short: 'Finns',
+      blurb: 'Skis, snowsuits, sisu and a sauna behind every line. Outnumbered, never out-saunaed.',
+      win: 'Sauna’s warm. Everyone in.',
+      lose: 'Even sisu needs a sauna break.',
+    },
+    {
+      id: 'soviet', name: 'The Soviet Union', short: 'Soviets', plural: false,
+      blurb: 'Endless tanks, summer uniforms (in winter), and a brass band packed for the victory parade in Helsinki.',
+      names: {
+        soldier: 'Comrade', heavy: 'Commissar', scout: 'Brass Band', engineer: 'Sapper', sniper: 'Marksman',
+        jeep: 'Aerosan', tank: 'T-28 (3 Turrets)', artillery: 'Howitzer', helicopter: 'Ishak (Donkey)', bomber: 'Bread Basket',
+        hq: 'Command Izba', barracks: 'Loudspeaker Tent', turret: 'Maxim Nest', wall: 'Barbed Wire', mine: 'Samovar Cart',
+        workshop: 'Tank Depot', airbase: 'Ice Airfield', bridge: 'Log Bridge', ramp: 'Slippery Slope',
+      },
+      icons: { hq: '🏠', barracks: '📢', wall: '🕸️', mine: '🫖', ramp: '🛷' },
+      win: 'Strike up the band! It finally gets to play.',
+      lose: 'The brass band goes home. The tuba stays behind.',
+    },
+  ],
   palette,
   teamBase: GREATCOAT,
   roofBase: [0.3, 0.32, 0.36],
   soldier: buildSoldier,
   vehicle: { jeep: buildSled, tank: buildTank, artillery: buildMortar },
   aircraft: { helicopter: buildFokker, bomber: buildBlenheim },
-  buildings: BUILD,
+  buildings: Object.fromEntries(Object.keys(BUILD).map((k) => [k, (g, t, f) => (soviet(f) && SOVIET_BUILD[k] ? SOVIET_BUILD[k] : BUILD[k])(g, t, f)])),
   drawTile,
   surface,
   background,

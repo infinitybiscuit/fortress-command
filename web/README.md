@@ -176,6 +176,23 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
     - **Log Bridge**, and a **Ski Jump** (Ramp).
   - **Effects:** shots are tracers, mortar bombs and tank shells. Every blast throws up a fountain of snow.
   - **Menus:** midnight blue, snow white and Finnish blue.
+  - **Sides:** play as **Finland** (everything above) or **the Soviet Union**, who arrived in summer uniforms (in winter) with a brass band packed for the victory parade:
+    - **Comrade**s in khaki greatcoats and pointy budenovka hats, with rosy cold noses (Soldier).
+    - A **Commissar** in a leather coat with a megaphone (Heavy).
+    - The **Brass Band**: a tuba player (Scout).
+    - **Sapper** with a pickaxe (Engineer).
+    - **Marksman** (Sniper).
+    - **Aerosan** propeller sledge (Jeep).
+    - **T-28 (3 Turrets)** (Tank).
+    - **Howitzer** (Artillery).
+    - **Ishak (Donkey)**, the stubby I-16 fighter's real nickname (Helicopter).
+    - **Bread Basket** bomber (Bomber).
+    - A **Command Izba** with an onion-domed cupola (HQ).
+    - A **Loudspeaker Tent** broadcasting surrender appeals (Barracks).
+    - **Barbed Wire** (Wall).
+    - A **Samovar Cart** (Mine).
+    - A **Tank Depot**, with no tally of captured tanks to paint (Workshop).
+    - The Maxim Nest and Ice Airfield are shared, and the ramp becomes the **Slippery Slope**.
 
 - **Cartel Wars:** an 80s action-movie turf war on the border, with fictional outfits only. No real cartels or people appear, and the only "product" on show is tacos.
   - **Setting:** a neon synthwave sunset with a big striped sun, mesas and buttes, and a border town with a domed church and a water tower. A helicopter silhouette drifts past, palms and saguaros stand in front, and desert dust drifts in the heat. The ground is red earth under sand, and the platforms are rusty shipping containers.
@@ -203,6 +220,24 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
     - **Plank Bridge** and **Loading Ramp** (Ramp).
   - **Effects:** shots are tracers, tank shells, improvised rockets and bombs.
   - **Menus:** neon pink, teal and sunset gold.
+  - **Sides:** play as **the Cartel** (everything above) or **the Cops**, straight out of an 80s cop show:
+    - **Vice Cop**s in pastel blazers and aviators (Soldier).
+    - **SWAT** with a riot shield (Heavy).
+    - **K-9**, a police dog in a team vest (Scout).
+    - **Forensics** in white coveralls with a camera (Engineer).
+    - **Sharpshooter** (Sniper).
+    - **Police Cruiser** with a lightbar (Jeep).
+    - **SWAT Truck** (Tank).
+    - **Riot Van** (Artillery).
+    - **Police Chopper** (Helicopter).
+    - **Police Blimp** (Bomber).
+    - A brick **Precinct** with blinking blue lamps (HQ).
+    - The **Police Academy** (Barracks).
+    - A **Checkpoint** (Turret).
+    - **Barricade** (Wall).
+    - A **Donut Shop** with a giant glowing donut on the roof (Mine).
+    - An **Impound Lot** (Workshop).
+    - The airstrip, bridge and ramp are shared.
 
 - **Trade Wars:** a political satire of Donald Trump's tariffs and how they backfired. He appears as a caricature (orange tan, swoop of yellow hair, pale goggle marks and an endless red tie) on the HQ billboard, and as a floating baby balloon. He is never a combat unit. Fallen units are just knocked flat, with no blood.
   - **Setting:** a bright Washington sky with the baby balloon bobbing over a skyline of a domed capitol, towers, and stock boards whose line only goes down. The ground is immaculate striped golf turf with topiary and water hazards, and the water hazards hold ice floes of tariffed penguins. Price tags flutter down from the sky. The platforms are gilded marble ledges.
@@ -271,7 +306,7 @@ Each theme is one file in `js/themes/`. A theme can also replace the explosion d
 
 ## Choosing sides
 
-Some themes split their armies into **sides**. In Civil War you fight for the Union or the Confederacy. Under the **Theme** button, the title screen shows which sides a theme has.
+Some themes split their armies into **sides**: the Union or the Confederacy in Civil War, Finns or Soviets in Winter War, the Cartel or the Cops in Cartel Wars. Under the **Theme** button, the title screen shows which sides a theme has.
 
 - **Offline:** tapping a mode opens **Choose your side**. Each card previews that side's troops and vehicles in your team colour. **🎲 Surprise me** picks at random. In **1 vs 1 Local**, Blue picks first and then Red, and Red is steered towards the other side. CPUs take whichever sides are left, sharing them round in Free-for-All. Your last pick is remembered for each theme, and **Restart** keeps everyone's sides.
 - **Online:** the host's theme is the room's war for everyone, shown at the top of the lobby, and the host can change it with **Change ▸**. Each seat shows its side. Tap your own side to switch it; the host can also set each CPU's side. Guests see the host's war while they're in the room, and their own theme comes back when they leave.
