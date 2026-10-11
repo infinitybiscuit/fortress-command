@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="Slop the War"
-config/description="Slop the War - a strategic base-building war game"
+config/name="Slop Wars"
+config/description="Slop Wars - a strategic base-building war game"
 run/main_scene="res://scenes/game/game_scene.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 
@@ -74,14 +74,14 @@ export_path="export/html5/index.html"
 [preset.1]
 name="Windows"
 platform="Windows"
-export_path="export/windows/slop_the_war.exe"
+export_path="export/windows/slop_wars.exe"
 
 [preset.2]
 name="Linux"
 platform="Linux/X11"
-export_path="export/linux/slop_the_war"
+export_path="export/linux/slop_wars"
 
 [preset.3]
 name="macOS"
 platform="macOS"
-export_path="export/macos/slop_the_war.zip"
+export_path="export/macos/slop_wars.zip"

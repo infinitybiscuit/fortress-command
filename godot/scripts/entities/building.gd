@@ -1,4 +1,4 @@
-## Building — Slop the War Building Entity
+## Building — Slop Wars Building Entity
 ## Migrated from HTML5/JS to Godot GDScript
 ## Handles building stats, construction, auto-attack turrets, and training queue
 

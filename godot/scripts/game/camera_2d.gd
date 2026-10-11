@@ -1,4 +1,4 @@
-## Camera2D — Slop the War RTS Camera Controller
+## Camera2D — Slop Wars RTS Camera Controller
 ## Handles smooth lerp pan, edge-scrolling, WASD/arrow pan, and camera limits.
 ## Attach to the Camera2D node in game_scene.tscn.
 

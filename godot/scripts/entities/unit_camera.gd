@@ -1,4 +1,4 @@
-## UnitCamera — Camera2D with world bounds clamping for Slop the War
+## UnitCamera — Camera2D with world bounds clamping for Slop Wars
 ## Follows the Unit and clamps to world boundaries (200x20 tiles at 32px each)
 
 class_name UnitCamera

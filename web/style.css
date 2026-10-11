@@ -282,6 +282,7 @@ button {
   letter-spacing: 0;
 }
 .overlay h1 { font-size: 30px; line-height: 1.35; }
+#subtitle { margin: -4px 0 10px; font-family: var(--pixel); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text); opacity: 0.9; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .overlay h2 { font-size: 30px; line-height: 1.35; }
 .online-title { font-size: 24px !important; }
 .tagline { color: var(--text); font-family: var(--pixel); font-size: 10px; line-height: 1.7; }
