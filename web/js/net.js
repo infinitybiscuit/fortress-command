@@ -316,7 +316,7 @@ export function encodeSnapshot(game) {
       u.flash > 0 ? 1 : 0, r2(u.cooldownTimer)]),
     b: game.buildings.map((b) => [b.id, BI[b.type], b.faction, b.tx, b.ty, Math.ceil(b.hp), r2(b.progress),
       b.constructing ? 1 : 0, b.queue.map((t) => UI[t]), b.trainCurrent ? UI[b.trainCurrent] : -1,
-      r2(b.trainTimer), b.trainTotal, b.flash > 0 ? 1 : 0, b.dir || 0]),
+      r2(b.trainTimer), b.trainTotal, b.flash > 0 ? 1 : 0, b.seg ? [b.seg.x1, b.seg.y1, b.seg.x2, b.seg.y2].map(r1) : 0]),
     pr: game.projectiles.map((p) => [p.id, SHOT_KINDS.indexOf(p.kind), r1(p.x), r1(p.y), r2(p.angle),
       r2(p.exploded), p.splash, p.radius]),
   };
@@ -372,12 +372,12 @@ export function applySnapshot(g, s) {
 
   const blds = new Map(g.buildings.map((b) => [b.id, b]));
   let changed = s.b.length !== g.buildings.length;
-  g.buildings = s.b.map(([id, ti, f, tx, ty, hp, progress, constructing, queue, cur, timer, total, flash, dir]) => {
+  g.buildings = s.b.map(([id, ti, f, tx, ty, hp, progress, constructing, queue, cur, timer, total, flash, seg]) => {
     let b = blds.get(id);
     if (!b) {
       b = new Building(g, BUILD_KEYS[ti], tx, ty, f);
       b.id = id;
-      if (dir) b.dir = dir;
+      if (seg) b.setSeg({ x1: seg[0], y1: seg[1], x2: seg[2], y2: seg[3] });
       changed = true;
     }
     Object.assign(b, {
@@ -400,7 +400,7 @@ export function applySnapshot(g, s) {
     g.map.buildingTiles.clear();
     g.map.wallTiles.clear();
     g.map.spanTiles.clear();
-    g.map.rampDirs.clear();
+    g.map.ramps.clear();
     for (const b of g.buildings) g.map.occupy(b);
   }
   g.players.forEach((p, i) => { p.hq = g.buildings.find((b) => b.type === 'hq' && b.faction === i) || null; });

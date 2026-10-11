@@ -1,6 +1,6 @@
 // Game state, economy, AI and win conditions. Ported from archive/godot-era/godot/scripts/game/game_scene.gd.
 import {
-  TILE_SIZE, TILE_EMPTY, TILE_RAMP, WORLD_W, MAP_W, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
+  TILE_SIZE, TILE_EMPTY, WORLD_W, WORLD_H, RAMP_MAX_ANGLE, RAMP_MAX_LEN, MAP_W, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
 } from './config.js';
 import { TileMap } from './tilemap.js';
 import { Unit, Building, Projectile, State, canReach, distTo } from './entities.js';
@@ -64,9 +64,9 @@ export class Game {
 
   buildingById(id) { return this.buildings.find((b) => b.id === id && !b.dead) || null; }
 
-  spawnBuilding(type, tx, ty, faction, dir = 0) {
+  spawnBuilding(type, tx, ty, faction, seg = null) {
     const b = new Building(this, type, tx, ty, faction);
-    if (dir) b.dir = dir; // ramps: which way the slope rises
+    if (seg) b.setSeg(seg); // ramps: a plank between two points
     this.buildings.push(b);
     this.map.occupy(b);
     return b;
@@ -79,9 +79,7 @@ export class Game {
     let ty = tapTy;
     // Fingers are imprecise: snap to the surface in the tapped column (bridges
     // span open air, so they stay exactly where tapped).
-    // Ramps can hang diagonally off a staircase, so a valid tapped tile wins.
-    const floatingRamp = type === 'ramp' && this.map.canPlace(tx, ty, 1, 1, 'ramp');
-    if (type !== 'bridge' && !floatingRamp) {
+    if (type !== 'bridge') {
       while (ty > 0 && this.map.isSolid(tx, ty)) ty--;
       while (ty < this.map.groundTop - 1 && !this.map.isSolid(tx, ty + 1)) ty++;
     }
@@ -124,6 +122,7 @@ export class Game {
   tryPlaceAt(playerIdx, type, tx, ty) {
     const p = this.players[playerIdx];
     const d = BUILDING_TYPES[type];
+    if (!d || d.isRamp) return "Can't place here!"; // ramps go through tryPlaceRamp
     if (p.money < d.cost) return 'Not enough credits!';
     const pl = this.placementAt(type, tx, ty, playerIdx);
     if (pl.reason === 'zone') return 'Too far from your base!';
@@ -133,46 +132,87 @@ export class Game {
     return null;
   }
 
-  // A ramp laid point to point: start on (or beside) solid footing, then run
-  // diagonally toward the pointer, one piece per column, stopping where the
-  // slope meets a platform or bridge (going up) or the ground (going down).
-  // `dir` is the way the slope rises.
-  rampRun(playerIdx, start, wx, wy) {
+  // ── Ramps ──────────────────────────────────────────────────────────────
+  // Laid like Poly Bridge planks: drag from one point to another. Ends snap
+  // to what's near them (another ramp's end, a platform's corner, or any
+  // ground/platform surface), so joints sit flush. `anchor` says the end
+  // rests on something.
+  rampSnap(wx, wy, radius) {
     const T = TILE_SIZE;
-    const cols = Math.round(this.dx((start.tx + 0.5) * T, wx) / T);
-    const d = Math.sign(cols) || 1;
-    const up = wy < (start.ty + 1) * T;
-    // Heading down from a spot on a platform: begin over its edge, level with the deck.
-    const below = this.map.get(start.tx, start.ty + 1);
-    const off = !up && below !== TILE_EMPTY && below !== TILE_RAMP ? 1 : 0;
-    const sx = start.tx + d * off, sy = start.ty + off;
-    // The run is as long as the drag covers both across and up (or down), so
-    // dragging onto a platform's top stops the slope level with its deck.
-    const rows = up ? Math.floor(((sy + 1) * T - wy) / T) : Math.ceil((wy - sy * T) / T);
-    const n = Math.max(1, Math.min(16, Math.abs(cols) + 1 - off, rows));
-    const tiles = this.map.rampRun(sx, sy, d, up, n);
-    const cost = tiles.length * BUILDING_TYPES.ramp.cost;
-    const first = tiles.length ? this.placementAt('ramp', tiles[0][0], tiles[0][1], playerIdx) : { reason: 'terrain' };
-    const zone = tiles.some(([tx]) => !this.inBuildZone(playerIdx, tx, 1));
-    const reason = first.reason || (zone ? 'zone' : null);
-    return { run: true, tiles, dir: up ? d : -d, cost, valid: !reason, reason, tx: start.tx, ty: start.ty, w: 1, h: 1 };
+    let best = null;
+    let bestD = radius;
+    const consider = (x, y, weight = 1) => {
+      const d = Math.hypot(x - wx, y - wy) * weight;
+      if (d <= bestD) { bestD = d; best = { x, y, anchor: true }; }
+    };
+    for (const seg of this.map.ramps.values()) { consider(seg.x1, seg.y1, 0.6); consider(seg.x2, seg.y2, 0.6); }
+    const m = this.map;
+    const solid = (tx, ty) => m.get(tx, ty) !== TILE_EMPTY;
+    const surface = (tx, ty) => solid(tx, ty) && !solid(tx, ty - 1);
+    for (let tx = Math.floor((wx - radius) / T); tx <= Math.floor((wx + radius) / T); tx++) {
+      for (let ty = Math.floor((wy - radius) / T); ty <= Math.floor((wy + radius) / T) + 1; ty++) {
+        if (!surface(tx, ty)) continue;
+        // Deck corners at a platform's open ends pull hardest: that's where a
+        // ramp joins it cleanly.
+        if (!solid(tx - 1, ty)) consider(tx * T, ty * T, 0.6);
+        if (!solid(tx + 1, ty)) consider((tx + 1) * T, ty * T, 0.6);
+        // Anywhere along a surface.
+        const x = Math.max(tx * T, Math.min((tx + 1) * T, wx));
+        consider(x, ty * T);
+      }
+    }
+    return best || { x: wx, y: wy, anchor: false };
   }
 
-  tryPlaceRamp(playerIdx, tiles, dir) {
-    const p = this.players[playerIdx];
-    if (!Array.isArray(tiles) || !tiles.length || tiles.length > 16 || (dir !== 1 && dir !== -1)) return "Can't place here!";
-    if (p.money < tiles.length * BUILDING_TYPES.ramp.cost) return 'Not enough credits!';
-    for (let i = 0; i < tiles.length; i++) {
-      const [tx, ty] = tiles[i] || [];
-      if (!Number.isInteger(tx) || !Number.isInteger(ty)) return "Can't place here!";
-      // Each piece after the first must carry on diagonally from the last.
-      if (i && (Math.abs(tx - tiles[i - 1][0]) !== 1 || Math.abs(ty - tiles[i - 1][1]) !== 1)) return "Can't place here!";
-      const pl = this.placementAt('ramp', tx, ty, playerIdx);
-      if (pl.reason === 'zone') return 'Too far from your base!';
-      if (!pl.valid) return i ? null : "Can't place here!";
-      p.money -= BUILDING_TYPES.ramp.cost;
-      this.spawnBuilding('ramp', tx, ty, playerIdx, dir);
+  // A ramp from point a to point b: { x1, y1, x2, y2 } left to right, its
+  // cost, and whether it can be built (`reason` says why not).
+  rampSegment(playerIdx, a, b) {
+    const T = TILE_SIZE;
+    const [l, r] = a.x <= b.x ? [a, b] : [b, a];
+    const dx = r.x - l.x;
+    const dy = r.y - l.y;
+    const len = Math.hypot(dx, dy);
+    const pieces = Math.max(1, Math.round(len / T));
+    const out = {
+      seg: true, x1: l.x, y1: l.y, x2: r.x, y2: r.y, a, b,
+      angle: Math.round((Math.atan2(Math.abs(dy), Math.max(dx, 0.001)) * 180) / Math.PI),
+      cost: pieces * BUILDING_TYPES.ramp.cost, valid: false, reason: null,
+    };
+    const fail = (reason) => Object.assign(out, { reason });
+    if (dx < T * 0.75) return fail('short');
+    if (out.angle > RAMP_MAX_ANGLE) return fail('steep');
+    if (len > RAMP_MAX_LEN * T) return fail('long');
+    if (l.x < 0 || r.x > WORLD_W || Math.min(l.y, r.y) < 0 || Math.max(l.y, r.y) > WORLD_H) return fail('blocked');
+    if (!a.anchor && !b.anchor) return fail('float');
+    // Nothing solid in the way between the ends.
+    for (let d = 6; d < len - 6; d += 4) {
+      const x = l.x + (dx * d) / len;
+      const y = l.y + (dy * d) / len;
+      if (this.map.isSolid(Math.floor(x / T), Math.floor((y - 3) / T))) return fail('blocked');
     }
+    for (const seg of this.map.ramps.values()) {
+      // Don't stack a ramp on top of another one.
+      if (seg.x1 < r.x - 2 && seg.x2 > l.x + 2 && Math.abs(seg.y1 - l.y) < 2 && Math.abs(seg.y2 - r.y) < 2) return fail('blocked');
+    }
+    if (playerIdx != null && !this.inBuildZone(playerIdx, Math.floor(l.x / T), Math.max(1, Math.ceil(dx / T)))) return fail('zone');
+    out.valid = true;
+    return out;
+  }
+
+  tryPlaceRamp(playerIdx, a, b) {
+    const num = (v) => typeof v === 'number' && Number.isFinite(v);
+    if (!Array.isArray(a) || !Array.isArray(b) || !a.every(num) || !b.every(num)) return "Can't place here!";
+    // Re-check the ends against this map (they were snapped on the sender's).
+    const ra = this.rampSnap(a[0], a[1], 1.5);
+    const rb = this.rampSnap(b[0], b[1], 1.5);
+    const seg = this.rampSegment(playerIdx, { ...ra, x: a[0], y: a[1] }, { ...rb, x: b[0], y: b[1] });
+    if (seg.reason === 'zone') return 'Too far from your base!';
+    if (!seg.valid) return "Can't place here!";
+    const p = this.players[playerIdx];
+    if (p.money < seg.cost) return 'Not enough credits!';
+    p.money -= seg.cost;
+    this.spawnBuilding('ramp', Math.floor(seg.x1 / TILE_SIZE), Math.floor(seg.y1 / TILE_SIZE), playerIdx,
+      { x1: seg.x1, y1: seg.y1, x2: seg.x2, y2: seg.y2 });
     return null;
   }
 
@@ -180,7 +220,8 @@ export class Game {
   // half the cost scaled by remaining health. Queued units are refunded in full.
   sellValue(b) {
     if (b.type === 'hq') return 0;
-    const base = b.constructing ? b.def.cost : Math.floor(b.def.cost * 0.5 * (b.hp / b.maxHp));
+    const cost = b.cost ?? b.def.cost;
+    const base = b.constructing ? cost : Math.floor(cost * 0.5 * (b.hp / b.maxHp));
     const queued = [...b.queue, ...(b.trainCurrent ? [b.trainCurrent] : [])]
       .reduce((sum, t) => sum + UNIT_TYPES[t].cost, 0);
     return base + queued;
