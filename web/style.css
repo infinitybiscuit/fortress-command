@@ -520,3 +520,30 @@ body[data-theme="cartel"] .toast.info { background: rgba(30, 140, 130, 0.95); }
 body[data-theme="cartel"] .code-input { background: #08040a; }
 body[data-theme="cartel"] .howto ul { color: var(--text); }
 body[data-theme="cartel"] .round-btn { background: rgba(36, 20, 40, 0.88); }
+body[data-theme="tariff"] {
+  --bg: #121a30;
+  --panel: #1e2a4a;
+  --panel-2: #2c3a62;
+  --bevel-light: #f2c84a;
+  --bevel-dark: #080c18;
+  --accent: #c8322a;
+  --accent-dim: #6a1a16;
+  --text: #fff8ec;
+  --dim: #c8c0b0;
+  --good: #6ac05a;
+  --danger: #ff5a4a;
+  --gold: #f2c84a;
+}
+body[data-theme="tariff"] .menu-btn,
+body[data-theme="tariff"] .act-btn.primary { border-color: #fff0a0 #4a0e0a #4a0e0a #fff0a0; }
+body[data-theme="tariff"] .menu-btn.secondary { border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light); }
+body[data-theme="tariff"] .overlay { background: linear-gradient(#4a8ad0 0 10%, #7cb4e8 10% 20%, #bcdef6 20% 26%, #f2c84a 26% 28%, #4aa04a 28% 31%, #2e7a34 31% 33%, rgba(18, 26, 48, 0.96) 33%); }
+body[data-theme="tariff"] #overlay-pause, body[data-theme="tariff"] #overlay-gameover { background: rgba(18, 26, 48, 0.92); }
+body[data-theme="tariff"] .overlay h1, body[data-theme="tariff"] .overlay h2 { color: #f2c84a; text-shadow: 3px 3px 0 #c8322a, 6px 6px 0 #22305a; }
+body[data-theme="tariff"] #tagline { color: #fff8ec; text-shadow: 1px 1px 0 #141c38, -1px -1px 0 #141c38, 1px -1px 0 #141c38, -1px 1px 0 #141c38, 2px 2px 0 #141c38; }
+body[data-theme="tariff"] .status { background: rgba(30, 42, 74, 0.9); }
+body[data-theme="tariff"] .toast { background: rgba(200, 50, 42, 0.95); }
+body[data-theme="tariff"] .toast.info { background: rgba(34, 48, 90, 0.95); }
+body[data-theme="tariff"] .code-input { background: #080c18; }
+body[data-theme="tariff"] .howto ul { color: var(--text); }
+body[data-theme="tariff"] .round-btn { background: rgba(30, 42, 74, 0.88); }

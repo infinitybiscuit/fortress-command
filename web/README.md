@@ -204,6 +204,33 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
   - **Effects:** shots are tracers, tank shells, improvised rockets and bombs.
   - **Menus:** neon pink, teal and sunset gold.
 
+- **Trade Wars:** a political satire of Donald Trump's tariffs and how they backfired. He appears as a caricature (orange tan, swoop of yellow hair, pale goggle marks and an endless red tie) on the HQ billboard, and as a floating baby balloon. He is never a combat unit. Fallen units are just knocked flat, with no blood.
+  - **Setting:** a bright Washington sky with the baby balloon bobbing over a skyline of a domed capitol, towers, and stock boards whose line only goes down. The ground is immaculate striped golf turf with topiary and water hazards, and the water hazards hold ice floes of tariffed penguins. Price tags flutter down from the sky. The platforms are gilded marble ledges.
+  - **Infantry:**
+    - **Tariff Agent**s in navy customs uniforms (Soldier).
+    - **Steel Tariff** steelworkers with I-beam cannons (Heavy).
+    - **Penguin**s from the islands that got tariffed, in team scarves (Scout).
+    - **Lobbyist**s with briefcases (Engineer).
+    - **Economist**s who saw it all coming from miles away (Sniper).
+  - **Vehicles:**
+    - **Golf Cart** with a golf-ball gun (Jeep).
+    - **Golden Tank** with spinner rims (Tank).
+    - **Tariff Launcher**, which lobs giant percentage signs (Artillery).
+  - **Air:**
+    - **Spin Copter** (Helicopter).
+    - **Hot Air Blimp** wearing a yellow comb-over (Bomber).
+  - **Buildings:**
+    - The **Golden Tower**, whose billboard tie reaches all the way to the door and whose eyes shift about (HQ).
+    - **Rally Tent** (Barracks).
+    - **Tariff Booth** (Turret).
+    - The **Beautiful Wall**, with a slightly taller ladder leaning on it (Wall).
+    - The **Golf Resort**, which is where the money actually comes from (Mine).
+    - **Factory (Soon)**, boarded up under a "coming soon" clock banner (Workshop).
+    - **Gilded Helipad** (Airbase).
+    - **Burned Bridge** (Bridge) and **Price Ramp**, where everything only goes up (Ramp).
+  - **Effects:** blasts burst into red, white, blue and gold confetti.
+  - **Menus:** gold, red and navy. Tagline: "The other countries pay. Believe me."
+
 Each theme is one file in `js/themes/`. A theme can also replace the explosion drawing (`explode`). It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
 
 ## Free-for-All: looping map
@@ -332,7 +359,7 @@ After about 3 minutes the CPU builds an airbase and adds helicopters and bombers
 | `js/game.js` | `game/game_scene.gd` (economy, AI, spawning, win check) |
 | `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` (now theme-driven) |
 | `js/pixel.js` | new: pixel-art toolkit and the active palette |
-| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War and Cartel Wars artwork |
+| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War, Cartel Wars and Trade Wars artwork |
 | `js/main.js` | new: camera, touch input, HUD and panels, overlays, main loop |
 
 ### Differences from the Godot build
