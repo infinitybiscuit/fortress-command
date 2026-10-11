@@ -55,7 +55,7 @@ export function applyCommand(game, p, cmd) {
     case 'place':
       return game.tryPlaceAt(p, cmd.type, cmd.tx, cmd.ty);
     case 'ramp':
-      return game.tryPlaceRamp(p, cmd.tiles, cmd.dir);
+      return game.tryPlaceRamp(p, cmd.a, cmd.b);
     case 'train': {
       const b = ownBuilding(cmd.id);
       return b && game.train(p, b, cmd.type) ? null : 'Not enough credits!';

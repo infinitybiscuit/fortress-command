@@ -1,7 +1,7 @@
 // Slop Wars (web) — app shell: camera, touch input, UI panels and main loop.
 import {
   WORLD_W, MAP_W, MAP_H, TILE_SIZE, GROUND_LEVEL_TILE, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
-  UNIT_ICONS, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize, ONLINE_LAYOUTS,
+  UNIT_ICONS, RAMP_MAX_ANGLE, RAMP_MAX_LEN, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize, ONLINE_LAYOUTS,
 } from './config.js';
 import { Game } from './game.js';
 import { canReach } from './entities.js';
@@ -53,7 +53,7 @@ let paused = true;
 let selectedBuilding = null;
 let pendingBuild = null;    // building type in placement mode
 let ghost = null;           // current placement preview
-let rampStart = null;       // ramps are laid point to point: the tile the run starts from
+let rampStart = null;       // ramps are laid point to point: where the first end went
 let markers = [];           // move-order feedback
 let statusText = '';
 let panelKey = '';
@@ -307,46 +307,51 @@ function handleTap(sx, sy) {
   clearSelection();
 }
 
-// Ramps go point to point: the first tap (or press) picks where the slope
-// starts, the second where it ends; the run follows the diagonal between them.
+// Ramps are planks laid like Poly Bridge: press (or tap) where one end goes
+// and drag (or tap) to where the other goes. Ends snap onto ground, platform
+// corners and other ramps' ends; fingers get a bigger snap.
+const snapRadius = () => (finePointer.matches ? 16 : 28);
+const rampTo = (wx, wy) => game.rampSegment(active, rampStart, game.rampSnap(wx, wy, snapRadius()));
+
 function rampTap(wx, wy) {
   if (!rampStart) { startRamp(wx, wy); return; }
-  const run = game.rampRun(active, rampStart, wx, wy);
+  const seg = rampTo(wx, wy);
   // With a mouse the second click builds; fingers preview first, then confirm.
-  const same = !finePointer.matches && ghost?.run && ghost.tiles.length === run.tiles.length && ghost.dir === run.dir;
-  ghost = run;
-  if (run.valid && (finePointer.matches || same)) confirmPlacement();
+  const same = !finePointer.matches && ghost?.seg && Math.hypot(ghost.b.x - seg.b.x, ghost.b.y - seg.b.y) < 8;
+  ghost = seg;
+  if (seg.valid && (finePointer.matches || same)) confirmPlacement();
   else showRampStatus();
 }
 
 function startRamp(wx, wy) {
-  const pl = game.placementFor('ramp', wx, wy, active);
-  if (!pl.valid) {
-    ghost = pl;
-    setStatus(pl.reason === 'zone' ? 'Too far from your base — build inside the green zone'
-      : 'Start a ramp on the ground, a platform, or beside a platform edge');
-    return false;
-  }
-  rampStart = { tx: pl.tx, ty: pl.ty };
-  ghost = game.rampRun(active, rampStart, (pl.tx + 0.5) * TILE_SIZE, pl.ty * TILE_SIZE);
-  setStatus(finePointer.matches ? 'Drag or move to where the ramp should end' : 'Now tap (or drag) to where the ramp should end');
+  const p = game.rampSnap(wx, wy, snapRadius());
+  rampStart = p;
+  ghost = { point: true, ...p };
+  setStatus(finePointer.matches ? 'Drag to where the other end goes' : 'Now tap or drag to where the other end goes');
   return true;
 }
 
 function showRampStatus() {
-  if (!ghost?.run) return;
-  if (ghost.reason === 'zone') setStatus('Too far from your base — build inside the green zone');
-  else if (!ghost.valid) setStatus("Can't build there — try another spot");
-  else setStatus(`${ghost.tiles.length} piece${ghost.tiles.length > 1 ? 's' : ''} · 💰${ghost.cost} — ${finePointer.matches ? 'click to build' : 'press Place'}`);
+  if (!ghost?.seg) return;
+  const why = {
+    zone: 'Too far from your base — build inside the green zone',
+    steep: `Too steep (${ghost.angle}°) — keep it under ${RAMP_MAX_ANGLE}°`,
+    long: `Too long — ${RAMP_MAX_LEN} tiles at most`,
+    short: 'Too short — drag further',
+    float: 'Attach one end to the ground, a platform or another ramp',
+    blocked: "Something's in the way",
+  }[ghost.reason];
+  setStatus(why || `${ghost.angle}° · 💰${ghost.cost} — ${finePointer.matches ? 'let go or click to build' : 'press Place'}`);
 }
 
 function confirmPlacement() {
   if (!ghost || !pendingBuild) return;
-  if (ghost.run) {
+  if (ghost.point) return;
+  if (ghost.seg) {
     if (game.players[active].money < ghost.cost) { toast('Not enough credits!'); return; }
     if (ghost.reason === 'zone') { toast('Too far from your base!'); return; }
     if (!ghost.valid) { toast("Can't place here!"); return; }
-    const err = issue({ c: 'ramp', tiles: ghost.tiles, dir: ghost.dir });
+    const err = issue({ c: 'ramp', a: [ghost.a.x, ghost.a.y], b: [ghost.b.x, ghost.b.y] });
     if (err) { toast(err); return; }
     toast(`${nameOf('ramp')} placed`, 'info');
     // Stay in ramp mode for the next one, unless the money's run out.
@@ -462,7 +467,10 @@ let hoverReason = '';
 function updateHoverGhost() {
   if (!pendingBuild || !hover || !game || gesture) return;
   const [rawX, wy] = screenToWorld(hover.x, hover.y);
-  if (rampStart) { ghost = game.rampRun(active, rampStart, game.normX(rawX), wy); showRampStatus(); return; }
+  if (pendingBuild === 'ramp') {
+    if (rampStart) { ghost = rampTo(game.normX(rawX), wy); showRampStatus(); } else ghost = { point: true, ...game.rampSnap(game.normX(rawX), wy, snapRadius()) };
+    return;
+  }
   const pl = game.placementFor(pendingBuild, game.normX(rawX), wy, active);
   ghost = pl;
   const reason = pl.reason === 'zone' ? 'zone' : pl.valid ? 'ok' : 'bad';
@@ -497,8 +505,8 @@ canvas.addEventListener('pointerdown', (e) => {
     // A finger that goes down on a ramp's start point drags out its end.
     if (pendingBuild === 'ramp' && rampStart && game) {
       const [rawX, wy] = screenToWorld(e.offsetX, e.offsetY);
-      const near = Math.abs(game.dx((rampStart.tx + 0.5) * TILE_SIZE, game.normX(rawX))) < TILE_SIZE * 1.5
-        && Math.abs((rampStart.ty + 0.5) * TILE_SIZE - wy) < TILE_SIZE * 1.5;
+      const near = Math.abs(game.dx(rampStart.x, game.normX(rawX))) < TILE_SIZE * 1.5
+        && Math.abs(rampStart.y - wy) < TILE_SIZE * 1.5;
       if (near) gesture.type = 'ramp';
     }
   } else if (pointers.size === 2) {
@@ -530,7 +538,7 @@ canvas.addEventListener('pointermove', (e) => {
       if (g.type === 'ramp') {
         if (far > BOX_MIN) g.moved = true;
         const [rawX, wy] = screenToWorld(e.offsetX, e.offsetY);
-        ghost = game.rampRun(active, rampStart, game.normX(rawX), wy);
+        ghost = rampTo(game.normX(rawX), wy);
         showRampStatus();
       } else if (g.type === 'box') Object.assign(g, { lx: e.offsetX, ly: e.offsetY });
       else if (g.type === 'drag') panBy(g, e.offsetX, e.offsetY);
@@ -559,7 +567,7 @@ canvas.addEventListener('pointermove', (e) => {
   }
   if (gesture.type === 'ramp') {
     const [rawX, wy] = screenToWorld(e.offsetX, e.offsetY);
-    ghost = game.rampRun(active, rampStart, game.normX(rawX), wy);
+    ghost = rampTo(game.normX(rawX), wy);
     showRampStatus();
     return;
   }
@@ -574,7 +582,7 @@ function endMouse(e) {
   gesture = null;
   if (!g || e.type !== 'pointerup') { cam.vx = cam.vy = 0; updateCursor(); return; }
   if (g.type === 'click') (g.shift ? toggleUnitAt : handleTap)(e.offsetX, e.offsetY);
-  else if (g.type === 'ramp' && g.moved && ghost?.run) confirmPlacement(); // let go to build
+  else if (g.type === 'ramp' && g.moved && ghost?.seg) confirmPlacement(); // let go to build
   else if (g.type === 'box') boxSelect(g);
   else if (g.type === 'mpan' && !g.moved && g.button === 2) handleCommand(e.offsetX, e.offsetY);
   // A mouse drag stops where it's let go; no fling.
@@ -711,12 +719,12 @@ function renderPanel() {
   if (mode === 'place') {
     const d = BUILDING_TYPES[pendingBuild];
     const tip = pendingBuild === 'bridge' ? 'Extend sideways from a platform or another bridge.'
-      : pendingBuild === 'ramp' ? `${finePointer.matches ? 'Press where the slope starts and drag to where it ends. Right-click or Esc cancels.' : 'Tap where the slope starts, then tap or drag to where it ends, then press Place.'} Units only climb it when you send them somewhere up top.`
+      : pendingBuild === 'ramp' ? `${finePointer.matches ? 'Press where one end goes and drag to the other. Right-click or Esc cancels.' : 'Tap where one end goes, then tap or drag to the other, then press Place.'} Ends snap to the ground, platform edges and other ramps. Up to ${RAMP_MAX_ANGLE}° steep, 💰${BUILDING_TYPES.ramp.cost} per tile of length. Units only climb it when you send them somewhere up top.`
         : 'Must sit on solid ground or a platform.';
     const zoneTip = ' Build inside the green zone near your base.';
     panel.innerHTML = `
       <div class="panel-head"><div class="panel-title">${iconOf(pendingBuild)} Place ${nameOf(pendingBuild)}</div>
-        <div class="panel-sub">💰 ${d.cost} · ${d.buildTime}s</div></div>
+        <div class="panel-sub">💰 ${d.cost}${pendingBuild === 'ramp' ? ' per tile' : ` · ${d.buildTime}s`}</div></div>
       <div class="hint">${pendingBuild === 'ramp' ? '' : finePointer.matches ? 'Point at the battlefield and click to build. Right-click or Esc cancels. ' : 'Tap the battlefield to position it, then tap the same spot again or press Place. '}${tip}${zoneTip}</div>
       <div class="row" style="margin-top:auto">
         <button class="act-btn" data-act="cancel">Cancel<kbd class="key">Esc</kbd></button>

@@ -1,4 +1,5 @@
 // Units, buildings and projectiles. Ported from archive/godot-era/godot/scripts/entities/*.gd.
+import { TileMap } from './tilemap.js';
 import {
   WORLD_W, WORLD_H, MAP_H, TILE_SIZE, TILE_GROUND, TILE_BRIDGE, GRAVITY, TERMINAL_VELOCITY, UNIT_W, UNIT_H, UNIT_TYPES, BUILDING_TYPES,
   PROJECTILE_SPEED, PROJECTILE_RADIUS,
@@ -366,12 +367,11 @@ export class Unit {
 
     this.vy = Math.min(this.vy + GRAVITY * dt, TERMINAL_VELOCITY);
 
-    // Standing on a ramp's slope? Then the slope under the unit's middle
-    // decides its height, so wide vehicles don't hop as their wheels cross
-    // onto the ground or deck.
-    const sx = Math.floor(this.x / ts);
-    const onSlope = this.onGround && [Math.floor((this.y - 1) / ts), Math.floor(this.y / ts)]
-      .some((ty) => map.isRamp(sx, ty) && Math.abs(map.rampSurface(sx, ty, this.x) - this.y) < 2);
+    // Standing on a ramp? Then the slope under the unit's middle decides its
+    // height, so wide vehicles don't hop as their wheels cross onto the
+    // ground or deck.
+    const slope = this.onGround && this.ramp && map.ramps.has(this.ramp.id)
+      && this.x >= this.ramp.x1 && this.x <= this.ramp.x2 ? this.ramp : null;
 
     let newX = this.x + this.vx * dt;
     if (this.vx !== 0) {
@@ -381,12 +381,14 @@ export class Unit {
       const tyBot = Math.floor((this.y - 2) / ts);
       let blocked = false;
       for (let ty = tyTop; ty <= tyBot; ty++) {
-        // Ramps are slopes, not blocks: walk straight onto them.
-        if (map.isRamp(tx, ty) || !map.isSolidForFaction(tx, ty, this.faction)) continue;
-        // Coming up a ramp, a wide unit's front reaches the platform at the
-        // top before its middle does: let it overlap that ledge.
-        if (this.onGround && map.isRamp(tx - dir, ty) && map.rampDir(tx - dir, ty) === dir
-          && map.enemyWallAt(tx, ty, this.faction) == null) continue;
+        if (!map.isSolidForFaction(tx, ty, this.faction)) continue;
+        // Coming up a ramp, a wide unit's front reaches the deck at the top
+        // before its middle does: let it overlap the ledge the ramp meets.
+        if (slope && map.enemyWallAt(tx, ty, this.faction) == null) {
+          const [hx, hy] = slope.y1 < slope.y2 ? [slope.x1, slope.y1] : [slope.x2, slope.y2];
+          const side = dir > 0 ? tx * ts : (tx + 1) * ts;
+          if (Math.abs(hy - ty * ts) <= 4 && Math.abs(hx - side) <= 6) continue;
+        }
         blocked = true;
         const wallId = map.enemyWallAt(tx, ty, this.faction);
         if (wallId != null) this.blockedBy = this.game.buildingById(wallId);
@@ -403,10 +405,8 @@ export class Unit {
     let newY = this.y + this.vy * dt;
     const cx = Math.floor(this.x / ts);
     // ...including stepping down onto a slope from the deck at its top.
-    const fy = Math.floor(this.y / ts);
-    const slopeMode = onSlope || (this.onGround && [fy - 1, fy, fy + 1].some((ty) => {
-      if (!map.isRamp(cx, ty)) return false;
-      const sy = map.rampSurface(cx, ty, this.x);
+    const slopeMode = !!slope || (this.onGround && map.rampsAt(this.x).some((seg) => {
+      const sy = TileMap.rampY(seg, this.x);
       return sy >= this.y - 0.5 && sy <= this.y + halfW + 4;
     }));
     const txL = slopeMode ? cx : Math.floor((this.x - halfW + 2) / ts);
@@ -419,7 +419,7 @@ export class Unit {
       outer: for (let ty = oldFeet; ty <= newFeet; ty++) {
         if (ty * ts < this.y - 14) continue; // a ledge we're already deep inside
         for (let tx = txL; tx <= txR; tx++) {
-          if (map.isSolid(tx, ty) && !map.isRamp(tx, ty)) {
+          if (map.isSolid(tx, ty)) {
             newY = ty * ts;
             this.vy = 0;
             this.onGround = true;
@@ -430,10 +430,10 @@ export class Unit {
     } else {
       const headTy = Math.floor((newY - h) / ts);
       for (let tx = txL; tx <= txR; tx++) {
-        if (map.isSolid(tx, headTy) && !map.isRamp(tx, headTy)) { newY = (headTy + 1) * ts + h; this.vy = 0; break; }
+        if (map.isSolid(tx, headTy)) { newY = (headTy + 1) * ts + h; this.vy = 0; break; }
       }
     }
-    if (this.vy >= 0) newY = this.rideRamp(map, newY, wasGrounded, onSlope);
+    if (this.vy >= 0) newY = this.rideRamp(map, newY, wasGrounded, !!slope);
     this.y = newY;
   }
 
@@ -449,19 +449,20 @@ export class Unit {
   // Stand on the slope of a ramp under the unit's middle: step up it (at most
   // one sub-step's climb), follow it down while walking, or land on it.
   rideRamp(map, newY, wasGrounded, onSlope) {
-    const ts = TILE_SIZE;
-    const STEP = 14;
-    const tx = Math.floor(this.x / ts);
+    const STEP = 16;
     const snapDown = wasGrounded && !this.onGround ? Math.max(STEP, this.w / 2 + 4) : 0;
     let best = null;
-    for (let ty = Math.floor((this.y - STEP) / ts); ty <= Math.floor((newY + snapDown) / ts); ty++) {
-      if (!map.isRamp(tx, ty)) continue;
-      const s = map.rampSurface(tx, ty, this.x);
+    let bestSeg = null;
+    for (const seg of map.rampsAt(this.x)) {
+      const s = TileMap.rampY(seg, this.x);
       if (s < this.y - STEP || s > newY + snapDown) continue;
       if (this.onGround && s >= newY) continue; // already standing higher
-      if (!onSlope && s < this.y - 0.5 && !this.wantsUp()) continue; // not going up there
-      if (best == null || s < best) best = s;
+      // Walking on the level, only step onto a ramp heading up when going up there.
+      const rising = Math.sign(this.vx) * (seg.y1 - seg.y2) > 0 || (s < this.y - 0.5);
+      if (!onSlope && wasGrounded && rising && !this.wantsUp()) continue;
+      if (best == null || s < best) { best = s; bestSeg = seg; }
     }
+    this.ramp = bestSeg; // the ramp being walked on, if any
     if (best == null) return newY;
     this.vy = 0;
     this.onGround = true;
@@ -520,10 +521,33 @@ export class Building {
     this.dead = false;
   }
 
+  // A ramp is a plank from (x1, y1) to (x2, y2), x1 < x2. Its box wraps the
+  // plank; taps only hit near the plank itself.
+  setSeg(seg) {
+    seg = this.seg = { ...seg, id: this.id };
+    this.x = seg.x1;
+    this.y = Math.min(seg.y1, seg.y2) - 4;
+    this.w = seg.x2 - seg.x1;
+    this.h = Math.abs(seg.y2 - seg.y1) + 10;
+    this.tx = Math.floor(this.x / TILE_SIZE);
+    this.ty = Math.floor(this.y / TILE_SIZE);
+    // Longer ramps take longer to build and take more punishment.
+    const pieces = Math.max(1, Math.round(Math.hypot(this.w, seg.y2 - seg.y1) / TILE_SIZE));
+    this.maxHp = this.hp = this.def.hp * pieces;
+    this.cost = this.def.cost * pieces;
+    this.buildTime = 1.5 + pieces;
+    return this;
+  }
+
   bounds() { return { x: this.x, y: this.y, w: this.w, h: this.h }; }
   centre() { return [this.x + this.w / 2, this.y + this.h / 2]; }
   containsPoint(px, py, pad = 0) {
     if (this.game.wrap) { const cx = this.x + this.w / 2; px = cx + this.game.dx(cx, px); }
+    if (this.seg) {
+      const { x1, y1, x2, y2 } = this.seg;
+      const t = Math.max(0, Math.min(1, ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / ((x2 - x1) ** 2 + (y2 - y1) ** 2)));
+      return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1))) <= 10 + pad;
+    }
     return px >= this.x - pad && px <= this.x + this.w + pad && py >= this.y - pad && py <= this.y + this.h + pad;
   }
 

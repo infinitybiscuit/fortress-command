@@ -6,7 +6,7 @@ import {
   TILE_SIZE, MAP_W, MAP_H, WORLD_W, WORLD_H, UNIT_H, BUILDING_TYPES,
   TILE_EMPTY, TILE_GROUND, TILE_PLATFORM, TILE_BRIDGE, TILE_RAMP, UNIT_TYPES,
 } from './config.js';
-import { RAMP_FOOT } from './tilemap.js';
+import { TileMap } from './tilemap.js';
 import { G, T, A, C, canvas, flip, rect, disc, hash, team, setPalette, sideOf, setSides, withSide } from './pixel.js';
 import classic from './themes/classic.js';
 import robots from './themes/robots.js';
@@ -76,31 +76,34 @@ function buildingSprite(b) {
   });
 }
 
-// Ramps are diagonal bridges drawn from the theme's bridge deck: one column
-// of its planking, stepped one art pixel per column so the deck runs corner
-// to corner. Where a ramp meets a platform it gets a short flat landing over
-// the edge; resting on the ground it ends in a flat foot, so both ends sit
-// square against the blocks. Canvas has 2px spare each side for the landing.
-const LAND = 2;
-function rampSprite(b, dir, footed, landing) {
-  return sprite(`ramp:${b.faction}:${dir}:${+footed}${+landing}`, 1, () => {
-    const deck = buildingSprite({ type: 'bridge', faction: b.faction, wt: 1, ht: 1 }).c;
-    const dg = deck.getContext('2d');
-    const alpha = (x, y) => dg.getImageData(x, y, 1, 1).data[3];
-    let th = 0;
-    while (th < 8 && alpha(0, th) > 0) th++;
-    th = Math.max(3, th);
-    const foot = RAMP_FOOT / G;
-    const [c, g] = canvas(T + LAND * 2, footed ? T : T + th);
-    const column = (i, top) => g.drawImage(deck, i % 4 === 3 ? 3 : 0, 0, 1, th, LAND + i, top, 1, th);
-    for (let i = 0; i < T; i++) {
-      let top = dir > 0 ? T - 1 - i : i;
-      if (footed) top = Math.min(top, T - foot);
-      column(i, top);
-    }
-    if (landing) for (let k = 1; k <= LAND; k++) column(dir > 0 ? T - 1 + k : -k, 0);
-    return { c, ax: LAND, ay: 0 };
-  });
+// A ramp is a plank between two points, drawn from the theme's bridge deck:
+// one column of its planking (with a slat every few pixels) laid along the
+// slope, one art pixel per column. Where the plank's underside would dip into
+// the ground or a platform it's trimmed, so the ends sit flush.
+function rampSprite(b) {
+  const key = `${theme.id}:${b.faction}`;
+  if (b.rampSpr?.key === key) return b.rampSpr;
+  const deck = buildingSprite({ type: 'bridge', faction: b.faction, wt: 1, ht: 1 }).c;
+  const dg = deck.getContext('2d');
+  let th = 0;
+  while (th < 8 && dg.getImageData(0, th, 1, 1).data[3] > 0) th++;
+  th = Math.max(3, th);
+  const { x1, y1, x2, y2 } = b.seg;
+  const m = b.game.map;
+  const ox = Math.floor(x1 / G);
+  const oy = Math.floor(Math.min(y1, y2) / G);
+  const cols = Math.max(1, Math.ceil(x2 / G) - ox);
+  const [c, g] = canvas(cols, Math.ceil(Math.abs(y2 - y1) / G) + th + 1);
+  for (let i = 0; i < cols; i++) {
+    const wx = Math.max(x1, Math.min(x2, (ox + i + 0.5) * G));
+    const wy = TileMap.rampY(b.seg, wx);
+    const top = Math.floor(wy / G + 0.001);
+    const floor = m.floorBelow(wx, wy, th * G);
+    const h = floor == null ? th : Math.min(th, Math.max(2, Math.floor(floor / G) - top));
+    g.drawImage(deck, i % 4 === 3 ? 3 : 0, 0, 1, h, i, top - oy, 1, h);
+  }
+  b.rampSpr = { key, c, ox, oy };
+  return b.rampSpr;
 }
 
 // A unit's sprite as an image URL, for menus in themes that use sprite icons.
@@ -144,8 +147,7 @@ export function drawTerrain(ctx, map, view) {
       const x = tx * T;
       const y = ty * T;
       const v = Math.floor(hash(col * 31 + ty) * 4);
-      const above = map.get(tx, ty - 1);
-      const surface = above === TILE_EMPTY || above === TILE_RAMP; // ramps are thin slopes, not cover
+      const surface = map.get(tx, ty - 1) === TILE_EMPTY;
       let img;
       if (k === TILE_GROUND) {
         const depth = ty - map.groundTop;
@@ -229,15 +231,9 @@ function hpBar(ctx, x, y, w, ratio) {
 
 // ── Buildings ──────────────────────────────────────────────────────────────
 export function drawBuilding(ctx, b) {
-  const m = b.game.map;
-  let s;
-  if (b.type === 'ramp') {
-    const dir = m.rampDir(b.tx, b.ty);
-    const ahead = m.get(b.tx + dir, b.ty);
-    s = rampSprite(b, dir, m.rampFooted(b.tx, b.ty), ahead === TILE_PLATFORM || ahead === TILE_BRIDGE);
-  } else s = buildingSprite(b);
-  const x = A(b.x) - s.ax;
-  const y = A(b.y);
+  const s = b.seg ? rampSprite(b) : buildingSprite(b);
+  const x = b.seg ? s.ox : A(b.x);
+  const y = b.seg ? s.oy : A(b.y);
   const w = s.c.width;
   const h = s.c.height;
   if (b.constructing) {
@@ -366,21 +362,34 @@ export function drawBuildZones(ctx, zones, view) {
 }
 
 export function drawGhost(ctx, pl) {
-  if (pl.run) {
-    // A ramp run: the diagonal it will follow, a few pixels thick.
-    const col = pl.valid ? '#5ee03a' : C.red;
-    if (!pl.tiles.length) { drawGhost(ctx, { ...pl, run: false }); return; }
-    ctx.fillStyle = col;
-    for (const [tx, ty] of pl.tiles) {
-      for (let i = 0; i < T; i++) {
-        const top = ty * T + (pl.dir > 0 ? T - 1 - i : i);
-        ctx.globalAlpha = 0.85;
-        ctx.fillRect(tx * T + i, top, 1, 2);
+  if (pl.seg || pl.point) {
+    // A ramp being laid: the plank's line, with a marker on each end that's
+    // solid when it has snapped onto something.
+    const col = pl.point || pl.valid ? '#5ee03a' : C.red;
+    const end = (p) => {
+      const x = Math.round(p.x / G);
+      const y = Math.round(p.y / G);
+      ctx.fillStyle = C.O;
+      ctx.fillRect(x - 3, y - 3, 7, 7);
+      ctx.fillStyle = col;
+      if (p.anchor) ctx.fillRect(x - 2, y - 2, 5, 5);
+      else { ctx.fillRect(x - 2, y - 2, 5, 1); ctx.fillRect(x - 2, y + 2, 5, 1); ctx.fillRect(x - 2, y - 2, 1, 5); ctx.fillRect(x + 2, y - 2, 1, 5); }
+    };
+    if (pl.seg) {
+      const n = Math.max(1, Math.round(Math.hypot(pl.x2 - pl.x1, pl.y2 - pl.y1) / G));
+      ctx.fillStyle = col;
+      for (let i = 0; i <= n; i++) {
+        const x = Math.round((pl.x1 + ((pl.x2 - pl.x1) * i) / n) / G);
+        const y = Math.round((pl.y1 + ((pl.y2 - pl.y1) * i) / n) / G);
+        ctx.globalAlpha = 0.9;
+        ctx.fillRect(x, y, 1, 2);
         ctx.globalAlpha = 0.3;
-        ctx.fillRect(tx * T + i, top + 2, 1, 3);
+        ctx.fillRect(x, y + 2, 1, 3);
       }
-    }
-    ctx.globalAlpha = 1;
+      ctx.globalAlpha = 1;
+      end(pl.a);
+      end(pl.b);
+    } else end(pl);
     return;
   }
   const x = pl.tx * T;
@@ -438,6 +447,15 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache, zones = null)
           t.fillRect(Math.floor(tx * TILE_SIZE * sx), Math.floor(ty * TILE_SIZE * sy), Math.ceil(TILE_SIZE * sx), Math.max(1, Math.ceil(TILE_SIZE * sy * 0.35)));
         }
       }
+    }
+    // Ramps as sloped lines.
+    t.strokeStyle = mm.ramp;
+    t.lineWidth = Math.max(1, TILE_SIZE * sy * 0.4);
+    for (const seg of game.map.ramps.values()) {
+      t.beginPath();
+      t.moveTo(seg.x1 * sx, seg.y1 * sy);
+      t.lineTo(seg.x2 * sx, seg.y2 * sy);
+      t.stroke();
     }
     Object.assign(terrainCache, { version: game.map.version, w: cw, h: ch, theme });
   }
