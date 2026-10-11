@@ -12,11 +12,12 @@ import robots from './themes/robots.js';
 import medieval from './themes/medieval.js';
 import gangster from './themes/gangster.js';
 import warring from './themes/warring.js';
+import steampunk from './themes/steampunk.js';
 
 export { G };
 
 // ── Themes ─────────────────────────────────────────────────────────────────
-export const THEMES = [classic, robots, medieval, gangster, warring];
+export const THEMES = [classic, robots, medieval, gangster, warring, steampunk];
 let theme = null;
 const sprites = new Map();
 const tiles = {};

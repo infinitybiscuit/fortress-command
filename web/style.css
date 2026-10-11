@@ -438,3 +438,30 @@ body[data-theme="warring"] .toast.info { background: rgba(90, 110, 60, 0.95); }
 body[data-theme="warring"] .code-input { background: #0a0504; }
 body[data-theme="warring"] .howto ul { color: var(--text); }
 body[data-theme="warring"] .round-btn { background: rgba(36, 20, 18, 0.88); }
+body[data-theme="steampunk"] {
+  --bg: #120c0c;
+  --panel: #241614;
+  --panel-2: #3a2420;
+  --bevel-light: #c8964a;
+  --bevel-dark: #0c0606;
+  --accent: #a82a2a;
+  --accent-dim: #5a1414;
+  --text: #f6e8cc;
+  --dim: #c8aa84;
+  --good: #8ab06a;
+  --danger: #e8503a;
+  --gold: #e8b860;
+}
+body[data-theme="steampunk"] .menu-btn,
+body[data-theme="steampunk"] .act-btn.primary { border-color: #e8b860 #3a0e0e #3a0e0e #e8b860; }
+body[data-theme="steampunk"] .menu-btn.secondary { border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light); }
+body[data-theme="steampunk"] .overlay { background: linear-gradient(#3a2448 0 10%, #8a3a50 10% 18%, #d86a4a 18% 25%, #f0a860 25% 29%, #5a3a40 29% 31%, #b87a3a 31% 33%, rgba(18, 12, 12, 0.96) 33%); }
+body[data-theme="steampunk"] #overlay-pause, body[data-theme="steampunk"] #overlay-gameover { background: rgba(18, 12, 12, 0.92); }
+body[data-theme="steampunk"] .overlay h1, body[data-theme="steampunk"] .overlay h2 { color: #e8b860; text-shadow: 3px 3px 0 #a82a2a, 6px 6px 0 #000; }
+body[data-theme="steampunk"] #tagline { color: #fff0d8; text-shadow: 1px 1px 0 #2a0a0a, -1px -1px 0 #2a0a0a, 1px -1px 0 #2a0a0a, -1px 1px 0 #2a0a0a, 2px 2px 0 #2a0a0a; }
+body[data-theme="steampunk"] .status { background: rgba(36, 22, 20, 0.9); }
+body[data-theme="steampunk"] .toast { background: rgba(168, 42, 42, 0.95); }
+body[data-theme="steampunk"] .toast.info { background: rgba(150, 100, 40, 0.95); }
+body[data-theme="steampunk"] .code-input { background: #0c0606; }
+body[data-theme="steampunk"] .howto ul { color: var(--text); }
+body[data-theme="steampunk"] .round-btn { background: rgba(36, 22, 20, 0.88); }
