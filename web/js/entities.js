@@ -368,11 +368,17 @@ export class Unit {
       const tx = Math.floor((newX + dir * halfW) / ts);
       const tyTop = Math.floor((this.y - h + 2) / ts);
       const tyBot = Math.floor((this.y - 2) / ts);
+      const tyFeet = Math.floor(this.y / ts);
+      const txFeetL = Math.floor((this.x - halfW + 2) / ts);
+      const txFeetR = Math.floor((this.x + halfW - 2) / ts);
       let blocked = false;
       for (let ty = tyTop; ty <= tyBot; ty++) {
         if (!map.isSolidForFaction(tx, ty, this.faction)) continue;
-        // Lemmings-style staircase: step up onto a ramp tile when grounded.
-        if (this.onGround && map.isRamp(tx, ty) && !map.isSolidForFaction(tx, ty - 1, this.faction)) {
+        // Lemmings-style staircase: step up onto a ramp tile when grounded,
+        // and from the top ramp onto whatever it leads to.
+        const onRamp = this.onGround && (map.isRamp(txFeetL, tyFeet) || map.isRamp(txFeetR, tyFeet));
+        if (this.onGround && (map.isRamp(tx, ty) || (onRamp && map.enemyWallAt(tx, ty, this.faction) == null))
+          && !map.isSolidForFaction(tx, ty - 1, this.faction)) {
           this.y -= ts;
           this.vy = 0;
           break;

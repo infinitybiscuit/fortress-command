@@ -86,6 +86,32 @@ export class TileMap {
     return this.buildingTiles.get(k) ?? null;
   }
 
+  // Ramps work like diagonal bridges: a ramp may float in the air as long as
+  // it carries on diagonally from a ramp, platform, bridge or the ground.
+  // Returns the [dx, dy] offsets of those diagonal neighbours.
+  rampDiagonals(tx, ty) {
+    return [[-1, 1], [1, 1], [-1, -1], [1, -1]].filter(([dx, dy]) => this.get(tx + dx, ty + dy) !== TILE_EMPTY);
+  }
+
+  // Where the next ramp in a staircase most likely goes after one at (tx, ty):
+  // straight on, away from the tile it hangs off. A ramp resting on the ground
+  // heads for the nearer platform it could reach diagonally (right by default).
+  rampNext(tx, ty) {
+    const empty = (x, y) => this.get(x, y) === TILE_EMPTY;
+    if (!this.isSolid(tx, ty + 1)) {
+      const [dx, dy] = this.rampDiagonals(tx, ty)[0] || [-1, 1];
+      return [tx - dx, ty - dy];
+    }
+    const reach = (dir) => {
+      for (let k = 2; k <= 10 && ty - k >= 0; k++) {
+        if (!empty(tx + dir * k, ty - k) || !empty(tx + dir * k, ty - k + 1)) return k;
+      }
+      return Infinity;
+    };
+    const dir = reach(-1) < reach(1) ? -1 : 1;
+    return [tx + dir, ty - 1];
+  }
+
   worldToTile(wx, wy) { return [Math.floor(wx / TILE_SIZE), Math.floor(wy / TILE_SIZE)]; }
 
   canPlace(tx, ty, w, h, type) {
@@ -108,7 +134,7 @@ export class TileMap {
       const l = this.get(tx - 1, ty), r = this.get(tx + w, ty);
       return l === TILE_BRIDGE || l === TILE_PLATFORM || r === TILE_BRIDGE || r === TILE_PLATFORM;
     }
-    if (type === 'ramp') return this.isSolid(tx, bottom + 1);
+    if (type === 'ramp') return this.isSolid(tx, bottom + 1) || this.rampDiagonals(tx, ty).length > 0;
     for (let x = tx; x < tx + w; x++) if (!this.isSolid(x, bottom + 1)) return false;
     return true;
   }
