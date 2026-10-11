@@ -111,9 +111,11 @@ button {
 }
 .toast.show { opacity: 1; }
 .toast.info { background: rgba(51, 128, 255, 0.92); }
-.zoom-ctrl { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+/* Pinch and the wheel are the main way to zoom, so the buttons stay small and faded until used. */
+.zoom-ctrl { position: absolute; right: 8px; bottom: 8px; display: flex; flex-direction: column; gap: 6px; opacity: 0.55; transition: opacity 0.15s; }
+.zoom-ctrl:hover, .zoom-ctrl:active { opacity: 1; }
 .round-btn {
-  width: 44px; height: 44px; border-radius: 50%;
+  width: 34px; height: 34px; border-radius: 50%;
   background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.15);
   font-size: 20px; font-weight: 700;
 }
