@@ -320,6 +320,28 @@ button {
 
 /* Theme switch on the title screen */
 .theme-btn { width: 100%; margin-top: 12px; }
+.theme-sides { margin: 6px 0 0; min-height: 12px; font-family: var(--pixel); font-size: 8px; color: var(--dim); }
+
+/* Choosing sides */
+.side-cards { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 14px; }
+.side-card {
+  display: grid; grid-template-columns: 1fr; gap: 6px; width: 100%; padding: 10px 12px 12px; text-align: left;
+  background: var(--panel); color: var(--text); border: 3px solid; border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
+  border-left: 6px solid var(--team); font: inherit; cursor: pointer;
+}
+.side-card.suggested { background: var(--panel-2); outline: 2px solid var(--gold); outline-offset: -5px; }
+.side-card:active { transform: translateY(2px); }
+.side-icons { display: flex; align-items: flex-end; gap: 10px; min-height: 48px; }
+.side-icons img { zoom: 2; image-rendering: pixelated; }
+.side-name { font-family: var(--pixel); font-size: 13px; color: var(--gold); text-shadow: 2px 2px 0 #000; }
+.side-blurb { font-size: 13px; line-height: 1.35; color: var(--dim); }
+
+/* The room's war, in the online lobby */
+.lobby-war { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 10px; font-family: var(--pixel); font-size: 9px; color: var(--dim); line-height: 1.6; }
+.lobby-war b { color: var(--gold); font-weight: 400; }
+#btn-lobby-theme { font-family: var(--pixel); font-size: 8px; min-height: 30px; }
+.slot-btn.side-btn { min-width: 0; color: var(--gold); }
+.slot-tag.side { color: var(--gold); }
 
 /* ── Rise of the Robots: night, rain, neon ─────────────────────────────── */
 body[data-theme="robots"] {
@@ -547,3 +569,30 @@ body[data-theme="tariff"] .toast.info { background: rgba(34, 48, 90, 0.95); }
 body[data-theme="tariff"] .code-input { background: #080c18; }
 body[data-theme="tariff"] .howto ul { color: var(--text); }
 body[data-theme="tariff"] .round-btn { background: rgba(30, 42, 74, 0.88); }
+body[data-theme="civil"] {
+  --bg: #16181e;
+  --panel: #242a36;
+  --panel-2: #323a4a;
+  --bevel-light: #c8b48a;
+  --bevel-dark: #0c0e12;
+  --accent: #2e4a8a;
+  --accent-dim: #1e3264;
+  --text: #f6f2e8;
+  --dim: #b8b2a4;
+  --good: #7ab84e;
+  --danger: #e8604a;
+  --gold: #f2d06a;
+}
+body[data-theme="civil"] .menu-btn,
+body[data-theme="civil"] .act-btn.primary { border-color: #8aa4d8 #0e1a38 #0e1a38 #8aa4d8; }
+body[data-theme="civil"] .menu-btn.secondary { border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light); }
+body[data-theme="civil"] .overlay { background: linear-gradient(#5a90cc 0 12%, #8cb4e0 12% 20%, #8aa4c2 20% 25%, #7aa45a 25% 29%, #5a9a3a 29% 31%, #7a5a3a 31% 33%, rgba(22, 24, 30, 0.96) 33%); }
+body[data-theme="civil"] #overlay-pause, body[data-theme="civil"] #overlay-gameover { background: rgba(22, 24, 30, 0.92); }
+body[data-theme="civil"] .overlay h1, body[data-theme="civil"] .overlay h2 { color: #f2d06a; text-shadow: 3px 3px 0 #2e4a8a, 6px 6px 0 #5e5e58; }
+body[data-theme="civil"] #tagline { color: #f6f2e8; text-shadow: 1px 1px 0 #1a1614, -1px -1px 0 #1a1614, 1px -1px 0 #1a1614, -1px 1px 0 #1a1614, 2px 2px 0 #1a1614; }
+body[data-theme="civil"] .status { background: rgba(36, 42, 54, 0.9); }
+body[data-theme="civil"] .toast { background: rgba(200, 50, 42, 0.95); }
+body[data-theme="civil"] .toast.info { background: rgba(46, 74, 138, 0.95); }
+body[data-theme="civil"] .code-input { background: #0c0e12; }
+body[data-theme="civil"] .howto ul { color: var(--text); }
+body[data-theme="civil"] .round-btn { background: rgba(36, 42, 54, 0.88); }

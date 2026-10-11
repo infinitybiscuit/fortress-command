@@ -34,6 +34,23 @@ export function team(f) {
   return teamCache[f];
 }
 
+// Which side each faction fights for, in themes that split their armies into
+// sides (Union or Confederacy, Finns or Soviets…). Purely cosmetic: every side
+// has the same units and stats. Factions without an entry use the default.
+let factionSides = [];
+let defaultSide = null;
+export const sideOf = (f) => factionSides[f] ?? defaultSide;
+export function setSides(list, fallback) {
+  factionSides = (list || []).slice();
+  defaultSide = fallback ?? null;
+}
+// Run fn with faction f temporarily on `side` (for side previews in menus).
+export function withSide(f, side, fn) {
+  const saved = factionSides[f];
+  factionSides[f] = side;
+  try { return fn(); } finally { factionSides[f] = saved; }
+}
+
 export function setPalette(palette, base, roof) {
   for (const k of Object.keys(C)) delete C[k];
   Object.assign(C, palette);

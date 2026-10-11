@@ -231,7 +231,53 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
   - **Effects:** blasts burst into red, white, blue and gold confetti.
   - **Menus:** gold, red and navy. Tagline: "The other countries pay. Believe me."
 
+- **Civil War:** 1861–65, played for laughs, and the first theme where you **choose a side**. The Confederate battle flag is left out: both sides fly flags in their team colour. Fallen soldiers are just knocked flat, with their hat beside them.
+  - **Setting:** a summer sky over rolling Virginia farmland with red barns, white churches and zig-zag split-rail fences. Distant cannon smoke puffs up, and picnickers watch from the hill with a parasol and a hamper, as spectators really did at Bull Run. Gunsmoke drifts across the field. The ground is grassy earth, and the platforms are rocky ridges.
+  - **The Union** (blue coats, sky-blue trousers, kepis):
+    - **Bluecoat** (Soldier).
+    - **Zouave** in a red fez and baggy red trousers (Heavy).
+    - **Cavalry** (Scout).
+    - **Pioneer** with a shovel (Engineer).
+    - **Sharpshooter** in Berdan green (Sniper).
+    - **Gatling Wagon** (Jeep).
+    - **Land Monitor**, a cheesebox turret on a raft on wheels (Tank).
+    - **The Dictator**, a huge mortar on a railway flatcar (Artillery).
+    - **Balloon Corps** (Helicopter).
+    - **Aereon Airship** (Bomber).
+    - The **Capitol (Unfinished)**, its dome half-built under a crane as it really was (HQ).
+    - **Breastworks** (Wall).
+    - **Greenback Press** (Mine).
+    - **Foundry** (Workshop).
+  - **The Confederacy** (grey coats, butternut trousers, slouch hats):
+    - **Greyback** (Soldier).
+    - **Tiger Zouave** in striped trousers (Heavy).
+    - **Plumed Cavalry** (Scout).
+    - **Sapper** (Engineer).
+    - **Whitworth Marksman** with a scope as long as his arm (Sniper).
+    - **Mule Howitzer** (Jeep).
+    - **Land Merrimack**, a sloping iron shed with a smokestack (Tank).
+    - **Napoleon** bronze field gun (Artillery).
+    - **Silk Dress Balloon**, patched together from donated dresses (Helicopter).
+    - **Flying Hunley**, a hand-cranked submarine dangling under a balloon (Bomber).
+    - A grey stone **Statehouse** (HQ).
+    - **Stone Wall** (Wall).
+    - **Paper Money Press**, which prints ever more money (Mine).
+    - **Tredegar Works** (Workshop).
+  - **Shared buildings:** Sibley-tent **Muster Tents**, an earthwork **Battery**, a **Balloon Yard**, a **Pontoon Bridge** and a **Plank Ramp**.
+  - **Effects:** Minié balls, cannonballs, fused bombs and mortar shells under clouds of gunsmoke.
+  - **Menus:** Union blue, grey and gold. Tagline: "Brother against brother. Beard against beard." Each side has its own victory and defeat one-liners.
+
 Each theme is one file in `js/themes/`. A theme can also replace the explosion drawing (`explode`). It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
+
+## Choosing sides
+
+Some themes split their armies into **sides**. In Civil War you fight for the Union or the Confederacy. Under the **Theme** button, the title screen shows which sides a theme has.
+
+- **Offline:** tapping a mode opens **Choose your side**. Each card previews that side's troops and vehicles in your team colour. **🎲 Surprise me** picks at random. In **1 vs 1 Local**, Blue picks first and then Red, and Red is steered towards the other side. CPUs take whichever sides are left, sharing them round in Free-for-All. Your last pick is remembered for each theme, and **Restart** keeps everyone's sides.
+- **Online:** the host's theme is the room's war for everyone, shown at the top of the lobby, and the host can change it with **Change ▸**. Each seat shows its side. Tap your own side to switch it; the host can also set each CPU's side. Guests see the host's war while they're in the room, and their own theme comes back when they leave.
+- **Cosmetic only:** sides look, sound and are named differently, but every side has the same units, costs and stats. Your **team colour** (Blue, Red, Green or Yellow) still marks your army, so two players can fight on the same side and still tell each other apart.
+
+**For theme authors:** list `sides: [{ id, name, short, blurb, names?, icons?, win?, lose? }]` on the theme. Sprite and building painters call `sideOf(f)` (from `pixel.js`) to draw a faction's side, building painters receive the faction as a third argument, and `background` receives the viewing player's side. A theme with fewer than two sides never shows the picker.
 
 ## Free-for-All: looping map
 
@@ -359,7 +405,7 @@ After about 3 minutes the CPU builds an airbase and adds helicopters and bombers
 | `js/game.js` | `game/game_scene.gd` (economy, AI, spawning, win check) |
 | `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` (now theme-driven) |
 | `js/pixel.js` | new: pixel-art toolkit and the active palette |
-| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War, Cartel Wars and Trade Wars artwork |
+| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War, Cartel Wars, Trade Wars and Civil War artwork |
 | `js/main.js` | new: camera, touch input, HUD and panels, overlays, main loop |
 
 ### Differences from the Godot build
