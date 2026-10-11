@@ -1,6 +1,6 @@
 {
-  "name": "Fortress Command",
-  "short_name": "Fortress",
+  "name": "Slop the War",
+  "short_name": "Slop the War",
   "description": "Side-scrolling platformer RTS. Build, train, conquer.",
   "start_url": "./",
   "scope": "./",

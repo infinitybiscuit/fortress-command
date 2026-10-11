@@ -2,7 +2,7 @@ class_name HUD
 extends Control
 
 # ═══════════════════════════════════════════════════════════════════
-# HUD - Heads-Up Display for Fortress Command
+# HUD - Heads-Up Display for Slop the War
 # Migrated from HTML5/CSS implementation
 # ═══════════════════════════════════════════════════════════════════
 

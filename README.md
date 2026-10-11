@@ -1,12 +1,21 @@
-# Fortress Command
+# Slop the War
 
-A side-scrolling platformer / RTS crossover built in Godot 4.
+A side-scrolling platformer / RTS crossover. Build bases, train armies, construct defences, and conquer the opposing forces across a procedurally generated battlefield. It was originally called *Fortress Command*.
 
-Build bases, train armies, construct defences, and conquer the opposing forces across a procedurally generated battlefield.
+**Play it:** <https://infinitybiscuit.github.io/fortress-command/> (works best on a phone in portrait; add it to your home screen).
+
+## About the name
+
+*Slop the War* is a play on words from the Stop the War Coalition, and it's meant to be ironic in two ways:
+
+- **War itself:** war is deeply un-comic by nature, and a cheerful pixel-art game about it sits uneasily with that. The name says so out loud.
+- **"AI slop":** the game was made with heavy help from AI, and we know that kind of work can be dismissed as slop. The creative name shows that humans were involved too. It could not have happened on its own.
 
 ## Web version (iPhone)
 
-The `web/` folder has a no-build HTML5 port tuned for iPhone portrait play. See [`web/README.md`](web/README.md).
+The `web/` folder has a no-build HTML5 version tuned for iPhone portrait play: online play for up to 4 players, five themes (Classic, Rise of the Robots, Medieval, Gangsters, Warring States), and more. See [`web/README.md`](web/README.md).
+
+The original Godot 4 project is in `godot/`.
 
 ## How to Play
 
@@ -57,7 +66,7 @@ Units are trained by selecting a barracks or workshop, then tapping a unit type 
 ## Project Structure
 
 ```
-fortress-command/
+.
 ├── godot/
 │   ├── project.godot          ← Godot 4 project file
 │   ├── scenes/
@@ -71,6 +80,8 @@ fortress-command/
 │       ├── entities/          ← unit & building scripts
 │       ├── game/              ← game logic scripts
 │       └── ui/                ← UI scripts
+├── web/                       ← the HTML5 game (see web/README.md)
+├── relay/                     ← Cloudflare Worker: matchmaking + TURN relay credentials
 ├── entities.txt               ← unit definitions
 ├── foundation.txt             ← building/terrain definitions
 ├── SPEC.md                    ← design specification
@@ -84,4 +95,4 @@ Open `godot/project.godot` in Godot 4. The project uses GDScript with Godot's bu
 
 ## Credits
 
-Original Fortress Command — Rick Dangerous / Lemmings / Command & Conquer inspired.
+Slop the War (originally Fortress Command): inspired by Rick Dangerous, Lemmings and Command & Conquer. Made by humans and AI together.

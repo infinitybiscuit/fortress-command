@@ -1,4 +1,4 @@
-## Building — Fortress Command Building Entity
+## Building — Slop the War Building Entity
 ## Migrated from HTML5/JS to Godot GDScript
 ## Handles building stats, construction, auto-attack turrets, and training queue
 

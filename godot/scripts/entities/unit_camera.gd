@@ -1,4 +1,4 @@
-## UnitCamera — Camera2D with world bounds clamping for Fortress Command
+## UnitCamera — Camera2D with world bounds clamping for Slop the War
 ## Follows the Unit and clamps to world boundaries (200x20 tiles at 32px each)
 
 class_name UnitCamera
