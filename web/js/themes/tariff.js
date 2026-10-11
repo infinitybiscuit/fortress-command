@@ -1196,7 +1196,7 @@ const CHINA_BUILD = {
     }
     for (let x = 5; x < 60; x += 5) for (const y of [26, 31]) { g.fillStyle = C.O; g.fillRect(x - 1, y - 1, 4, 4); g.fillStyle = C.glass; g.fillRect(x, y, 2, 2); }
     g.fillStyle = C.O; g.fillRect(16, 23, 32, 10); g.fillStyle = t.main; g.fillRect(17, 24, 30, 8);
-    g.fillStyle = C.white; disc(g, 24, 28, 3, C.white); disc(g, 24, 28, 1, t.main);
+    g.fillStyle = C.white; g.fillRect(19, 25, 2, 2); g.fillRect(24, 29, 2, 2); for (let i = 0; i < 6; i++) g.fillRect(25 - i, 25 + i, 1, 1);
     g.fillRect(29, 26, 15, 1); g.fillRect(29, 29, 12, 1);
     outlined(g, [[26, 36, 12, 12, C.steelDark]], [[26, 36, 12, 1, C.steelLight], [26, 40, 12, 1, C.steel], [26, 44, 12, 1, C.steel]]);
     g.fillStyle = C.yellow; for (let x = 26; x < 38; x += 2) g.fillRect(x, 47, 1, 1);
@@ -1233,18 +1233,20 @@ const CHINA_BUILD = {
     g.fillStyle = C.white; g.fillRect(6, 16, 4, 1);
   },
   mine(g, t) {
-    // Rare Earth Mine: terraced pit, a conveyor of magnets and a big magnet sign
-    outlined(g, [[0, 24, 32, 8, C.dirt], [3, 20, 14, 4, C.dirtMid], [6, 17, 8, 3, '#8a6a4e']], [[0, 24, 32, 1, C.pebble], [3, 20, 14, 1, C.pebble]]);
-    g.fillStyle = C.dirtDeep; g.fillRect(6, 27, 18, 3); g.fillStyle = '#b06ad0'; g.fillRect(9, 28, 2, 1); g.fillRect(16, 27, 2, 1); g.fillRect(20, 29, 1, 1);
-    for (let i = 0; i < 14; i++) { g.fillStyle = C.O; g.fillRect(14 + i, 22 - Math.round(i * 0.7), 1, 3); }
-    for (let i = 0; i < 14; i++) { g.fillStyle = C.steel; g.fillRect(14 + i, 23 - Math.round(i * 0.7), 1, 1); }
-    outlined(g, [[25, 10, 7, 4, C.steelDark]], [[25, 10, 7, 1, C.steelLight]]);
-    g.fillStyle = C.O; g.fillRect(27, 14, 2, 10);
-    // Horseshoe magnet sign on a pole
-    g.fillStyle = C.O; g.fillRect(5, 4, 2, 13); g.fillRect(1, 0, 11, 7);
-    g.fillStyle = C.boxRed; g.fillRect(2, 1, 9, 2); g.fillRect(2, 4, 9, 2); g.fillRect(2, 1, 2, 5);
-    g.fillStyle = C.steelLight; g.fillRect(9, 1, 2, 2); g.fillRect(9, 4, 2, 2);
-    g.fillStyle = t.main; g.fillRect(17, 30, 6, 2);
+    // Rare Earth Mine: a terraced spoil heap, a conveyor of glowing ore and a big magnet sign
+    outlined(g, [[0, 25, 32, 7, C.dirt], [1, 20, 22, 5, C.dirtMid], [4, 15, 16, 5, C.dirt], [7, 11, 10, 4, C.dirtMid]], [
+      [0, 25, 32, 1, C.pebble], [1, 20, 22, 1, C.pebble], [4, 15, 16, 1, C.pebble], [7, 11, 10, 1, C.pebble],
+      [3, 22, 2, 1, '#b06ad0'], [12, 17, 2, 1, '#b06ad0'], [16, 22, 1, 1, '#b06ad0'], [9, 13, 1, 1, '#b06ad0'], [22, 28, 2, 1, '#b06ad0'],
+    ]);
+    for (let i = 0; i < 9; i++) { g.fillStyle = C.O; g.fillRect(19 + i, 24 - i, 2, 3); }
+    for (let i = 0; i < 9; i++) { g.fillStyle = C.steel; g.fillRect(19 + i, 25 - i, 1, 1); }
+    outlined(g, [[25, 10, 7, 5, C.steelDark]], [[25, 10, 7, 1, C.steelLight], [27, 12, 3, 1, '#b06ad0']]);
+    g.fillStyle = C.O; g.fillRect(28, 15, 2, 10);
+    // Horseshoe magnet sign on top of the heap
+    g.fillStyle = C.O; g.fillRect(11, 6, 2, 5); g.fillRect(6, 0, 12, 7);
+    g.fillStyle = C.boxRed; g.fillRect(7, 1, 10, 2); g.fillRect(7, 4, 10, 2); g.fillRect(7, 1, 2, 5);
+    g.fillStyle = C.steelLight; g.fillRect(15, 1, 2, 2); g.fillRect(15, 4, 2, 2);
+    g.fillStyle = t.main; g.fillRect(2, 29, 8, 2);
   },
   workshop(g, t) {
     // EV Gigaplant: a gleaming white plant, blue glass band, a lightning sign
@@ -1297,7 +1299,8 @@ const CANADA_BUILD = {
       [2, 24, 24, 1, C.white], [38, 24, 24, 1, C.white], [2, 46, 60, 2, C.stoneDark], [25, 10, 14, 1, C.white],
     ]);
     for (const [x0, w] of [[2, 24], [38, 24]]) {
-      for (let k = 0; k < 5; k++) { g.fillStyle = C.O; g.fillRect(x0 + k - 1, 19 + k, w - 2 * k + 2, 1); g.fillStyle = C.copper; g.fillRect(x0 + k, 20 + k, w - 2 * k, 1); }
+      for (let k = 0; k < 5; k++) { g.fillStyle = C.O; g.fillRect(x0 + k - 1, 22 - k, w - 2 * k + 2, 3); }
+      for (let k = 0; k < 5; k++) { g.fillStyle = k === 0 ? C.copperDark : C.copper; g.fillRect(x0 + k, 23 - k, w - 2 * k, 1); }
       for (let x = x0 + 3; x < x0 + w - 2; x += 5) { gothic(g, x, 29, 6); gothic(g, x, 38, 5); }
     }
     for (let k = 0; k < 8; k++) { g.fillStyle = C.O; g.fillRect(31 - Math.floor(k * 0.8) - 1, 2 + k, 2 + Math.floor(k * 0.8) * 2 + 2, 1); g.fillStyle = C.copper; g.fillRect(31 - Math.floor(k * 0.8), 2 + k, 2 + Math.floor(k * 0.8) * 2, 1); }
@@ -1393,7 +1396,7 @@ const EU_BUILD = {
     g.fillStyle = C.steel; for (let y = 16; y < 44; y += 3) { g.fillRect(4, y, 16, 1); g.fillRect(44, y, 16, 1); }
     g.fillStyle = C.O; g.fillRect(20, 2, 24, 3); g.fillStyle = C.cabinetLight; g.fillRect(20, 2, 24, 2);
     // The team's own ring of stars over the entrance
-    outlined(g, [[24, 9, 16, 12, t.main]]);
+    outlined(g, [[24, 9, 16, 12, t.main]], [[25, 10, 14, 10, C.euBlue]]);
     stars(g, 32, 15, 4, C.star);
     outlined(g, [[26, 36, 12, 12, C.euBlueDark]], [[26, 36, 12, 1, C.euBlueLight], [31, 37, 2, 11, C.glassDark]]);
     g.fillStyle = C.O; g.fillRect(2, 44, 60, 4); g.fillStyle = C.cabinetLight; g.fillRect(2, 44, 60, 3);
@@ -1406,9 +1409,8 @@ const EU_BUILD = {
     g.fillStyle = C.O; g.fillRect(4, 13, 28, 12); g.fillStyle = '#e8eef0'; g.fillRect(5, 14, 26, 10);
     g.fillStyle = C.woodDark; g.fillRect(7, 20, 22, 2);
     for (let x = 8; x < 28; x += 4) { g.fillStyle = C.skin; g.fillRect(x, 17, 2, 2); g.fillStyle = C.grey; g.fillRect(x, 19, 2, 1); g.fillStyle = C.paper; g.fillRect(x, 20, 2, 1); }
-    disc(g, 18, 15, 1, C.O);
     outlined(g, [[35, 18, 8, 14, C.euBlueDark]], [[41, 25, 1, 1, C.star], [36, 19, 6, 2, t.main]]);
-    g.fillStyle = C.O; g.fillRect(14, 0, 20, 7); g.fillStyle = t.main; g.fillRect(15, 1, 18, 5);
+    g.fillStyle = C.O; g.fillRect(14, 0, 20, 7); g.fillStyle = t.main; g.fillRect(15, 1, 18, 5); g.fillStyle = C.euBlue; g.fillRect(20, 1, 8, 5);
     stars(g, 24, 3, 2, C.star);
     binders(g, 4, 27, 12, 5, t.main);
   },
@@ -1435,7 +1437,7 @@ const EU_BUILD = {
     outlined(g, [[2, 12, 20, 20, C.paper], [0, 9, 24, 3, C.euBlue]], [[0, 9, 24, 1, C.euBlueLight], [2, 30, 20, 2, C.paperShade]]);
     // A big euro sign
     g.fillStyle = C.O; g.fillRect(5, 14, 9, 9); g.fillStyle = C.star; g.fillRect(6, 15, 7, 7);
-    g.fillStyle = C.euBlue; g.fillRect(9, 16, 3, 1); g.fillRect(8, 17, 1, 3); g.fillRect(9, 20, 3, 1); g.fillRect(7, 18, 4, 1); g.fillRect(7, 17, 1, 0);
+    g.fillStyle = C.euBlue; g.fillRect(9, 15, 3, 1); g.fillRect(8, 16, 1, 1); g.fillRect(6, 17, 5, 1); g.fillRect(7, 18, 1, 1); g.fillRect(6, 19, 5, 1); g.fillRect(8, 20, 1, 1); g.fillRect(9, 21, 3, 1);
     outlined(g, [[14, 22, 6, 10, C.euBlueDark]], [[18, 26, 1, 1, C.star]]);
     // Stacks of gold coins out front and the outsized cheque
     for (const [x, h] of [[24, 6], [28, 9]]) { g.fillStyle = C.O; g.fillRect(x - 1, 31 - h, 5, h + 1); for (let i = 0; i < h; i++) { g.fillStyle = i % 2 ? C.goldDark : C.gold; g.fillRect(x, 31 - i, 3, 1); } }
@@ -1462,7 +1464,7 @@ function animate(ctx, b, x, y) {
   const t = team(b.faction);
   if (side === 'china') {
     if (b.type === 'hq') { for (let i = 0; i < 2; i++) { puff(ctx, x + 7, y + 1, ms, i); puff(ctx, x + 54, y + 5, ms + 600, i); } }
-    else if (b.type === 'mine') { const k = Math.floor(ms / 200) % 14; rect(ctx, x + 14 + k, y + 21 - Math.round(k * 0.7), 2, 1, '#b06ad0'); }
+    else if (b.type === 'mine') { const k = Math.floor(ms / 220) % 9; rect(ctx, x + 19 + k, y + 23 - k, 1, 1, '#d08af0'); }
     else if (b.type === 'workshop') { if (tick % 8 < 4) rect(ctx, x + 23, y + 3, 1, 1, C.white); }
     else if (b.type === 'barracks') { if (tick % 6 < 3) rect(ctx, x + 14, y + 12, 1, 2, C.yellow); }
     else if (b.type === 'airbase') { const k = Math.floor(ms / 300) % 8; rect(ctx, x + 47, y + 11 + (k < 4 ? k : 8 - k), 3, 1, C.O); }
