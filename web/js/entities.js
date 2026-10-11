@@ -1,4 +1,4 @@
-// Units, buildings and projectiles. Ported from godot/scripts/entities/*.gd.
+// Units, buildings and projectiles. Ported from archive/godot-era/godot/scripts/entities/*.gd.
 import {
   WORLD_W, WORLD_H, MAP_H, TILE_SIZE, TILE_GROUND, TILE_BRIDGE, GRAVITY, TERMINAL_VELOCITY, UNIT_W, UNIT_H, UNIT_TYPES, BUILDING_TYPES,
   PROJECTILE_SPEED, PROJECTILE_RADIUS,

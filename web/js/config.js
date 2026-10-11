@@ -1,5 +1,5 @@
 // Slop Wars (web) — game constants.
-// Ported from godot/scripts/autoload/game_config.gd and the STATS tables in
+// Ported from archive/godot-era/godot/scripts/autoload/game_config.gd and the STATS tables in
 // unit.gd / building.gd. Gameplay stats for units come from unit.gd (the
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
