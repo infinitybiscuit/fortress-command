@@ -1,6 +1,6 @@
 // Network-first service worker: always fetch fresh when online, fall back to
 // the cache so the game still launches from the home screen when offline.
-const CACHE = 'slop-wars-v38';
+const CACHE = 'slop-wars-v39';
 const ASSETS = [
   './', 'index.html', 'style.css', 'manifest.webmanifest',
   'js/main.js', 'js/game.js', 'js/commands.js', 'js/net.js', 'vendor/peerjs-1.5.4.min.js', 'vendor/fonts/press-start-2p-latin-400-normal.woff2', 'js/entities.js', 'js/tilemap.js', 'js/render.js', 'js/config.js', 'js/pixel.js', 'js/themes/classic.js', 'js/themes/robots.js', 'js/themes/medieval.js', 'js/themes/gangster.js', 'js/themes/warring.js', 'js/themes/steampunk.js', 'js/themes/winter.js', 'js/themes/cartel.js', 'js/themes/tariff.js', 'js/themes/civil.js',

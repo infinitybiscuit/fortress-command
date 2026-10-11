@@ -1,6 +1,6 @@
 // Slop Wars (web) — app shell: camera, touch input, UI panels and main loop.
 import {
-  WORLD_W, WORLD_H, MAP_W, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
+  WORLD_W, MAP_W, MAP_H, TILE_SIZE, GROUND_LEVEL_TILE, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
   UNIT_ICONS, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize, ONLINE_LAYOUTS,
 } from './config.js';
 import { Game } from './game.js';
@@ -64,16 +64,22 @@ const minimapCache = {};
 // scale = screen points per world unit. It's snapped so each art pixel
 // (G world units) covers a whole number of device pixels, keeping the pixel
 // art sharp; `zoom` is the unsnapped target that pinch gestures adjust.
-// The one exception is the fit zoom, where the whole height of the world
-// exactly fills the battlefield: games start there and the minus button stops
-// there, so there's no vertical scrolling and no wasted band of sky. Pixels
-// at that zoom may differ in size by one device pixel.
+// The one exception is the fit zoom, where the playable band (VIEW_TOP to
+// VIEW_BOTTOM) exactly fills the battlefield height: games start there and
+// zooming out stops there, so there's no vertical scrolling and no wasted
+// sky or dirt. Pixels at that zoom may differ in size by one device pixel.
 const cam = { x: 0, y: 0, scale: 1, zoom: 1, vx: 0, vy: 0 };
 let viewW = 0;
 let viewH = 0;
 let dpr = 1;
 
-function fitScale() { return Math.max(viewH / WORLD_H, viewW / WORLD_W); }
+// The camera never looks above the highest point an aircraft climbs to, or
+// more than a sliver of dirt below the ground surface.
+const VIEW_TOP = 24;
+const VIEW_BOTTOM = (MAP_H - GROUND_LEVEL_TILE) * TILE_SIZE + 24;
+const VIEW_SPAN = VIEW_BOTTOM - VIEW_TOP;
+
+function fitScale() { return Math.max(viewH / VIEW_SPAN, viewW / WORLD_W); }
 function maxScale() { return Math.max(MAX_SCALE, fitScale()); }
 function view() { return { x: cam.x, y: cam.y, w: viewW / cam.scale, h: viewH / cam.scale }; }
 
@@ -93,14 +99,13 @@ function clampCam() {
   // Looping maps pan forever; otherwise stop at the map edges.
   if (game?.wrap) cam.x = ((cam.x % WORLD_W) + WORLD_W) % WORLD_W;
   else cam.x = Math.min(Math.max(0, cam.x), WORLD_W - v.w);
-  // Taller than the world: pin the ground to the bottom of the screen.
-  cam.y = v.h >= WORLD_H ? WORLD_H - v.h : Math.min(Math.max(0, cam.y), WORLD_H - v.h);
+  cam.y = Math.min(Math.max(VIEW_TOP, cam.y), VIEW_BOTTOM - v.h);
 }
 
 function centreOn(wx, wy) {
   const v = view();
   cam.x = wx - v.w / 2;
-  cam.y = wy == null ? WORLD_H - v.h : wy - v.h / 2;
+  cam.y = wy == null ? VIEW_BOTTOM - v.h : wy - v.h / 2;
   clampCam();
 }
 
@@ -595,11 +600,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener('blur', () => keys.clear());
 
-// The buttons zoom about the middle of the battlefield, not the empty sky.
-function zoomButton(factor) {
-  const top = Math.max(0, -cam.y * cam.scale);
-  zoomAt(factor, viewW / 2, (top + viewH) / 2);
-}
+function zoomButton(factor) { zoomAt(factor, viewW / 2, viewH / 2); }
 $('btn-zoom-in').addEventListener('click', () => zoomButton(1.4));
 $('btn-zoom-out').addEventListener('click', () => zoomButton(1 / 1.4));
 
