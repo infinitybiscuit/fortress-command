@@ -657,14 +657,15 @@ function chinaSoldier(type, f, frame) {
   let details;
   if (type === 'scout') {
     // A panda on reconnaissance, in a team scarf
-    const lg = frame ? [[6, 12, 3, 4], [10, 12, 3, 4]] : [[4, 12, 3, 4], [11, 12, 3, 4]];
+    const lg = frame ? [[5, 12, 3, 4], [10, 12, 3, 4]] : [[3, 12, 3, 4], [11, 12, 3, 4]];
     parts = [
       ...lg.map((l) => [...l, C.penguin]),
-      [3, 6, 12, 7, C.white], [9, 1, 7, 6, C.white], [9, 0, 2, 2, C.penguin], [14, 0, 2, 2, C.penguin], [2, 7, 1, 2, C.white],
+      [3, 6, 11, 7, C.white], [10, 1, 7, 6, C.white], [9, 0, 2, 2, C.penguin], [16, 0, 2, 2, C.penguin], [2, 7, 1, 2, C.white],
+      frame ? [11, 8, 3, 4, C.penguin] : [12, 8, 3, 4, C.penguin],
     ];
     details = [
-      [10, 6, 4, 7, C.penguin], [12, 3, 2, 2, C.penguin], [13, 3, 1, 1, C.white], [15, 4, 1, 1, C.O], [9, 6, 6, 1, t.main], [14, 7, 1, 2, t.main],
-      [3, 11, 7, 1, C.marbleShade],
+      [3, 9, 4, 3, C.penguin], [13, 3, 2, 2, C.penguin], [14, 3, 1, 1, C.white], [16, 5, 1, 1, C.O], [14, 6, 2, 1, C.marbleShade],
+      [9, 7, 5, 1, t.main], [9, 8, 1, 2, t.main],
     ];
   } else if (type === 'heavy') {
     // Rare-earth magnet gunner: hauls a giant horseshoe magnet
@@ -812,11 +813,11 @@ function euSoldier(type, f, frame) {
     parts = [
       ...legs.map((l) => [...l, C.greyDark]), ...boots.map((b) => [...b, C.boot]),
       [4, 7, 9, 5, C.grey], [6, 3, 6, 5, C.skin], [6, 1, 6, 2, C.hair],
-      [7, 8, 4, 3, C.red], [11, 9, 4, 1, C.woodLight], [15, 7, 3, 5, C.woodDark],
+      [14, 2, 4, 3, C.red], [15, 5, 2, 2, C.woodLight], [12, 7, 8, 4, C.woodDark], [11, 9, 2, 2, C.skin],
     ];
     details = [
-      [7, 8, 4, 1, '#f06a5a'], [10, 5, 1, 1, C.O], [7, 7, 4, 1, C.skinDark], [6, 8, 1, 4, t.main], [12, 8, 1, 4, t.main],
-      [18, 7, 1, 5, C.red], [15, 7, 3, 1, C.wood],
+      [14, 2, 4, 1, '#f06a5a'], [10, 5, 1, 1, C.O], [7, 7, 4, 1, C.skinDark], [6, 8, 1, 4, t.main],
+      [12, 10, 8, 1, C.red], [12, 7, 8, 1, C.wood], [14, 8, 4, 1, C.paper],
     ];
   } else if (type === 'engineer') {
     // Regulator: grey suit, glasses, a clipboard and a ruler for bananas
@@ -990,9 +991,9 @@ function canadaPuckLauncher(f, frame) {
   const t = team(f);
   const [c, g] = canvas(32, 19);
   outlined(g, [
-    [2, 10, 22, 4, C.serge], [3, 1, 5, 9, C.gunDark], [9, 6, 9, 4, C.steel], [16, 4, 6, 3, C.gun], [21, 2, 6, 3, C.gun],
+    [2, 10, 22, 4, C.serge], [3, 1, 5, 9, C.gunDark], [9, 6, 9, 4, C.steel], [16, 4, 6, 3, C.steel], [21, 2, 6, 3, C.steel],
   ], [
-    [2, 12, 22, 1, t.main], [2, 10, 22, 1, '#e84a50'], [9, 6, 9, 1, C.steelLight], [26, 2, 1, 3, C.O],
+    [2, 12, 22, 1, t.main], [2, 10, 22, 1, '#e84a50'], [9, 6, 9, 1, C.steelLight], [16, 4, 6, 1, C.steelLight], [21, 2, 6, 1, C.steelLight], [26, 2, 1, 3, C.O],
   ]);
   for (let y = 2; y < 10; y += 2) { g.fillStyle = C.gunLight; g.fillRect(3, y, 5, 1); }
   disc(g, 13, 8, 2, C.gunDark); g.fillStyle = C.steelLight; g.fillRect(13, 8, 1, 1);
@@ -1109,8 +1110,8 @@ function euPaperPlane(f) {
   const [c, g] = canvas(46, 21);
   const col = (x) => {
     // Top of the wing slopes from the tall tail down to the nose; the keel tapers too.
-    const top = Math.round(3 + (x - 3) * 0.22);
-    const bot = Math.round(14 - (x - 3) * 0.12);
+    const top = Math.round(3 + (x - 3) * 0.2);
+    const bot = Math.round(15 - (x - 3) * 0.1);
     return [top, bot];
   };
   g.fillStyle = C.O;

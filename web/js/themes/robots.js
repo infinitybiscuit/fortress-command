@@ -901,7 +901,7 @@ function rotor(ctx, u, x, y) {
       rect(ctx, x - 16, y - 12, 32, 1, '#9aa3ad');
       ctx.globalAlpha = 1;
       const len = flick ? 15 : 9;
-      rect(ctx, x - len, y - 12, len * 2, 1, '#1d2026');
+      rect(ctx, x - len, y - 12, len * 2, 1, '#4a525c');
       const tx = u.facing > 0 ? x - 16 : x + 14;
       rect(ctx, tx, flick ? y - 11 : y - 9, 3, flick ? 3 : 1, '#5d6873');
       return;
