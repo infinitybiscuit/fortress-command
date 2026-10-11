@@ -123,6 +123,33 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
   - **Effects:** shots are crossbow bolts, great bolts, stones and fire pots.
   - **Menus:** black lacquer, vermilion and gold.
 
+- **Steam Shogun:** Japanese steampunk: an Edo-period Japan powered by brass boilers and clockwork.
+  - **Setting:** a sunset sky with a great red sun, Mount Fuji, koi airships drifting past, and a far town of pagodas and smoking factories. Cherry trees and torii gates stand in front, and blossom petals drift across everything. Brass pipes run through the earth, and the platforms are brass girders.
+  - **Infantry:**
+    - **Ashigaru** in jingasa hats with back banners and brass rifles (Soldier).
+    - **Steam Samurai** with boiler backpacks and katanas (Heavy).
+    - **Ninja** (Scout).
+    - **Tinkerer**s with wrenches (Engineer).
+    - **Teppo** marksmen (Sniper).
+  - **Vehicles:**
+    - Steam-driven **Rickshaw** (Jeep).
+    - **Kabuto Tank**, a walking beetle (Tank).
+    - **Hanabi Mortar**, which fires fireworks (Artillery).
+  - **Air:**
+    - **Tengu Flyer** with flapping wings (Helicopter).
+    - **Koi Airship** (Bomber).
+  - **Buildings:**
+    - A **Castle** on stone walls with gold finials and a great gear (HQ).
+    - **Dojo** (Barracks).
+    - **Yagura** gatling tower (Turret).
+    - **Ishigaki** stone wall (Wall).
+    - **Boiler** with pressure gauges (Mine).
+    - **Karakuri Works** (Workshop).
+    - **Sky Dock** flying koinobori (Airbase).
+    - Red **Taiko Bridge** and **Steps** (Ramp).
+  - **Effects:** shots are brass slugs, fused bombs, firework shells and cannonballs. Explosions burst like hanabi fireworks.
+  - **Menus:** black lacquer, brass and vermilion.
+
 Each theme is one file in `js/themes/`. A theme can also replace the explosion drawing (`explode`). It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
 
 ## Free-for-All: looping map
@@ -251,7 +278,7 @@ After about 3 minutes the CPU builds an airbase and adds helicopters and bombers
 | `js/game.js` | `game/game_scene.gd` (economy, AI, spawning, win check) |
 | `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` (now theme-driven) |
 | `js/pixel.js` | new: pixel-art toolkit and the active palette |
-| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters and Warring States artwork |
+| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States and Steam Shogun artwork |
 | `js/main.js` | new: camera, touch input, HUD and panels, overlays, main loop |
 
 ### Differences from the Godot build

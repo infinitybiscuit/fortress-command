@@ -1406,6 +1406,7 @@ const TAGLINES = {
   medieval: 'Raise your banners. Storm the castle.',
   gangster: 'Chicago, 1932. The custard flies at midnight.',
   warring: 'Seven kingdoms. Only one will rise.',
+  steampunk: 'Steam rises over the Land of the Rising Sun.',
 };
 function applyTheme(id) {
   const t = setTheme(id);
