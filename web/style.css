@@ -409,3 +409,32 @@ body[data-theme="gangster"] .toast.info { background: rgba(140, 104, 30, 0.95); 
 body[data-theme="gangster"] .code-input { background: #0a0708; }
 body[data-theme="gangster"] .howto ul { color: var(--text); }
 body[data-theme="gangster"] .round-btn { background: rgba(30, 22, 24, 0.88); }
+
+/* ── Warring States: black lacquer, vermilion and gold ──────────────────── */
+body[data-theme="warring"] {
+  --bg: #140c0a;
+  --panel: #241412;
+  --panel-2: #3e201a;
+  --bevel-light: #c8a050;
+  --bevel-dark: #0a0504;
+  --accent: #a82a1a;
+  --accent-dim: #5e140c;
+  --text: #f4e6c8;
+  --dim: #c8b08a;
+  --good: #8ab84a;
+  --danger: #e2502e;
+  --gold: #e8c060;
+}
+body[data-theme="warring"] .menu-btn,
+body[data-theme="warring"] .act-btn.primary { border-color: #e8c060 #3a0a06 #3a0a06 #e8c060; }
+body[data-theme="warring"] .menu-btn.secondary { border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light); }
+body[data-theme="warring"] .overlay { background: linear-gradient(#9fb2c0 0 14%, #c6cec8 14% 24%, #8e9aa2 24% 28%, #f0dcb8 28% 31%, #6a7680 31% 33%, rgba(20, 12, 10, 0.96) 33%); }
+body[data-theme="warring"] #overlay-pause, body[data-theme="warring"] #overlay-gameover { background: rgba(18, 10, 8, 0.92); }
+body[data-theme="warring"] .overlay h1, body[data-theme="warring"] .overlay h2 { color: #e8c060; text-shadow: 3px 3px 0 #a82a1a, 6px 6px 0 #000; }
+body[data-theme="warring"] #tagline { color: #fff4d6; text-shadow: 1px 1px 0 #3a0a06, -1px -1px 0 #3a0a06, 1px -1px 0 #3a0a06, -1px 1px 0 #3a0a06, 2px 2px 0 #3a0a06; }
+body[data-theme="warring"] .status { background: rgba(36, 20, 18, 0.9); }
+body[data-theme="warring"] .toast { background: rgba(168, 42, 26, 0.95); }
+body[data-theme="warring"] .toast.info { background: rgba(90, 110, 60, 0.95); }
+body[data-theme="warring"] .code-input { background: #0a0504; }
+body[data-theme="warring"] .howto ul { color: var(--text); }
+body[data-theme="warring"] .round-btn { background: rgba(36, 20, 18, 0.88); }
