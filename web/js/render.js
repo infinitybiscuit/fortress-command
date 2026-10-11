@@ -75,6 +75,19 @@ function buildingSprite(b) {
   });
 }
 
+// Ramps reuse the theme's bridge deck, stepped one art pixel per column so
+// it runs corner to corner across the tile: a diagonal bridge. The canvas is
+// taller than the tile because the deck's underside hangs below the slope.
+// Resting on solid ground, the underside is trimmed at the tile's foot.
+function rampSprite(b, dir, grounded) {
+  return sprite(`ramp:${b.faction}:${dir}:${grounded}`, 1, () => {
+    const deck = buildingSprite({ type: 'bridge', faction: b.faction, wt: 1, ht: 1 }).c;
+    const [c, g] = canvas(T, grounded ? T : T + 8);
+    for (let i = 0; i < T; i++) g.drawImage(deck, i, 0, 1, 8, i, dir > 0 ? T - 1 - i : i, 1, 8);
+    return { c, ax: 0, ay: 0 };
+  });
+}
+
 // A unit's sprite as an image URL, for menus in themes that use sprite icons.
 export function unitIcon(type, faction) {
   const key = `${theme.id}:${sideOf(faction)}:${type}:${faction}`;
@@ -116,7 +129,8 @@ export function drawTerrain(ctx, map, view) {
       const x = tx * T;
       const y = ty * T;
       const v = Math.floor(hash(col * 31 + ty) * 4);
-      const surface = map.get(tx, ty - 1) === TILE_EMPTY;
+      const above = map.get(tx, ty - 1);
+      const surface = above === TILE_EMPTY || above === TILE_RAMP; // ramps are thin slopes, not cover
       let img;
       if (k === TILE_GROUND) {
         const depth = ty - map.groundTop;
@@ -200,7 +214,10 @@ function hpBar(ctx, x, y, w, ratio) {
 
 // ── Buildings ──────────────────────────────────────────────────────────────
 export function drawBuilding(ctx, b) {
-  const s = buildingSprite(b);
+  const m = b.game.map;
+  const s = b.type === 'ramp'
+    ? rampSprite(b, m.rampDir(b.tx, b.ty), m.isSolid(b.tx, b.ty + 1) && !m.isRamp(b.tx, b.ty + 1))
+    : buildingSprite(b);
   const x = A(b.x);
   const y = A(b.y);
   const w = s.c.width;

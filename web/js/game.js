@@ -78,7 +78,9 @@ export class Game {
     let ty = tapTy;
     // Fingers are imprecise: snap to the surface in the tapped column (bridges
     // span open air, so they stay exactly where tapped).
-    if (type !== 'bridge') {
+    // Ramps can hang diagonally off a staircase, so a valid tapped tile wins.
+    const floatingRamp = type === 'ramp' && this.map.canPlace(tx, ty, 1, 1, 'ramp');
+    if (type !== 'bridge' && !floatingRamp) {
       while (ty > 0 && this.map.isSolid(tx, ty)) ty--;
       while (ty < this.map.groundTop - 1 && !this.map.isSolid(tx, ty + 1)) ty++;
     }

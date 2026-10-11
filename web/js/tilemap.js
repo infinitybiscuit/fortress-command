@@ -86,6 +86,45 @@ export class TileMap {
     return this.buildingTiles.get(k) ?? null;
   }
 
+  // Ramps are diagonal bridges: each tile is a 45° slope, and a run of them
+  // laid corner to corner makes one long incline. A ramp rises toward its
+  // "high side" (+1 = right, -1 = left), worked out from what it joins:
+  // the next ramp up or down the diagonal, or a platform/bridge it meets at
+  // the top. A lone ramp on the ground faces the nearer platform it could reach.
+  rampDir(tx, ty) {
+    const ramp = (x, y) => this.get(x, y) === TILE_RAMP;
+    const deck = (x, y) => { const t = this.get(x, y); return t === TILE_PLATFORM || t === TILE_BRIDGE; };
+    const score = (d) => 2 * (ramp(tx - d, ty + 1) + ramp(tx + d, ty - 1)) + deck(tx + d, ty);
+    const r = score(1), l = score(-1);
+    if (r !== l) return r > l ? 1 : -1;
+    return this.rampReach(tx, ty, -1) < this.rampReach(tx, ty, 1) ? -1 : 1;
+  }
+
+  // Ramps needed going `dir` from (tx, ty) before the slope meets a platform
+  // or bridge at its top (Infinity if none within reach).
+  rampReach(tx, ty, dir) {
+    for (let k = 1; k <= 10 && ty - k + 1 >= 0; k++) {
+      const t = this.get(tx + dir * k, ty - k + 1);
+      if (t === TILE_PLATFORM || t === TILE_BRIDGE) return k;
+      if (t !== TILE_EMPTY) return Infinity;
+    }
+    return Infinity;
+  }
+
+  // World y of a ramp's walking surface at world x (clamped to its tile).
+  rampSurface(tx, ty, wx) {
+    const fx = Math.max(0, Math.min(TILE_SIZE, wx - tx * TILE_SIZE));
+    return ty * TILE_SIZE + (this.rampDir(tx, ty) > 0 ? TILE_SIZE - fx : fx);
+  }
+
+  // Where the next ramp of a run goes after one at (tx, ty): on up the slope,
+  // or down it when the top already meets a platform, bridge or ramp.
+  rampNext(tx, ty) {
+    const d = this.rampDir(tx, ty);
+    const topJoined = this.get(tx + d, ty) !== TILE_EMPTY || this.get(tx + d, ty - 1) === TILE_RAMP;
+    return topJoined ? [tx - d, ty + 1] : [tx + d, ty - 1];
+  }
+
   worldToTile(wx, wy) { return [Math.floor(wx / TILE_SIZE), Math.floor(wy / TILE_SIZE)]; }
 
   canPlace(tx, ty, w, h, type) {
@@ -108,7 +147,16 @@ export class TileMap {
       const l = this.get(tx - 1, ty), r = this.get(tx + w, ty);
       return l === TILE_BRIDGE || l === TILE_PLATFORM || r === TILE_BRIDGE || r === TILE_PLATFORM;
     }
-    if (type === 'ramp') return this.isSolid(tx, bottom + 1);
+    if (type === 'ramp') {
+      // Rest on the ground, a platform or a bridge; meet a platform or bridge
+      // side-on (the slope's top lines up with its deck); or carry on
+      // diagonally from another ramp.
+      const below = this.get(tx, ty + 1);
+      const side = [this.get(tx - 1, ty), this.get(tx + 1, ty)];
+      return (below !== TILE_EMPTY && below !== TILE_RAMP)
+        || side.some((t) => t === TILE_PLATFORM || t === TILE_BRIDGE)
+        || [[-1, 1], [1, 1], [-1, -1], [1, -1]].some(([dx, dy]) => this.get(tx + dx, ty + dy) === TILE_RAMP);
+    }
     for (let x = tx; x < tx + w; x++) if (!this.isSolid(x, bottom + 1)) return false;
     return true;
   }
