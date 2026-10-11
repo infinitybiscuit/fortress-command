@@ -243,7 +243,7 @@ function handleTap(sx, sy) {
   const mine = (e) => e.faction === active;
   const enemy = (e) => e.faction !== active;
 
-  if (pendingBuild === 'ramp') { rampTap(wx, wy); return; }
+  if (pendingBuild === 'bridge') { rampTap(wx, wy); return; }
   if (pendingBuild) {
     const pl = game.placementFor(pendingBuild, wx, wy, active);
     const sameSpot = ghost && ghost.tx === pl.tx && ghost.ty === pl.ty;
@@ -338,10 +338,10 @@ function showRampStatus() {
     steep: `Too steep (${ghost.angle}°) — keep it under ${RAMP_MAX_ANGLE}°`,
     long: `Too long — ${RAMP_MAX_LEN} tiles at most`,
     short: 'Too short — drag further',
-    float: 'Attach one end to the ground, a platform or another ramp',
+    float: 'Attach one end to the ground, a platform or another bridge',
     blocked: "Something's in the way",
   }[ghost.reason];
-  setStatus(why || `${ghost.angle}° · 💰${ghost.cost} — ${finePointer.matches ? 'let go or click to build' : 'press Place'}`);
+  setStatus(why || `${ghost.angle ? `${ghost.angle}°` : 'Level'} · 💰${ghost.cost} — ${finePointer.matches ? 'let go or click to build' : 'press Place'}`);
 }
 
 function confirmPlacement() {
@@ -353,13 +353,13 @@ function confirmPlacement() {
     if (!ghost.valid) { toast("Can't place here!"); return; }
     const err = issue({ c: 'ramp', a: [ghost.a.x, ghost.a.y], b: [ghost.b.x, ghost.b.y] });
     if (err) { toast(err); return; }
-    toast(`${nameOf('ramp')} placed`, 'info');
+    toast(`${nameOf('bridge')} placed`, 'info');
     // Stay in ramp mode for the next one, unless the money's run out.
     const spent = net.role === 'guest' ? ghost.cost : 0;
     rampStart = null;
     ghost = null;
-    if (game.players[active].money - spent < BUILDING_TYPES.ramp.cost) cancelPlacement();
-    else setStatus(`${tap(true)} where the next ramp starts`);
+    if (game.players[active].money - spent < BUILDING_TYPES.bridge.cost) cancelPlacement();
+    else setStatus(`${tap(true)} where the next one starts`);
     return;
   }
   if (game.players[active].money < BUILDING_TYPES[pendingBuild].cost) { toast('Not enough credits!'); return; }
@@ -369,16 +369,7 @@ function confirmPlacement() {
   const err = issue({ c: 'place', type: pendingBuild, tx: ghost.tx, ty: ghost.ty });
   if (err) { toast(err); return; }
   toast(`${nameOf(pendingBuild)} placed`, 'info');
-  // Bridges are usually laid in runs — stay in placement mode, previewing
-  // the next tile along.
-  if (pendingBuild === 'bridge') {
-    ghost = game.placementAt(pendingBuild, ghost.tx + 1, ghost.ty, active);
-    // Online guests see their spend a moment later, so count it now.
-    const spent = net.role === 'guest' ? BUILDING_TYPES[pendingBuild].cost : 0;
-    if (game.players[active].money - spent < BUILDING_TYPES[pendingBuild].cost) cancelPlacement();
-  } else {
-    cancelPlacement();
-  }
+  cancelPlacement();
 }
 
 // ── Mouse orders: right-click commands, shift-click and box selection ──────
@@ -467,7 +458,7 @@ let hoverReason = '';
 function updateHoverGhost() {
   if (!pendingBuild || !hover || !game || gesture) return;
   const [rawX, wy] = screenToWorld(hover.x, hover.y);
-  if (pendingBuild === 'ramp') {
+  if (pendingBuild === 'bridge') {
     if (rampStart) { ghost = rampTo(game.normX(rawX), wy); showRampStatus(); } else ghost = { point: true, ...game.rampSnap(game.normX(rawX), wy, snapRadius()) };
     return;
   }
@@ -493,7 +484,7 @@ canvas.addEventListener('pointerdown', (e) => {
     const base = { sx: e.offsetX, sy: e.offsetY, lx: e.offsetX, ly: e.offsetY, lt: performance.now(), shift: e.shiftKey, button: e.button };
     gesture = e.button === 0 ? { type: 'click', ...base } : { type: 'mpan', moved: false, ...base };
     // Ramps: press where the slope starts and drag to where it ends.
-    if (e.button === 0 && pendingBuild === 'ramp' && game && !paused && !rampStart) {
+    if (e.button === 0 && pendingBuild === 'bridge' && game && !paused && !rampStart) {
       const [rawX, wy] = screenToWorld(e.offsetX, e.offsetY);
       if (startRamp(game.normX(rawX), wy)) gesture.type = 'ramp';
     }
@@ -503,7 +494,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (pointers.size === 1) {
     gesture = { type: 'tap', sx: e.offsetX, sy: e.offsetY, lx: e.offsetX, ly: e.offsetY, lt: performance.now() };
     // A finger that goes down on a ramp's start point drags out its end.
-    if (pendingBuild === 'ramp' && rampStart && game) {
+    if (pendingBuild === 'bridge' && rampStart && game) {
       const [rawX, wy] = screenToWorld(e.offsetX, e.offsetY);
       const near = Math.abs(game.dx(rampStart.x, game.normX(rawX))) < TILE_SIZE * 1.5
         && Math.abs(rampStart.y - wy) < TILE_SIZE * 1.5;
@@ -718,14 +709,13 @@ function renderPanel() {
 
   if (mode === 'place') {
     const d = BUILDING_TYPES[pendingBuild];
-    const tip = pendingBuild === 'bridge' ? 'Extend sideways from a platform or another bridge.'
-      : pendingBuild === 'ramp' ? `${finePointer.matches ? 'Press where one end goes and drag to the other. Right-click or Esc cancels.' : 'Tap where one end goes, then tap or drag to the other, then press Place.'} Ends snap to the ground, platform edges and other ramps. Up to ${RAMP_MAX_ANGLE}° steep, 💰${BUILDING_TYPES.ramp.cost} per tile of length. Units only climb it when you send them somewhere up top.`
+    const tip = pendingBuild === 'bridge' ? `${finePointer.matches ? 'Press where one end goes and drag to the other. Right-click or Esc cancels.' : 'Tap where one end goes, then tap or drag to the other, then press Place.'} Ends snap to the ground, platform edges and other bridges. Drag across to lie it level, or up to ${RAMP_MAX_ANGLE}° steep; 💰${BUILDING_TYPES.bridge.cost} per tile of length. Units only take a slope when you send them somewhere up or down it.`
         : 'Must sit on solid ground or a platform.';
     const zoneTip = ' Build inside the green zone near your base.';
     panel.innerHTML = `
       <div class="panel-head"><div class="panel-title">${iconOf(pendingBuild)} Place ${nameOf(pendingBuild)}</div>
-        <div class="panel-sub">💰 ${d.cost}${pendingBuild === 'ramp' ? ' per tile' : ` · ${d.buildTime}s`}</div></div>
-      <div class="hint">${pendingBuild === 'ramp' ? '' : finePointer.matches ? 'Point at the battlefield and click to build. Right-click or Esc cancels. ' : 'Tap the battlefield to position it, then tap the same spot again or press Place. '}${tip}${zoneTip}</div>
+        <div class="panel-sub">💰 ${d.cost}${pendingBuild === 'bridge' ? ' per tile' : ` · ${d.buildTime}s`}</div></div>
+      <div class="hint">${pendingBuild === 'bridge' ? '' : finePointer.matches ? 'Point at the battlefield and click to build. Right-click or Esc cancels. ' : 'Tap the battlefield to position it, then tap the same spot again or press Place. '}${tip}${zoneTip}</div>
       <div class="row" style="margin-top:auto">
         <button class="act-btn" data-act="cancel">Cancel<kbd class="key">Esc</kbd></button>
         <button class="act-btn primary" data-act="place" data-key="enter" ${ghost?.valid ? '' : 'disabled'}>Place<kbd class="key">Enter</kbd></button>
@@ -758,8 +748,7 @@ function renderPanel() {
         mine: `Earns +${BUILDING_TYPES.mine.income}/s once built.`,
         turret: 'Fires at enemy units in range, and at aircraft from much further away.',
         wall: 'Blocks enemy units. Your troops walk through.',
-        bridge: 'Walkable span. Extend it to cross gaps.',
-        ramp: 'A diagonal bridge. Units climb it when sent somewhere above.',
+        bridge: 'Walkable span, level or sloped. Units take a slope when sent somewhere up or down it.',
       }[b.type] || '';
       body = `<div class="hint">${info}</div>`;
     }

@@ -102,14 +102,16 @@ export class Unit {
     return px >= b.x - pad && px <= b.x + b.w + pad && py >= b.y - pad && py <= b.y + b.h + pad;
   }
 
-  // `y` is where on screen the order pointed: units only climb a ramp when
-  // it's above them.
+  // `y` is where on screen the order pointed: with it, units plan a route
+  // there over the ground, platforms and bridges (see TileMap.route).
   moveTo(x, y = null) {
     if (this.dead) return;
     this.resume = null;
     this.home = null;
     this.moveX = x;
     this.moveY = y;
+    this.route = null;
+    this.routeT = 0;
     this.target = null;
     this.state = State.MOVING;
   }
@@ -171,9 +173,10 @@ export class Unit {
         if (scan) this.autoEngage();
         break;
       case State.MOVING: {
+        const toX = this.followRoute(dt);
         const dx = this.game.dx(this.x, this.moveX);
-        if (Math.abs(dx) < 6) { this.vx = 0; this.state = State.IDLE; this.forced = false; break; }
-        this.vx = Math.sign(dx) * this.speed;
+        if (toX == null && Math.abs(dx) < 6) { this.vx = 0; this.state = State.IDLE; this.forced = false; this.route = null; break; }
+        this.vx = Math.sign(this.game.dx(this.x, toX ?? this.moveX)) * this.speed;
         // Attack-move: fight anything that comes into weapon range, then carry on.
         if (scan && !this.forced && this.repairRate === 0) {
           const e = this.findEnemyUnit(this.range);
@@ -433,40 +436,100 @@ export class Unit {
         if (map.isSolid(tx, headTy)) { newY = (headTy + 1) * ts + h; this.vy = 0; break; }
       }
     }
-    if (this.vy >= 0) newY = this.rideRamp(map, newY, wasGrounded, !!slope);
+    if (this.vy >= 0) newY = this.rideRamp(map, newY, wasGrounded);
     this.y = newY;
   }
 
-  // Is the unit headed somewhere above it? Only then does it start up a ramp;
-  // otherwise it walks on past the foot.
-  wantsUp() {
-    const above = (y) => y != null && y < this.y - TILE_SIZE;
-    if (this.state === State.MOVING) return above(this.moveY);
-    if (this.target && (this.state === State.ATTACKING || this.state === State.REPAIRING)) return above(this.target.centre()[1]);
-    return false;
+  // Steer along the planned route (re-planned every half second, so it copes
+  // with bridges built or knocked down on the way): the x of the next column
+  // to head for, or null once on the last stretch.
+  followRoute(dt) {
+    if (this.moveY == null || this.air) return null;
+    const key = this.ramp ? `r${this.ramp.id}` : this.onGround ? `t${Math.round(this.y / TILE_SIZE)}` : null;
+    if ((this.routeT -= dt) <= 0 || !this.route) {
+      this.routeT = 0.5;
+      this.route = this.game.map.route(this.x, this.y, key, this.moveX, this.moveY, this.h) || [];
+      this.routeP = 0;
+    }
+    const r = this.route;
+    const C = TILE_SIZE / 2;
+    const ci = Math.floor(this.game.normX(this.x) / C);
+    // Into the next column, on the surface it says: that step's done.
+    while (this.routeP + 1 < r.length && r[this.routeP + 1].i === ci && key === r[this.routeP + 1].key) this.routeP++;
+    if (this.routeP + 1 >= r.length) return null;
+    return r[this.routeP + 1].x;
   }
 
-  // Stand on the slope of a ramp under the unit's middle: step up it (at most
-  // one sub-step's climb), follow it down while walking, or land on it.
-  rideRamp(map, newY, wasGrounded, onSlope) {
+  // Is the unit headed somewhere above it (-1), below it (1), or neither (0)?
+  // Where it has a choice of ways on, that decides whether it takes a slope.
+  upOrDown() {
+    let y = null;
+    if (this.state === State.MOVING) y = this.moveY;
+    else if (this.target && (this.state === State.ATTACKING || this.state === State.REPAIRING)) {
+      const t = this.target;
+      y = t.kind === 'building' ? t.y + t.h : t.air ? t.centre()[1] : t.y;
+    }
+    if (y == null) return 0;
+    return y < this.y - TILE_SIZE ? -1 : y > this.y + TILE_SIZE ? 1 : 0;
+  }
+
+  // Stand on a bridge deck under the unit's middle: step up it (at most one
+  // sub-step's climb), follow it down while walking, or land on it. Where
+  // ways part (a slope leaving the ground or a level deck, or a level deck
+  // carrying on past the top of one), keep level unless the unit is headed
+  // up or down; with no level way on, take whatever slope there is.
+  rideRamp(map, newY, wasGrounded) {
     const STEP = 16;
-    const snapDown = wasGrounded && !this.onGround ? Math.max(STEP, this.w / 2 + 4) : 0;
-    let best = null;
-    let bestSeg = null;
+    const floor = this.onGround; // landed on solid tiles at newY
+    const snapDown = wasGrounded && !floor ? Math.max(STEP, this.w / 2 + 4) : 0;
+    const dir = Math.sign(this.vx);
+    const options = [];
     for (const seg of map.rampsAt(this.x)) {
       const s = TileMap.rampY(seg, this.x);
       if (s < this.y - STEP || s > newY + snapDown) continue;
-      if (this.onGround && s >= newY) continue; // already standing higher
-      // Walking on the level, only step onto a ramp heading up when going up there.
-      const rising = Math.sign(this.vx) * (seg.y1 - seg.y2) > 0 || (s < this.y - 0.5);
-      if (!onSlope && wasGrounded && rising && !this.wantsUp()) continue;
-      if (best == null || s < best) { best = s; bestSeg = seg; }
+      if (floor && s > newY + 0.5) continue; // a deck below the ground we're on
+      const grade = (dir * (seg.y2 - seg.y1)) / Math.max(seg.x2 - seg.x1, 1); // + is downhill
+      const way = grade < -0.05 || (seg !== this.ramp && s < this.y - 0.5) ? -1 : grade > 0.05 ? 1 : 0;
+      options.push({ seg, s, way });
     }
-    this.ramp = bestSeg; // the ramp being walked on, if any
-    if (best == null) return newY;
+    let pick = null;
+    if (!wasGrounded) {
+      // Falling: land on the highest deck in reach.
+      for (const o of options) if (!pick || o.s < pick.s) pick = o;
+    } else if (options.length && this.route?.length) {
+      // Following a route: take the surface it says to be on next.
+      const r = this.route;
+      const want = [r[this.routeP + 1]?.key, r[this.routeP]?.key];
+      // The ground just under a deck's foot counts too, to step off onto it.
+      const fy = floor ? newY : map.floorBelow(this.x, this.y - 0.5, 4);
+      const ways = fy != null ? [{ seg: null, s: fy, key: `t${Math.round(fy / TILE_SIZE)}` }, ...options] : options;
+      const cur = this.ramp ? `r${this.ramp.id}` : null;
+      for (const k of want) {
+        // Switch decks only where they meet, not by hopping between them.
+        pick = ways.find((o) => (o.key ?? `r${o.seg.id}`) === k && (k === cur || Math.abs(o.s - this.y) <= 6));
+        if (pick) break;
+      }
+    }
+    if (!pick && wasGrounded && options.length) {
+      // Ways on from where the unit stands (a deck that starts well below is
+      // only for when there's nothing else underfoot).
+      const near = (o) => o.s <= this.y + 8;
+      let ways = floor ? [{ seg: null, s: newY, way: 0 }, ...options.filter(near)] : options;
+      if (!floor && ways.some(near)) ways = ways.filter(near);
+      const want = this.upOrDown();
+      const order = want < 0 ? [-1, 0, 1] : want > 0 ? [1, 0, -1] : [0, 1, -1];
+      const rank = (o) => order.indexOf(o.way) * 2 + (o.seg === this.ramp ? 0 : 1);
+      for (const o of ways) {
+        // On the level, a climb is only for units headed up there.
+        if (o.way < 0 && o.seg !== this.ramp && want >= 0 && ways.some((w) => w.way >= 0)) continue;
+        if (!pick || rank(o) < rank(pick)) pick = o;
+      }
+    }
+    this.ramp = pick?.seg ?? null; // the deck being walked on, if any
+    if (!this.ramp) return newY;
     this.vy = 0;
     this.onGround = true;
-    return best;
+    return pick.s;
   }
 
   takeDamage(amount, source) {
