@@ -1,8 +1,8 @@
-# Slop the War — Godot Spec
+# Slop Wars — Godot Spec
 
 ## 1. Concept & Vision
 
-**Slop the War** (originally Fortress Command) is a side-scrolling platformer/RTS crossover built in Godot 4. Players build bases on procedurally generated terrain, train armies, and crush the opposition. The feel is nostalgic Command & Conquer meets Lemmings: chunky pixel-adjacent art drawn procedurally, satisfying micro-management, and frantic platformer traversal.
+**Slop Wars** (originally Fortress Command) is a side-scrolling platformer/RTS crossover built in Godot 4. Players build bases on procedurally generated terrain, train armies, and crush the opposition. The feel is nostalgic Command & Conquer meets Lemmings: chunky pixel-adjacent art drawn procedurally, satisfying micro-management, and frantic platformer traversal.
 
 **Target:** Godot 4 project using GDScript and Godot's built-in scene system. Export to desktop and mobile platforms. Touch-first mobile design with desktop keyboard/mouse support.
 
@@ -157,7 +157,7 @@ Damage flash:      #FFFFFF
 - Click/tap jumps camera to that world position
 
 ### Menu Screen
-- "SLOP THE WAR" title centered, large bold text
+- "SLOP WARS" title centered, large bold text
 - Mode buttons stacked vertically: "1 vs CPU", "1 vs 1 Local", "Free-for-All (3)", "Free-for-All (4)"
 - Tap/click to start game
 

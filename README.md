@@ -1,4 +1,4 @@
-# Slop the War
+# Slop Wars
 
 A side-scrolling platformer / RTS crossover. Build bases, train armies, construct defences, and conquer the opposing forces across a procedurally generated battlefield. It was originally called *Fortress Command*.
 
@@ -6,10 +6,12 @@ A side-scrolling platformer / RTS crossover. Build bases, train armies, construc
 
 ## About the name
 
-*Slop the War* is a play on words from the Stop the War Coalition, and it's meant to be ironic in two ways:
+*Slop Wars* started life as *Slop the War*, a play on words from the Stop the War Coalition. That joke still sits under the title on the start screen ("…or, Slop the War"), and it's meant to be ironic in two ways:
 
 - **War itself:** war is deeply un-comic by nature, and a cheerful pixel-art game about it sits uneasily with that. The name says so out loud.
 - **"AI slop":** the game was made with heavy help from AI, and we know that kind of work can be dismissed as slop. The creative name shows that humans were involved too. It could not have happened on its own.
+
+The shorter *Slop Wars* is the catchier everyday name.
 
 ## Web version (iPhone)
 
@@ -95,4 +97,4 @@ Open `godot/project.godot` in Godot 4. The project uses GDScript with Godot's bu
 
 ## Credits
 
-Slop the War (originally Fortress Command): inspired by Rick Dangerous, Lemmings and Command & Conquer. Made by humans and AI together.
+Slop Wars (originally Fortress Command, then Slop the War): inspired by Rick Dangerous, Lemmings and Command & Conquer. Made by humans and AI together.

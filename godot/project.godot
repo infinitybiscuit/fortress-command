@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="Slop the War"
-config/description="Slop the War - a strategic base-building war game"
+config/name="Slop Wars"
+config/description="Slop Wars - a strategic base-building war game"
 run/main_scene="res://scenes/game/game_scene.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 

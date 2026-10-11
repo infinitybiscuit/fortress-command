@@ -1,4 +1,4 @@
-// Slop the War (web) — app shell: camera, touch input, UI panels and main loop.
+// Slop Wars (web) — app shell: camera, touch input, UI panels and main loop.
 import {
   WORLD_W, WORLD_H, MAP_W, TILE_SIZE, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
   UNIT_ICONS, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize, ONLINE_LAYOUTS,
@@ -1199,9 +1199,9 @@ async function keepAwake(on) {
 
 async function shareInvite() {
   const url = `${location.origin}${location.pathname}?join=${net.code}`;
-  const text = `Join my Slop the War game! Room code: ${net.code}`;
+  const text = `Join my Slop Wars game! Room code: ${net.code}`;
   try {
-    if (navigator.share) await navigator.share({ title: 'Slop the War', text, url });
+    if (navigator.share) await navigator.share({ title: 'Slop Wars', text, url });
     else {
       await navigator.clipboard.writeText(`${text}\n${url}`);
       toast('Invite link copied', 'info');
@@ -1449,7 +1449,7 @@ resize();
 }
 requestAnimationFrame(frame);
 
-for (const el of document.querySelectorAll('.version')) el.textContent = `Slop the War ${VERSION}`;
+for (const el of document.querySelectorAll('.version')) el.textContent = `Slop Wars ${VERSION}`;
 
 // Keep the installed app current: check for a new build whenever it's opened,
 // and switch to it as soon as you're back on the title screen.

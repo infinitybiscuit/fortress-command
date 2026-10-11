@@ -1,4 +1,4 @@
-# Slop the War online services (Cloudflare Worker)
+# Slop Wars online services (Cloudflare Worker)
 
 The Worker is deployed as `fortress-relay`, from before the game was renamed. It keeps that name because a renamed Worker is a new Worker without the TURN secrets. Players never see it.
 

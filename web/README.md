@@ -1,6 +1,6 @@
-# Slop the War — Web (iPhone portrait)
+# Slop Wars — Web (iPhone portrait)
 
-*Slop the War* (originally *Fortress Command*). The name is a play on the Stop the War Coalition: ironic about how un-comic war really is, and about AI "slop". It was made by humans and AI together. See the [main README](../README.md#about-the-name).
+*Slop Wars* (originally *Fortress Command*, then *Slop the War*). The name started as a play on the Stop the War Coalition, and the start screen still says "…or, Slop the War". It is ironic about how un-comic war really is, and about AI "slop". It was made by humans and AI together. See the [main README](../README.md#about-the-name).
 
 A browser port of the Godot game in `../godot`. It's plain HTML5 Canvas and ES modules with
 no build step, laid out for an **iPhone 16 Pro Max in portrait** (440×956 pt, 3× display).

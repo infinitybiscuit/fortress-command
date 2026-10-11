@@ -1,4 +1,4 @@
-// Slop the War online services — a Cloudflare Worker.
+// Slop Wars online services — a Cloudflare Worker.
 //
 // 1. Matchmaking (/peerjs/…): a small PeerJS-compatible signalling server.
 //    Phones register their room code here and swap the few messages WebRTC

@@ -1,4 +1,4 @@
-## MinimapRenderer — Slop the War minimap rendering via ImageTexture.
+## MinimapRenderer — Slop Wars minimap rendering via ImageTexture.
 ## Draws terrain/buildings/units to an Image, blits it to an ImageTexture each frame.
 extends Node
 
