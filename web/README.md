@@ -177,6 +177,33 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
   - **Effects:** shots are tracers, mortar bombs and tank shells. Every blast throws up a fountain of snow.
   - **Menus:** midnight blue, snow white and Finnish blue.
 
+- **Cartel Wars:** an 80s action-movie turf war on the border, with fictional outfits only. No real cartels or people appear, and the only "product" on show is tacos.
+  - **Setting:** a neon synthwave sunset with a big striped sun, mesas and buttes, and a border town with a domed church and a water tower. A helicopter silhouette drifts past, palms and saguaros stand in front, and desert dust drifts in the heat. The ground is red earth under sand, and the platforms are rusty shipping containers.
+  - **Infantry:**
+    - **Gunman** in an open Hawaiian shirt, aviators and a gold chain (Soldier).
+    - **Enforcer** in a balaclava and plate carrier with a belt-fed gun (Heavy).
+    - **Lookout** with a team cap and a walkie-talkie (Scout).
+    - **Mechanic** in greasy overalls with a big wrench (Engineer).
+    - **Sicario** in a white suit and sunglasses with a scoped rifle (Sniper).
+  - **Vehicles:**
+    - **Technical**, a pickup with a machine gun in the bed (Jeep).
+    - **Monstruo**, a homemade armoured truck of welded plate (Tank).
+    - **Rocket Truck** with a rack of improvised rockets (Artillery).
+  - **Air:**
+    - **Narco Chopper** (Helicopter).
+    - **Smuggler Plane** (Bomber).
+  - **Buildings:**
+    - A **Hacienda** with terracotta roofs, arches, a bell tower, golden gates and palms (HQ).
+    - **Safe House** of cinderblock (Barracks).
+    - **Watchtower** with a sweeping spotlight (Turret).
+    - **Sandbags** (Wall).
+    - A perfectly legitimate **Taco Stand** with a green neon "$" in the window (Mine).
+    - **Chop Shop** (Workshop).
+    - **Airstrip** (Airbase).
+    - **Plank Bridge** and **Loading Ramp** (Ramp).
+  - **Effects:** shots are tracers, tank shells, improvised rockets and bombs.
+  - **Menus:** neon pink, teal and sunset gold.
+
 Each theme is one file in `js/themes/`. A theme can also replace the explosion drawing (`explode`). It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
 
 ## Free-for-All: looping map
@@ -305,7 +332,7 @@ After about 3 minutes the CPU builds an airbase and adds helicopters and bombers
 | `js/game.js` | `game/game_scene.gd` (economy, AI, spawning, win check) |
 | `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` (now theme-driven) |
 | `js/pixel.js` | new: pixel-art toolkit and the active palette |
-| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun and Winter War artwork |
+| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War and Cartel Wars artwork |
 | `js/main.js` | new: camera, touch input, HUD and panels, overlays, main loop |
 
 ### Differences from the Godot build

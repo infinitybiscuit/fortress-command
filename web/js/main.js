@@ -1408,6 +1408,7 @@ const TAGLINES = {
   warring: 'Seven kingdoms. Only one will rise.',
   steampunk: 'Steam rises over the Land of the Rising Sun.',
   winter: 'Minus forty. Perfect sauna weather.',
+  cartel: 'Totally legitimate business. Ask the taco stand.',
 };
 function applyTheme(id) {
   const t = setTheme(id);
