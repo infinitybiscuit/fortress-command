@@ -1,6 +1,6 @@
 // Game state, economy, AI and win conditions. Ported from archive/godot-era/godot/scripts/game/game_scene.gd.
 import {
-  TILE_SIZE, TILE_EMPTY, WORLD_W, WORLD_H, RAMP_MAX_ANGLE, RAMP_MAX_LEN, MAP_W, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
+  TILE_SIZE, TILE_EMPTY, WORLD_W, WORLD_H, RAMP_MAX_ANGLE, RAMP_MAX_LEN, RAMP_LEVEL_SNAP, MAP_W, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
 } from './config.js';
 import { TileMap } from './tilemap.js';
 import { Unit, Building, Projectile, State, canReach, distTo } from './entities.js';
@@ -77,12 +77,9 @@ export class Game {
     const d = BUILDING_TYPES[type];
     const [tx, tapTy] = this.map.worldToTile(wx, wy);
     let ty = tapTy;
-    // Fingers are imprecise: snap to the surface in the tapped column (bridges
-    // span open air, so they stay exactly where tapped).
-    if (type !== 'bridge') {
-      while (ty > 0 && this.map.isSolid(tx, ty)) ty--;
-      while (ty < this.map.groundTop - 1 && !this.map.isSolid(tx, ty + 1)) ty++;
-    }
+    // Fingers are imprecise: snap to the surface in the tapped column.
+    while (ty > 0 && this.map.isSolid(tx, ty)) ty--;
+    while (ty < this.map.groundTop - 1 && !this.map.isSolid(tx, ty + 1)) ty++;
     return this.placementAt(type, tx - Math.floor((d.w - 1) / 2), ty - d.h + 1, playerIdx);
   }
 
@@ -132,11 +129,11 @@ export class Game {
     return null;
   }
 
-  // ── Ramps ──────────────────────────────────────────────────────────────
+  // ── Bridges ────────────────────────────────────────────────────────────
   // Laid like Poly Bridge planks: drag from one point to another. Ends snap
-  // to what's near them (another ramp's end, a platform's corner, or any
-  // ground/platform surface), so joints sit flush. `anchor` says the end
-  // rests on something.
+  // to what's near them (another bridge's end or deck, a platform's corner,
+  // or any ground/platform surface), so joints sit flush. `anchor` says the
+  // end rests on something.
   rampSnap(wx, wy, radius) {
     const T = TILE_SIZE;
     let best = null;
@@ -145,7 +142,13 @@ export class Game {
       const d = Math.hypot(x - wx, y - wy) * weight;
       if (d <= bestD) { bestD = d; best = { x, y, anchor: true }; }
     };
-    for (const seg of this.map.ramps.values()) { consider(seg.x1, seg.y1, 0.6); consider(seg.x2, seg.y2, 0.6); }
+    for (const seg of this.map.ramps.values()) {
+      consider(seg.x1, seg.y1, 0.6);
+      consider(seg.x2, seg.y2, 0.6);
+      // Anywhere along its deck, to branch off it.
+      const x = Math.max(seg.x1, Math.min(seg.x2, wx));
+      consider(x, TileMap.rampY(seg, x));
+    }
     const m = this.map;
     const solid = (tx, ty) => m.get(tx, ty) !== TILE_EMPTY;
     const surface = (tx, ty) => solid(tx, ty) && !solid(tx, ty - 1);
@@ -164,10 +167,16 @@ export class Game {
     return best || { x: wx, y: wy, anchor: false };
   }
 
-  // A ramp from point a to point b: { x1, y1, x2, y2 } left to right, its
-  // cost, and whether it can be built (`reason` says why not).
+  // A bridge from point a to point b: { x1, y1, x2, y2 } left to right, its
+  // cost, and whether it can be built (`reason` says why not). Nearly flat
+  // drags lie level, pivoting on the attached end.
   rampSegment(playerIdx, a, b) {
     const T = TILE_SIZE;
+    const tilt = Math.atan2(Math.abs(b.y - a.y), Math.max(Math.abs(b.x - a.x), 0.001)) * 180 / Math.PI;
+    if (tilt <= RAMP_LEVEL_SNAP && a.y !== b.y) {
+      if (!b.anchor) b = { ...b, y: a.y };
+      else if (!a.anchor) a = { ...a, y: b.y };
+    }
     const [l, r] = a.x <= b.x ? [a, b] : [b, a];
     const dx = r.x - l.x;
     const dy = r.y - l.y;
@@ -176,7 +185,7 @@ export class Game {
     const out = {
       seg: true, x1: l.x, y1: l.y, x2: r.x, y2: r.y, a, b,
       angle: Math.round((Math.atan2(Math.abs(dy), Math.max(dx, 0.001)) * 180) / Math.PI),
-      cost: pieces * BUILDING_TYPES.ramp.cost, valid: false, reason: null,
+      cost: pieces * BUILDING_TYPES.bridge.cost, valid: false, reason: null,
     };
     const fail = (reason) => Object.assign(out, { reason });
     if (dx < T * 0.75) return fail('short');
@@ -211,7 +220,7 @@ export class Game {
     const p = this.players[playerIdx];
     if (p.money < seg.cost) return 'Not enough credits!';
     p.money -= seg.cost;
-    this.spawnBuilding('ramp', Math.floor(seg.x1 / TILE_SIZE), Math.floor(seg.y1 / TILE_SIZE), playerIdx,
+    this.spawnBuilding('bridge', Math.floor(seg.x1 / TILE_SIZE), Math.floor(seg.y1 / TILE_SIZE), playerIdx,
       { x1: seg.x1, y1: seg.y1, x2: seg.x2, y2: seg.y2 });
     return null;
   }

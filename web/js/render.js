@@ -253,7 +253,7 @@ export function drawBuilding(ctx, b) {
   if (b.flash > 0) flashSprite(ctx, s.c, x, y);
   // Damage: smoke, then fire
   const r = b.hp / b.maxHp;
-  if (r < 0.5 && b.type !== 'bridge' && b.type !== 'ramp') {
+  if (r < 0.5 && b.type !== 'bridge') {
     const tt = performance.now() / 1000;
     for (let i = 0; i < 3; i++) {
       const k = (tt * 0.6 + i / 3) % 1;
@@ -449,7 +449,7 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache, zones = null)
       }
     }
     // Ramps as sloped lines.
-    t.strokeStyle = mm.ramp;
+    t.strokeStyle = mm.bridge;
     t.lineWidth = Math.max(1, TILE_SIZE * sy * 0.4);
     for (const seg of game.map.ramps.values()) {
       t.beginPath();
@@ -467,7 +467,7 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache, zones = null)
     }
   }
   for (const b of game.buildings) {
-    if (b.type === 'bridge' || b.type === 'ramp') continue;
+    if (b.type === 'bridge') continue;
     ctx.fillStyle = team(b.faction).main;
     ctx.fillRect(Math.floor(b.x * sx), Math.floor(b.y * sy), Math.max(3, Math.ceil(b.w * sx)), Math.max(3, Math.ceil(b.h * sy)));
   }

@@ -399,7 +399,6 @@ export function applySnapshot(g, s) {
     // Rebuild footprint/wall bookkeeping so placement previews match the host.
     g.map.buildingTiles.clear();
     g.map.wallTiles.clear();
-    g.map.spanTiles.clear();
     g.map.ramps.clear();
     for (const b of g.buildings) g.map.occupy(b);
   }

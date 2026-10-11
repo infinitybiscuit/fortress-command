@@ -4,7 +4,7 @@
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v42 · PC Edition';
+export const VERSION = 'v43 · PC Edition';
 
 // Cloudflare Worker (see /relay; it keeps its original name, fortress-relay)
 // that hands out TURN relay credentials, used
@@ -82,17 +82,19 @@ export const BUILDING_TYPES = {
   mine:     { hp: 100, w: 2, h: 2, cost: 200, buildTime: 8.0, income: 15 },
   workshop: { hp: 180, w: 3, h: 2, cost: 200, buildTime: 6.0, canTrain: ['engineer', 'jeep', 'tank', 'artillery'] },
   airbase:  { hp: 300, w: 4, h: 2, cost: 300, buildTime: 10.0, canTrain: ['helicopter', 'bomber'] },
-  bridge:   { hp: 150, w: 1, h: 1, cost: 15,  buildTime: 3.0, isBridge: true, noZone: true },
-  ramp:     { hp: 120, w: 1, h: 1, cost: 20,  buildTime: 4.0, isRamp: true, noZone: true },
+  // Bridges are planks dragged between two points, level or sloped; cost,
+  // health and build time are per tile of length.
+  bridge:   { hp: 150, w: 1, h: 1, cost: 15,  buildTime: 3.0, isRamp: true, noZone: true },
 };
 
-// Ramps are planks dragged between two points: no steeper than this many
-// degrees, and no longer than this many tiles.
+// Bridges are no steeper than this many degrees and no longer than this many
+// tiles; within RAMP_LEVEL_SNAP degrees of flat they lie level.
 export const RAMP_MAX_ANGLE = 50;
 export const RAMP_MAX_LEN = 10;
-export const BUILD_MENU = ['barracks', 'turret', 'wall', 'mine', 'workshop', 'airbase', 'bridge', 'ramp'];
+export const RAMP_LEVEL_SNAP = 8;
+export const BUILD_MENU = ['barracks', 'turret', 'wall', 'mine', 'workshop', 'airbase', 'bridge'];
 export const BUILD_ICONS = {
-  barracks: '⚔️', turret: '🗼', wall: '🧱', mine: '⛏️', workshop: '🔧', airbase: '🛫', bridge: '🌉', ramp: '🔼',
+  barracks: '⚔️', turret: '🗼', wall: '🧱', mine: '⛏️', workshop: '🔧', airbase: '🛫', bridge: '🌉',
 };
 export const UNIT_ICONS = {
   soldier: '🪖', heavy: '🛡️', scout: '🏃', engineer: '🔩', sniper: '🎯', helicopter: '🚁', bomber: '✈️',
