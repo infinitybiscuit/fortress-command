@@ -150,6 +150,33 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
   - **Effects:** shots are brass slugs, fused bombs, firework shells and cannonballs. Explosions burst like hanabi fireworks.
   - **Menus:** black lacquer, brass and vermilion.
 
+- **Winter War:** Finland, 1939–40: ski troops in white snowsuits fighting at minus forty in the spruce forests, where motti tactics, Molotov cocktails and sisu held off a giant.
+  - **Setting:** a starry night under shimmering northern lights and a crescent moon. Snowy hills and dark spruce forest roll away, birches and snow-laden spruces stand in front, and now and then a little sauna cabin puffs smoke. Snow falls steadily. The ground is frozen earth under deep snow, and the platforms are snow-capped granite ledges.
+  - **Infantry:**
+    - **Ski Trooper**s in hooded white snowsuits with Suomi submachine guns (Soldier).
+    - **Tank Hunter**s in fur hats with a satchel charge and a lit Molotov cocktail held high (Heavy).
+    - **Ski Patrol** on long wooden skis with poles (Scout).
+    - **Sapper**s with an axe and a log for jamming tank tracks (Engineer).
+    - The **White Death**, a snowsuited marksman with an iron-sighted rifle and a scarf over the face (Sniper).
+  - **Vehicles:**
+    - **Reindeer Sled**, a pulka with a machine gunner, hauled by a reindeer in a team-coloured blanket (Jeep).
+    - **Trophy Tank**, a captured tank whitewashed, repainted in its new owners' colours, and fitted with a stovepipe for the cold (Tank).
+    - **Motti Mortar**, a mortar on a ski sledge with a "motti" of firewood stacked behind (Artillery).
+  - **Air:**
+    - **Ski Fokker**, a fighter on skis (Helicopter).
+    - **Blenheim**, a bomber also on skis (Bomber).
+  - **Buildings:**
+    - A log **Korsu** command post under a deep blanket of snow, with warm windows, a radio mast and a flag (HQ).
+    - The **Sauna**, puffing steam from the chimney and the door, with a birch whisk on the wall (Barracks). Every soldier starts here.
+    - **Maxim Nest** (Turret).
+    - **Granite Line** anti-tank rocks (Wall).
+    - **Soup Cannon** field kitchen with the coffee pot on (Mine).
+    - **Trophy Yard**, with a tally of captured tanks painted on the wall (Workshop).
+    - **Ice Airfield** on a frozen lake with a camouflaged hangar and a windsock (Airbase).
+    - **Log Bridge**, and a **Ski Jump** (Ramp).
+  - **Effects:** shots are tracers, mortar bombs and tank shells. Every blast throws up a fountain of snow.
+  - **Menus:** midnight blue, snow white and Finnish blue.
+
 Each theme is one file in `js/themes/`. A theme can also replace the explosion drawing (`explode`). It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
 
 ## Free-for-All: looping map
@@ -278,7 +305,7 @@ After about 3 minutes the CPU builds an airbase and adds helicopters and bombers
 | `js/game.js` | `game/game_scene.gd` (economy, AI, spawning, win check) |
 | `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` (now theme-driven) |
 | `js/pixel.js` | new: pixel-art toolkit and the active palette |
-| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States and Steam Shogun artwork |
+| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun and Winter War artwork |
 | `js/main.js` | new: camera, touch input, HUD and panels, overlays, main loop |
 
 ### Differences from the Godot build

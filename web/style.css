@@ -465,3 +465,30 @@ body[data-theme="steampunk"] .toast.info { background: rgba(150, 100, 40, 0.95);
 body[data-theme="steampunk"] .code-input { background: #0c0606; }
 body[data-theme="steampunk"] .howto ul { color: var(--text); }
 body[data-theme="steampunk"] .round-btn { background: rgba(36, 22, 20, 0.88); }
+body[data-theme="winter"] {
+  --bg: #0c1220;
+  --panel: #16203a;
+  --panel-2: #22304e;
+  --bevel-light: #a8c4e0;
+  --bevel-dark: #060a14;
+  --accent: #2a5aa8;
+  --accent-dim: #16305e;
+  --text: #eef4fa;
+  --dim: #a8b8cc;
+  --good: #5af0a8;
+  --danger: #e8604a;
+  --gold: #f4f8fc;
+}
+body[data-theme="winter"] .menu-btn,
+body[data-theme="winter"] .act-btn.primary { border-color: #eef4fa #0a1830 #0a1830 #eef4fa; }
+body[data-theme="winter"] .menu-btn.secondary { border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light); }
+body[data-theme="winter"] .overlay { background: linear-gradient(#0c1428 0 8%, #183a4a 8% 12%, #2a7a6a 12% 14%, #182644 14% 22%, #2c4062 22% 28%, #c4d2e2 28% 30%, #eef4fa 30% 33%, rgba(12, 18, 32, 0.96) 33%); }
+body[data-theme="winter"] #overlay-pause, body[data-theme="winter"] #overlay-gameover { background: rgba(12, 18, 32, 0.92); }
+body[data-theme="winter"] .overlay h1, body[data-theme="winter"] .overlay h2 { color: #f4f8fc; text-shadow: 3px 3px 0 #2a5aa8, 6px 6px 0 #000; }
+body[data-theme="winter"] #tagline { color: #f4f8fc; text-shadow: 1px 1px 0 #0a1830, -1px -1px 0 #0a1830, 1px -1px 0 #0a1830, -1px 1px 0 #0a1830, 2px 2px 0 #0a1830; }
+body[data-theme="winter"] .status { background: rgba(22, 32, 58, 0.9); }
+body[data-theme="winter"] .toast { background: rgba(168, 48, 36, 0.95); }
+body[data-theme="winter"] .toast.info { background: rgba(42, 90, 168, 0.95); }
+body[data-theme="winter"] .code-input { background: #060a14; }
+body[data-theme="winter"] .howto ul { color: var(--text); }
+body[data-theme="winter"] .round-btn { background: rgba(22, 32, 58, 0.88); }
