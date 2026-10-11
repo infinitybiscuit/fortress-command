@@ -217,7 +217,7 @@ button {
   display: none; position: fixed; inset: 0; z-index: 20;
   background: var(--bg); place-items: center; font-size: 20px; font-weight: 700;
 }
-@media (orientation: landscape) and (max-height: 500px) {
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
   #rotate-hint { display: grid; }
 }
 
@@ -603,3 +603,53 @@ body[data-theme="civil"] .toast.info { background: rgba(46, 74, 138, 0.95); }
 body[data-theme="civil"] .code-input { background: #0c0e12; }
 body[data-theme="civil"] .howto ul { color: var(--text); }
 body[data-theme="civil"] .round-btn { background: rgba(36, 42, 54, 0.88); }
+
+/* ── Keyboard shortcut badges (only with a mouse) ─────────────────────── */
+.key { display: none; }
+body.mouse .key {
+  display: inline-block; font-family: var(--pixel); font-size: 7px; line-height: 1; color: var(--dim);
+  padding: 2px 3px; border: 1px solid var(--bevel-light); background: rgba(0, 0, 0, 0.35); vertical-align: 1px;
+}
+body.mouse .tile-btn .key { position: absolute; top: 4px; left: 4px; }
+body.mouse .act-btn, body.mouse .small-btn { white-space: nowrap; }
+body.mouse .act-btn .key, body.mouse .small-btn .key { margin-left: 6px; }
+body.mouse .howto .touch-only, .howto .mouse-only { display: none; }
+body.mouse .howto .mouse-only { display: block; }
+.controls-tip { margin-top: auto; font-size: 12px; color: var(--dim); line-height: 1.7; border-top: 2px solid var(--bevel-dark); padding-top: 8px; }
+.controls-tip kbd, .howto kbd { font-family: var(--pixel); font-size: 8px; padding: 1px 3px; border: 1px solid var(--bevel-light); background: rgba(0, 0, 0, 0.35); }
+
+@media (hover: hover) and (pointer: fine) {
+  .tile-btn:hover:not(:disabled), .act-btn:hover:not(:disabled), .small-btn:hover, .hud-btn:hover,
+  .menu-btn:hover:not(:disabled), .round-btn:hover, .side-card:hover, .slot-btn:hover { filter: brightness(1.18); }
+}
+
+/* ── PC layout: a wide screen gets the whole battlefield ──────────────────
+   The battlefield fills the window, with the minimap under it and the
+   command panel down the right-hand side, like a 90s PC war game. */
+@media (min-width: 900px) and (min-aspect-ratio: 1/1) {
+  #app {
+    max-width: none;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "hud hud" "stage panel" "mini panel";
+  }
+  #hud { grid-area: hud; min-height: 52px; }
+  #stage { grid-area: stage; }
+  #minimap-wrap { grid-area: mini; }
+  #minimap { height: 64px; }
+  #panel {
+    grid-area: panel; min-height: 0; overflow-y: auto;
+    border-left: 3px solid var(--bevel-dark); box-shadow: inset 2px 0 0 var(--bevel-light);
+    padding: 12px 12px 14px;
+  }
+  .panel-title { font-size: 12px; flex: 1 1 auto; min-width: 5em; }
+  .panel-sub { white-space: normal; text-align: right; line-height: 1.5; }
+  .hint { font-size: 14px; }
+  .tile-btn { min-height: 82px; }
+  .status { top: 12px; font-size: 10px; }
+  .toast { top: 52px; font-size: 10px; }
+  .overlay-card { max-width: 440px; }
+  .overlay h1 { font-size: 40px; }
+  #subtitle { font-size: 11px; }
+}
