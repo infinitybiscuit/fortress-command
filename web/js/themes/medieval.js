@@ -323,18 +323,17 @@ function vikingSoldier(type, f, frame) {
 function vikingGoatCart(f, frame) {
   const t = team(f);
   const [c, g] = canvas(28, 23);
-  const legs = frame ? [[17, 16, 1, 5], [19, 16, 1, 4], [22, 16, 1, 4], [24, 16, 1, 5]]
-    : [[16, 16, 1, 4], [19, 16, 1, 5], [22, 16, 1, 5], [25, 16, 1, 4]];
+  const legs = frame ? [[17, 15, 2, 6], [22, 15, 2, 5]] : [[16, 15, 2, 5], [23, 15, 2, 6]];
   outlined(g, [
-    ...legs.map((l) => [...l, C.goatDark]), [16, 11, 9, 5, C.goat], [15, 10, 1, 2, C.goat],
-    [23, 7, 3, 5, C.goat], [24, 6, 3, 3, C.goat], [26, 7, 1, 2, C.goat], [22, 4, 2, 3, C.horn],
+    ...legs.map((l) => [...l, C.goatDark]), [15, 10, 10, 5, C.goat], [14, 10, 1, 2, C.goat],
+    [23, 6, 3, 6, C.goat], [24, 5, 3, 4, C.goat], [27, 6, 1, 2, C.goat], [22, 3, 2, 3, C.horn], [21, 2, 1, 2, C.horn],
     [5, 7, 5, 5, t.main], [6, 3, 4, 4, C.skin], [6, 1, 4, 2, C.metal], [5, 0, 1, 2, C.horn], [10, 0, 1, 2, C.horn],
     [1, 11, 12, 5, C.wood], [12, 9, 2, 3, C.wood],
   ], [
-    [16, 11, 9, 1, C.white], [25, 7, 1, 1, C.O], [25, 9, 1, 2, C.goatDark], [26, 8, 1, 1, '#d8a0a0'], [23, 8, 1, 1, C.goatDark],
+    [15, 10, 10, 1, C.white], [25, 6, 1, 1, C.O], [26, 9, 1, 3, C.goatDark], [27, 7, 1, 1, '#d8a0a0'], [23, 6, 1, 1, C.goatDark],
     [6, 1, 4, 1, C.metalLight], [8, 4, 1, 1, C.O], [7, 6, 3, 2, C.beard],
     [1, 11, 12, 1, C.woodLight], [1, 13, 12, 1, t.main], [1, 14, 12, 1, t.dark], [12, 9, 2, 1, C.yellow],
-    [16, 13, 9, 1, t.main],
+    [15, 12, 10, 1, t.main], ...legs.map(([x, y, w, h]) => [x, y + h - 1, w, 1, C.furDark]),
   ]);
   // Reins from the driver's fists to the goat's head
   g.fillStyle = '#5a3a1e'; g.fillRect(10, 9, 4, 1); g.fillRect(14, 8, 9, 1);
@@ -439,10 +438,10 @@ function vikingSkyship(f) {
   hullShields(g, [11, 17, 23, 29, 35], 8, t);
   // Oars dangling into thin air
   for (const x of [14, 21, 28, 35]) {
-    g.fillStyle = C.woodDark;
-    for (let k = 0; k < 5; k++) g.fillRect(x - k, 13 + k, 1, 1);
-    g.fillStyle = C.O; g.fillRect(x - 7, 17, 4, 3);
-    g.fillStyle = C.woodLight; g.fillRect(x - 6, 18, 2, 1);
+    for (let k = 0; k < 4; k++) { g.fillStyle = C.O; g.fillRect(x - k - 1, 13 + k, 3, 1); }
+    for (let k = 0; k < 4; k++) { g.fillStyle = C.woodLight; g.fillRect(x - k, 13 + k, 1, 1); }
+    g.fillStyle = C.O; g.fillRect(x - 6, 16, 4, 4);
+    g.fillStyle = C.woodLight; g.fillRect(x - 5, 17, 2, 2);
   }
   return { c, ax: 23, ay: 15 };
 }
