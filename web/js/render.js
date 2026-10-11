@@ -40,7 +40,8 @@ export const currentTheme = () => theme;
 
 // ── Sides ──────────────────────────────────────────────────────────────────
 // A theme may offer `sides` (e.g. Union and Confederacy): each is
-// { id, name, short, blurb, names?, icons?, win?, lose? }. Only themes with two
+// { id, name, short, blurb, names?, icons?, win?, lose?, preview? }, where preview
+// lists the unit types shown on the side's picker card. Only themes with two
 // or more sides ask players to choose.
 export const themeSides = (t = theme) => (t.sides?.length > 1 ? t.sides : null);
 export const sideInfo = (f) => theme.sides?.find((s) => s.id === sideOf(f)) || null;

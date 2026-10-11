@@ -773,7 +773,7 @@ function showSidePicker(f, multi, taken, done) {
     : `${esc(th.name)}: whose side are you on?`;
   $('side-cards').classList.toggle('many', sides.length > 4);
   $('side-cards').innerHTML = sides.map((s) => `<button class="side-card${s.id === suggest ? ' suggested' : ''}" data-side="${s.id}" style="--team:${colourOf(f)}">
-      <span class="side-icons">${['soldier', 'heavy', 'tank', 'helicopter'].map((t) => `<img src="${sideIcon(s.id, t, f)}" alt="">`).join('')}</span>
+      <span class="side-icons">${(s.preview || ['soldier', 'heavy', 'tank', 'helicopter']).map((t) => `<img src="${sideIcon(s.id, t, f)}" alt="">`).join('')}</span>
       <span class="side-name">${esc(s.name)}</span>
       <span class="side-blurb">${esc(s.blurb || '')}</span>
     </button>`).join('');

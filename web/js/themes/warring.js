@@ -1471,6 +1471,7 @@ const SIDES = [
   },
   {
     id: 'zhao', name: 'Zhao', short: 'Zhao',
+    preview: ['soldier', 'scout', 'jeep', 'helicopter'],
     blurb: 'King Wuling\'s big idea: trousers. Ride like the nomads, shoot from the saddle, and never trip over a robe again.',
     names: {
       soldier: 'Trouser Guard', heavy: 'Felt Guard', scout: 'Horse Archer', engineer: 'Stable Hand', sniper: 'Trouser Archer',
@@ -1484,6 +1485,7 @@ const SIDES = [
   },
   {
     id: 'yan', name: 'Yan', short: 'Yan',
+    preview: ['soldier', 'heavy', 'jeep', 'helicopter'],
     blurb: 'The far, frozen north: fur hats, horse sleds and a long wall of its own. Built a wall before it was cool. Everything up here is cool.',
     names: {
       soldier: 'Fur Spearman', heavy: 'Bear Hat', scout: 'Ski Scout', engineer: 'Snow Shoveller', sniper: 'Frost Crossbow',
