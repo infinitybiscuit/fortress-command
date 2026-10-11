@@ -20,7 +20,7 @@ export function applyCommand(game, p, cmd) {
 
   switch (cmd.c) {
     case 'move':
-      for (const u of own) order(u).moveTo(cmd.x + (Math.random() - 0.5) * Math.min(60, own.length * 6));
+      for (const u of own) order(u).moveTo(cmd.x + (Math.random() - 0.5) * Math.min(60, own.length * 6), cmd.y ?? null);
       return null;
     case 'attack': {
       const t = resolve(cmd.target);
@@ -54,6 +54,8 @@ export function applyCommand(game, p, cmd) {
       return null;
     case 'place':
       return game.tryPlaceAt(p, cmd.type, cmd.tx, cmd.ty);
+    case 'ramp':
+      return game.tryPlaceRamp(p, cmd.tiles, cmd.dir);
     case 'train': {
       const b = ownBuilding(cmd.id);
       return b && game.train(p, b, cmd.type) ? null : 'Not enough credits!';

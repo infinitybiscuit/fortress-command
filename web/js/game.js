@@ -1,6 +1,6 @@
 // Game state, economy, AI and win conditions. Ported from archive/godot-era/godot/scripts/game/game_scene.gd.
 import {
-  TILE_SIZE, WORLD_W, MAP_W, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
+  TILE_SIZE, TILE_EMPTY, TILE_RAMP, WORLD_W, MAP_W, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
 } from './config.js';
 import { TileMap } from './tilemap.js';
 import { Unit, Building, Projectile, State, canReach, distTo } from './entities.js';
@@ -64,8 +64,9 @@ export class Game {
 
   buildingById(id) { return this.buildings.find((b) => b.id === id && !b.dead) || null; }
 
-  spawnBuilding(type, tx, ty, faction) {
+  spawnBuilding(type, tx, ty, faction, dir = 0) {
     const b = new Building(this, type, tx, ty, faction);
+    if (dir) b.dir = dir; // ramps: which way the slope rises
     this.buildings.push(b);
     this.map.occupy(b);
     return b;
@@ -129,6 +130,49 @@ export class Game {
     if (!pl.valid) return "Can't place here!";
     p.money -= d.cost;
     this.spawnBuilding(type, tx, ty, playerIdx);
+    return null;
+  }
+
+  // A ramp laid point to point: start on (or beside) solid footing, then run
+  // diagonally toward the pointer, one piece per column, stopping where the
+  // slope meets a platform or bridge (going up) or the ground (going down).
+  // `dir` is the way the slope rises.
+  rampRun(playerIdx, start, wx, wy) {
+    const T = TILE_SIZE;
+    const cols = Math.round(this.dx((start.tx + 0.5) * T, wx) / T);
+    const d = Math.sign(cols) || 1;
+    const up = wy < (start.ty + 1) * T;
+    // Heading down from a spot on a platform: begin over its edge, level with the deck.
+    const below = this.map.get(start.tx, start.ty + 1);
+    const off = !up && below !== TILE_EMPTY && below !== TILE_RAMP ? 1 : 0;
+    const sx = start.tx + d * off, sy = start.ty + off;
+    // The run is as long as the drag covers both across and up (or down), so
+    // dragging onto a platform's top stops the slope level with its deck.
+    const rows = up ? Math.floor(((sy + 1) * T - wy) / T) : Math.ceil((wy - sy * T) / T);
+    const n = Math.max(1, Math.min(16, Math.abs(cols) + 1 - off, rows));
+    const tiles = this.map.rampRun(sx, sy, d, up, n);
+    const cost = tiles.length * BUILDING_TYPES.ramp.cost;
+    const first = tiles.length ? this.placementAt('ramp', tiles[0][0], tiles[0][1], playerIdx) : { reason: 'terrain' };
+    const zone = tiles.some(([tx]) => !this.inBuildZone(playerIdx, tx, 1));
+    const reason = first.reason || (zone ? 'zone' : null);
+    return { run: true, tiles, dir: up ? d : -d, cost, valid: !reason, reason, tx: start.tx, ty: start.ty, w: 1, h: 1 };
+  }
+
+  tryPlaceRamp(playerIdx, tiles, dir) {
+    const p = this.players[playerIdx];
+    if (!Array.isArray(tiles) || !tiles.length || tiles.length > 16 || (dir !== 1 && dir !== -1)) return "Can't place here!";
+    if (p.money < tiles.length * BUILDING_TYPES.ramp.cost) return 'Not enough credits!';
+    for (let i = 0; i < tiles.length; i++) {
+      const [tx, ty] = tiles[i] || [];
+      if (!Number.isInteger(tx) || !Number.isInteger(ty)) return "Can't place here!";
+      // Each piece after the first must carry on diagonally from the last.
+      if (i && (Math.abs(tx - tiles[i - 1][0]) !== 1 || Math.abs(ty - tiles[i - 1][1]) !== 1)) return "Can't place here!";
+      const pl = this.placementAt('ramp', tx, ty, playerIdx);
+      if (pl.reason === 'zone') return 'Too far from your base!';
+      if (!pl.valid) return i ? null : "Can't place here!";
+      p.money -= BUILDING_TYPES.ramp.cost;
+      this.spawnBuilding('ramp', tx, ty, playerIdx, dir);
+    }
     return null;
   }
 
