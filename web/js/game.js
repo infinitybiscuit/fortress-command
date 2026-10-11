@@ -1,4 +1,4 @@
-// Game state, economy, AI and win conditions. Ported from godot/scripts/game/game_scene.gd.
+// Game state, economy, AI and win conditions. Ported from archive/godot-era/godot/scripts/game/game_scene.gd.
 import {
   TILE_SIZE, WORLD_W, MAP_W, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
 } from './config.js';

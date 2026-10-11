@@ -2,7 +2,7 @@
 
 *Slop Wars: The Next Generation* (originally *Fortress Command*). The name is a mash-up of *Star Wars* and *Star Trek: The Next Generation*, with a nod to "AI slop" and to the AI generation used to make it. It was made by humans and AI together. See the [main README](../README.md#about-the-name).
 
-A browser port of the Godot game in `../godot`. It's plain HTML5 Canvas and ES modules with
+A browser port of the original Godot prototype (now retired, in [`../archive/godot-era/godot`](../archive/godot-era/godot)). It's plain HTML5 Canvas and ES modules with
 no build step, laid out for an **iPhone 16 Pro Max in portrait** (440×956 pt, 3× display).
 It also runs in any modern desktop or mobile browser.
 
@@ -35,7 +35,7 @@ The art style is a homage to early-90s home-computer war games: chunky, crisp pi
 
 ## Themes
 
-Tap **Theme** on the title screen to switch between looks. The choice is remembered on the device. Themes are cosmetic only: the units, buildings and rules are identical, and online players can each use a different theme.
+Tap **Theme** on the title screen to switch between looks. The choice is remembered on the device. Themes are cosmetic only: the units, buildings and rules are identical. Online, the host's theme is the room's war, and everyone plays in it.
 
 - **Classic:** the original early-90s jungle war, described above.
 - **Rise of the Robots:** a rain-soaked future war at night.
@@ -477,6 +477,8 @@ After about 3 minutes the CPU builds an airbase and adds helicopters and bombers
 ```
 
 ## Code map
+
+The `.gd` paths are in the retired Godot project, under `archive/godot-era/godot/scripts/`.
 
 | File | Ported from |
 |---|---|

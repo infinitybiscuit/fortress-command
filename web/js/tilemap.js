@@ -1,4 +1,4 @@
-// Procedural terrain + tile occupancy. Ported from godot/scripts/game/tilemap.gd.
+// Procedural terrain + tile occupancy. Ported from archive/godot-era/godot/scripts/game/tilemap.gd.
 import {
   MAP_W, MAP_H, TILE_SIZE, GROUND_LEVEL_TILE, PLATFORM_ROWS,
   TILE_EMPTY, TILE_GROUND, TILE_PLATFORM, TILE_BRIDGE, TILE_RAMP,

@@ -11,91 +11,52 @@ A side-scrolling platformer / RTS crossover. Build bases, train armies, construc
 - **"Slop":** the game was made with heavy help from AI, and we know that kind of work can be dismissed as "AI slop". The name owns that, and shows that humans were involved too. It could not have happened on its own.
 - **"The Next Generation":** a nod to the AI *generation* used to create it.
 
-## Web version (iPhone)
+## The game
 
-The `web/` folder has a no-build HTML5 version tuned for iPhone portrait play: online play for up to 4 players, ten themes (Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War, Cartel Wars, Trade Wars, Civil War), choosing your side in every theme except Classic, and more. See [`web/README.md`](web/README.md).
+A no-build HTML5 game in `web/`, tuned for iPhone portrait play. Features:
 
-The original Godot 4 project is in `godot/`.
+- online play for up to 4 players
+- ten themes: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War, Cartel Wars, Trade Wars and Civil War
+- a choice of side in every theme except Classic
 
-## How to Play
+How to play, the controls, every theme and the code layout are in [`web/README.md`](web/README.md).
 
-Open the project in Godot 4 (editior or exported binary). Select a scene under `godot/scenes/game/` and press F5 to run.
+## Roadmap and ideas
 
-### Controls
+- **Planned work and ideas:** tracked as [issues](https://github.com/infinitybiscuit/fortress-command/issues) on the Slop Wars Roadmap board.
+- **Loose thoughts:** go in [Discussions](https://github.com/infinitybiscuit/fortress-command/discussions).
 
-**Desktop (PC)**
-- **Click** a unit or building to select it
-- **Click** empty ground to issue a move order
-- **Click** an enemy unit or building to issue an attack order
-- **Drag** to pan the camera
-- **Q** — toggle the build menu
-- **Esc** — cancel build placement
-
-**Mobile (Touch)**
-- **Tap** a unit or building to select it
-- **Tap** empty ground to move selected units
-- **Tap** an enemy to attack
-- **Swipe** the game world to pan the camera
-- **Swipe in** from the left edge (or tap `▸`) to open the build menu
-- **Tap** a valid tile (green preview) to place a building
-
-### Game Modes
-
-| Mode | Description |
-|------|-------------|
-| **1 vs CPU** | You (blue) vs one AI opponent (red) |
-| **1 vs 1 Local** | Two human players on the same device |
-| **Free-for-All (3)** | You vs two AI opponents |
-| **Free-for-All (4)** | You vs three AI opponents |
-
-### Win Condition
-
-Destroy the enemy HQ. Last player standing wins.
-
-### Building & Units
-
-Open the build menu (`▸` tab) to place structures:
-- **Barracks** — trains soldiers, heavies, and scouts
-- **Turret** — auto-attacks nearby enemies
-- **Wall** — blocks movement
-- **Mine** — generates +15 credits/tick
-- **Workshop** — trains engineers
-
-Units are trained by selecting a barracks or workshop, then tapping a unit type in the build menu.
-
-## Project Structure
+## Project structure
 
 ```
 .
-├── godot/
-│   ├── project.godot          ← Godot 4 project file
-│   ├── scenes/
-│   │   ├── root.tscn          ← root scene
-│   │   ├── game/              ← game scenes
-│   │   ├── entities/          ← unit & building scenes
-│   │   └── ui/                ← HUD, menus, build menu
-│   └── scripts/
-│       ├── root.gd            ← project entry point
-│       ├── autoload/          ← singleton systems
-│       ├── entities/          ← unit & building scripts
-│       ├── game/              ← game logic scripts
-│       └── ui/                ← UI scripts
-├── web/                       ← the HTML5 game (see web/README.md)
-├── relay/                     ← Cloudflare Worker: matchmaking + TURN relay credentials
-├── entities.txt               ← unit definitions
-├── foundation.txt             ← building/terrain definitions
-├── SPEC.md                    ← design specification
-├── README.md                  ← this file
-└── LICENSE                    ← All rights reserved
+├── web/                ← the game (HTML5 canvas, no build step); deployed to GitHub Pages
+├── relay/              ← Cloudflare Worker: matchmaking + TURN relay credentials for online play
+├── archive/
+│   └── godot-era/      ← the retired Godot 4 prototype and early design notes (read-only)
+├── .github/workflows/  ← Pages deploy (web/) and Cloudflare deploy (relay/)
+├── README.md           ← this file
+└── LICENSE             ← all rights reserved
 ```
 
 ## Development
 
-Open `godot/project.godot` in Godot 4. The project uses GDScript with Godot's built-in scene system.
+There's nothing to build or install. Serve `web/` from any static server:
+
+```bash
+cd web && python3 -m http.server 8000
+```
+
+Then open http://localhost:8000, or your computer's LAN address on a phone. Pushing to `main` deploys `web/` to GitHub Pages automatically. Each release bumps `VERSION` in `web/js/config.js` and `CACHE` in `web/sw.js`.
+
+## History
+
+The game began as **Fortress Command**, a Godot 4 prototype. It was ported to the browser and has grown there ever since. The Godot project was retired and moved to [`archive/godot-era/`](archive/godot-era/).
 
 ## Credits
 
 Slop Wars: The Next Generation (originally Fortress Command): inspired by Rick Dangerous, Lemmings and Command & Conquer. Made by humans and AI together.
+
 ## Licence
 
 Copyright © 2026 Tim Coles / infinitybiscuit. **All rights reserved.** You're welcome to play the game, but the code, art and content may not be copied, modified or redistributed without written permission. See [LICENSE](LICENSE). Bundled third-party components (PeerJS, the Press Start 2P font) keep their own licences.
