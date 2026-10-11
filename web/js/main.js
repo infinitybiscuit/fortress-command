@@ -1,6 +1,6 @@
 // Slop Wars (web) — app shell: camera, touch input, UI panels and main loop.
 import {
-  WORLD_W, WORLD_H, MAP_W, TILE_SIZE, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
+  WORLD_W, WORLD_H, MAP_W, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
   UNIT_ICONS, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize, ONLINE_LAYOUTS,
 } from './config.js';
 import { Game } from './game.js';
@@ -64,26 +64,30 @@ const minimapCache = {};
 // scale = screen points per world unit. It's snapped so each art pixel
 // (G world units) covers a whole number of device pixels, keeping the pixel
 // art sharp; `zoom` is the unsnapped target that pinch gestures adjust.
-// Zoomed out past the world's height (down to one device pixel per art
-// pixel) the battlefield sits at the bottom of the screen with sky above.
+// The one exception is the fit zoom, where the whole height of the world
+// exactly fills the battlefield: games start there and the minus button stops
+// there, so there's no vertical scrolling and no wasted band of sky. Pixels
+// at that zoom may differ in size by one device pixel.
 const cam = { x: 0, y: 0, scale: 1, zoom: 1, vx: 0, vy: 0 };
 let viewW = 0;
 let viewH = 0;
 let dpr = 1;
 
-function minScale() { return Math.max(viewW / WORLD_W, 1 / (dpr * G)); }
-function defaultScale() { return Math.min(MAX_SCALE, Math.max(viewH / WORLD_H, viewW / WORLD_W, viewH / (WORLD_H - 5 * TILE_SIZE))); }
+function fitScale() { return Math.max(viewH / WORLD_H, viewW / WORLD_W); }
+function maxScale() { return Math.max(MAX_SCALE, fitScale()); }
 function view() { return { x: cam.x, y: cam.y, w: viewW / cam.scale, h: viewH / cam.scale }; }
 
 function snapScale(z) {
+  const fit = fitScale();
+  if (z <= fit * 1.0001) return fit;
   const unit = dpr * G; // device pixels per world unit at scale 1, times art pixel size
   let p = Math.max(1, Math.round(z * unit));
-  while (p / unit < minScale() - 1e-6) p++;
+  while (p / unit <= fit) p++;
   return p / unit;
 }
 
 function clampCam() {
-  cam.zoom = Math.min(MAX_SCALE, Math.max(minScale(), cam.zoom));
+  cam.zoom = Math.min(maxScale(), Math.max(fitScale(), cam.zoom));
   cam.scale = snapScale(cam.zoom);
   const v = view();
   // Looping maps pan forever; otherwise stop at the map edges.
@@ -114,6 +118,8 @@ function screenToWorld(sx, sy) { return [cam.x + sx / cam.scale, cam.y + sy / ca
 
 function resize() {
   const r = canvas.getBoundingClientRect();
+  // Stay at the fit zoom across rotations and window resizes.
+  if (viewH && cam.zoom <= fitScale() * 1.0001) cam.zoom = 0;
   dpr = Math.min(window.devicePixelRatio || 1, 3);
   viewW = r.width;
   viewH = r.height;
@@ -844,7 +850,7 @@ function startGame(key, opts = {}) {
   showOverlay(null);
   paused = false;
   resize();
-  cam.zoom = defaultScale();
+  cam.zoom = fitScale();
   clampCam();
   focusHq();
 }
@@ -1689,7 +1695,8 @@ const lctx = low.getContext('2d');
 const SKY_PAD = 100;
 
 function draw(dt) {
-  const P = Math.max(1, Math.round(cam.scale * dpr * G)); // device px per art px
+  // Device px per art px: a whole number, except at the fit zoom.
+  const P = cam.scale === fitScale() ? cam.scale * dpr * G : Math.max(1, Math.round(cam.scale * dpr * G));
   const camAX = Math.floor(cam.x / G);
   const camAY = Math.floor(cam.y / G);
   const topA = Math.max(camAY, -SKY_PAD); // first art row in the buffer
