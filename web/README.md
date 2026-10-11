@@ -1,10 +1,12 @@
-# Slop Wars: The Next Generation — Web (iPhone portrait)
+# Slop Wars: The Next Generation — Web (phone and PC)
 
 *Slop Wars: The Next Generation* (originally *Fortress Command*). The name is a mash-up of *Star Wars* and *Star Trek: The Next Generation*, with a nod to "AI slop" and to the AI generation used to make it. It was made by humans and AI together. See the [main README](../README.md#about-the-name).
 
 A browser port of the original Godot prototype (now retired, in [`../archive/godot-era/godot`](../archive/godot-era/godot)). It's plain HTML5 Canvas and ES modules with
 no build step, laid out for an **iPhone 16 Pro Max in portrait** (440×956 pt, 3× display).
-It also runs in any modern desktop or mobile browser.
+It also runs in any modern desktop or mobile browser, and on a **PC** (any window at least
+900 px wide and wider than it is tall) it switches to a widescreen layout with full mouse and
+keyboard controls: see [Controls (PC)](#controls-pc).
 
 ## Play
 
@@ -422,8 +424,30 @@ Colours follow seat order: Blue, Red, Green, Yellow. Everyone uses the normal co
 Placement snaps to the surface under your finger. Bridges and ramps stay in placement mode
 after each block, so you can lay several in a row.
 
-Desktop works too: click instead of tap, mouse wheel zooms, WASD or the arrow keys pan,
-and Esc cancels.
+
+## Controls (PC)
+
+On a wide window the battlefield fills the screen, the minimap sits under it, and the command
+panel runs down the right-hand side, like a 90s PC war game. With a mouse, hints say "click",
+every panel button shows its keyboard shortcut, and the build menu ends with a controls reminder.
+
+| Action | Mouse / keyboard |
+|---|---|
+| Select a unit or building | Left-click it |
+| Select a group | Drag a box with the left button |
+| Add or remove a unit | Shift-click it (shift-drag adds a box) |
+| Select all units of a type on screen | Double-click a unit |
+| Select your whole army | <kbd>Q</kbd> |
+| Move / attack / repair | Right-click the ground / an enemy / a damaged friendly building or vehicle (left-click works for orders too, as on a phone) |
+| Hold / Charge / Retreat / Find | <kbd>H</kbd> / <kbd>C</kbd> / <kbd>R</kbd> / <kbd>F</kbd> |
+| Pan | <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrow keys, drag with the right or middle button, or scroll sideways on a trackpad |
+| Zoom | Mouse wheel (or trackpad pinch), <kbd>+</kbd> / <kbd>-</kbd> |
+| Back to your HQ | <kbd>Space</kbd> or <kbd>Home</kbd> |
+| Build | <kbd>1</kbd>–<kbd>8</kbd> (or click a structure), point at the battlefield (the preview follows the mouse) and click once. Right-click or <kbd>Esc</kbd> cancels |
+| Train | Select a Barracks/Workshop/Airbase, then <kbd>1</kbd>–<kbd>4</kbd> |
+| Sell | <kbd>X</kbd> twice |
+| Switch player (1 vs 1 Local) | <kbd>Tab</kbd> |
+| Deselect, then pause | <kbd>Esc</kbd>; <kbd>P</kbd> pauses, and <kbd>Esc</kbd> or <kbd>P</kbd> resumes |
 
 ## Walls
 
@@ -462,6 +486,8 @@ After about 3 minutes the CPU builds an airbase and adds helicopters and bombers
 
 ## Layout
 
+On a phone:
+
 ```
 ┌──────────── safe area (Dynamic Island) ────────────┐
 │ 💰 credits  +income/s     YOU · mode         ⏸     │  HUD
@@ -474,6 +500,21 @@ After about 3 minutes the CPU builds an airbase and adds helicopters and bombers
 ├────────────────────────────────────────────────────┤
 │ Context panel: build grid │ unit orders │ training │
 └──────────── safe area (home indicator) ────────────┘
+```
+
+On a PC (900 px or wider, landscape):
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 💰 credits  +income/s        YOU · mode           ⏸         │  HUD
+├────────────────────────────────────────┬────────────────────┤
+│                                        │ Context panel      │
+│ scrolling battlefield (canvas)         │ build grid,        │
+│                                        │ unit orders or     │
+│                                + -       │ training           │
+├────────────────────────────────────────┤                    │
+│ minimap (click / drag to jump)         │ controls reminder  │
+└────────────────────────────────────────┴────────────────────┘
 ```
 
 ## Code map

@@ -13,7 +13,7 @@ A side-scrolling platformer / RTS crossover. Build bases, train armies, construc
 
 ## The game
 
-A no-build HTML5 game in `web/`, tuned for iPhone portrait play. Features:
+A no-build HTML5 game in `web/`, tuned for iPhone portrait play, with a widescreen layout and mouse and keyboard controls on a PC. Features:
 
 - online play for up to 4 players
 - ten themes: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War, Cartel Wars, Trade Wars and Civil War

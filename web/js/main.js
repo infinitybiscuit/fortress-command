@@ -36,6 +36,15 @@ const TAP_SLOP = 10;        // px of finger travel before a touch becomes a pan
 const DOUBLE_TAP_MS = 320;
 const HIT_PAD = 12;         // extra world px around units for fat-finger taps
 const MAX_SCALE = 2.5;
+const BOX_MIN = 6;          // px a mouse drag must cover before it's a box selection
+
+// A mouse or trackpad (not a touch screen): hints say "click", and the panel
+// shows keyboard shortcuts.
+const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
+const tap = (cap) => (finePointer.matches ? (cap ? 'Click' : 'click') : (cap ? 'Tap' : 'tap'));
+const syncPointerClass = () => document.body.classList.toggle('mouse', finePointer.matches);
+finePointer.addEventListener?.('change', () => { syncPointerClass(); panelKey = ''; });
+syncPointerClass();
 
 let game = null;
 let modeKey = 'cpu';
@@ -194,7 +203,7 @@ function selectUnits(list) {
   for (const u of list) u.selected = true;
 }
 
-function cancelPlacement() { pendingBuild = null; ghost = null; }
+function cancelPlacement() { pendingBuild = null; ghost = null; hoverReason = ''; }
 
 // ── Hit testing (prefers the closest entity to the finger) ─────────────────
 function pickUnit(wx, wy, pred) {
@@ -229,7 +238,7 @@ function handleTap(sx, sy) {
     if (sameSpot && pl.valid) confirmPlacement();
     else if (pl.reason === 'zone') setStatus('Too far from your base — build inside the green zone');
     else if (!pl.valid) setStatus("Can't build there — try another spot");
-    else setStatus('Tap again or press Place to build');
+    else setStatus(`${tap(true)} again or press Place to build`);
     return;
   }
 
@@ -306,14 +315,116 @@ function confirmPlacement() {
   }
 }
 
-// ── Pointer input: pan, pinch-zoom, tap ────────────────────────────────────
+// ── Mouse orders: right-click commands, shift-click and box selection ──────
+// Right-click is the PC order button: it never selects, it only sends the
+// selected units somewhere (attack, repair or move) or cancels a placement.
+function handleCommand(sx, sy) {
+  if (!game || paused || game.over) return;
+  if (pendingBuild) { cancelPlacement(); setStatus(''); return; }
+  const sel = selectedUnits();
+  if (!sel.length) { clearSelection(); return; }
+  const [rawX, wy] = screenToWorld(sx, sy);
+  const wx = game.normX(rawX);
+  const mine = (e) => e.faction === active;
+  const enemy = (e) => e.faction !== active;
+  const target = pickUnit(wx, wy, enemy) || pickBuilding(wx, wy, enemy);
+  if (target) {
+    if (!sel.some((u) => canReach(u, target))) { toast("Can't reach that — it's too high up"); return; }
+    issue({ c: 'attack', ids: ids(sel), target: ref(target) });
+    markers.push({ x: target.centre()[0], y: target.centre()[1], t: 0.6, color: '#ff4d4d' });
+    return;
+  }
+  const engineers = sel.filter((u) => u.repairRate > 0);
+  const ownUnit = pickUnit(wx, wy, mine);
+  const fixUnit = ownUnit?.vehicle && ownUnit.hp < ownUnit.maxHp ? ownUnit : null;
+  const ownBuilding = ownUnit ? null : pickBuilding(wx, wy, mine);
+  const fixBuilding = ownBuilding && ownBuilding.hp < ownBuilding.maxHp ? ownBuilding : null;
+  const fixers = engineers.filter((u) => u !== fixUnit);
+  if ((fixUnit || fixBuilding) && fixers.length) {
+    issue({ c: 'repair', ids: ids(fixers), target: ref(fixUnit || fixBuilding) });
+    toast('Repairing', 'info');
+    return;
+  }
+  issue({ c: 'move', ids: ids(sel), x: wx });
+  markers.push({ x: wx, y: wy, t: 0.6, color: '#00ff66' });
+}
+
+// Shift-click adds one of your units to the selection, or takes it out.
+function toggleUnitAt(sx, sy) {
+  if (!game || paused || game.over || pendingBuild) return handleTap(sx, sy);
+  const [rawX, wy] = screenToWorld(sx, sy);
+  const u = pickUnit(game.normX(rawX), wy, (e) => e.faction === active);
+  if (!u) return handleTap(sx, sy);
+  if (selectedBuilding) { selectedBuilding.selected = false; selectedBuilding = null; }
+  u.selected = !u.selected;
+}
+
+// Drag a box to select every unit of yours inside it (shift adds to the selection).
+function boxSelect(g) {
+  if (!game || paused || game.over) return;
+  const [x0, y0] = screenToWorld(Math.min(g.sx, g.lx), Math.min(g.sy, g.ly));
+  const [x1, y1] = screenToWorld(Math.max(g.sx, g.lx), Math.max(g.sy, g.ly));
+  const inside = game.units.filter((u) => {
+    if (u.dead || u.faction !== active) return false;
+    const [cx, cy] = u.centre();
+    const dx = game.dx(game.normX(x0), cx);
+    return dx >= -4 && dx <= x1 - x0 + 4 && cy >= y0 - 4 && cy <= y1 + 4;
+  });
+  if (g.shift) {
+    if (selectedBuilding) { selectedBuilding.selected = false; selectedBuilding = null; }
+    for (const u of inside) u.selected = true;
+  } else {
+    selectUnits(inside);
+  }
+}
+
+// Where the mouse is over the battlefield (null when it's elsewhere): the
+// building preview follows it, and the cursor shows what a click would do.
+let hover = null;
+
+function updateCursor() {
+  let cursor = '';
+  if (gesture?.type === 'box') cursor = 'crosshair';
+  else if (gesture?.type === 'mpan' && gesture.moved) cursor = 'grabbing';
+  else if (hover && game && !paused && !game.over) {
+    const [rawX, wy] = screenToWorld(hover.x, hover.y);
+    const wx = game.normX(rawX);
+    if (pendingBuild) cursor = 'copy';
+    else if (selectedUnits().length && (pickUnit(wx, wy, (e) => e.faction !== active) || pickBuilding(wx, wy, (e) => e.faction !== active))) cursor = 'crosshair';
+    else if (pickUnit(wx, wy, (e) => e.faction === active) || pickBuilding(wx, wy, (e) => e.faction === active)) cursor = 'pointer';
+  }
+  if (canvas.style.cursor !== cursor) canvas.style.cursor = cursor;
+}
+
+// With a mouse, the placement preview tracks the pointer and one click builds.
+let hoverReason = '';
+function updateHoverGhost() {
+  if (!pendingBuild || !hover || !game || gesture) return;
+  const [rawX, wy] = screenToWorld(hover.x, hover.y);
+  const pl = game.placementFor(pendingBuild, game.normX(rawX), wy, active);
+  ghost = pl;
+  const reason = pl.reason === 'zone' ? 'zone' : pl.valid ? 'ok' : 'bad';
+  if (reason !== hoverReason) {
+    hoverReason = reason;
+    setStatus(reason === 'zone' ? 'Too far from your base — build inside the green zone'
+      : reason === 'bad' ? "Can't build there — try another spot" : `Click to build ${nameOf(pendingBuild)}`);
+  }
+}
+
+// ── Pointer input: pan, pinch-zoom, tap; mouse clicks, drags and boxes ────
 const pointers = new Map();
 let gesture = null;
 
 canvas.addEventListener('pointerdown', (e) => {
   try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or stale pointer */ }
-  pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
   cam.vx = cam.vy = 0;
+  if (e.pointerType === 'mouse') {
+    // Left button selects (or drags a box); right or middle button pans.
+    const base = { sx: e.offsetX, sy: e.offsetY, lx: e.offsetX, ly: e.offsetY, lt: performance.now(), shift: e.shiftKey, button: e.button };
+    gesture = e.button === 0 ? { type: 'click', ...base } : { type: 'mpan', moved: false, ...base };
+    return;
+  }
+  pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
   if (pointers.size === 1) {
     gesture = { type: 'tap', sx: e.offsetX, sy: e.offsetY, lx: e.offsetX, ly: e.offsetY, lt: performance.now() };
   } else if (pointers.size === 2) {
@@ -322,7 +433,36 @@ canvas.addEventListener('pointerdown', (e) => {
   }
 });
 
+function panBy(g, x, y) {
+  const now = performance.now();
+  const dx = x - g.lx;
+  const dy = y - g.ly;
+  cam.x -= dx / cam.scale;
+  cam.y -= dy / cam.scale;
+  const dt = Math.max(1, now - g.lt) / 1000;
+  cam.vx = (-dx / cam.scale) / dt;
+  cam.vy = (-dy / cam.scale) / dt;
+  Object.assign(g, { lx: x, ly: y, lt: now });
+  clampCam();
+}
+
 canvas.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'mouse') {
+    hover = { x: e.offsetX, y: e.offsetY };
+    const g = gesture;
+    if (g) {
+      const far = Math.hypot(e.offsetX - g.sx, e.offsetY - g.sy);
+      if (g.type === 'click' && far > BOX_MIN) g.type = pendingBuild ? 'drag' : 'box';
+      if (g.type === 'box') Object.assign(g, { lx: e.offsetX, ly: e.offsetY });
+      else if (g.type === 'drag') panBy(g, e.offsetX, e.offsetY);
+      else if (g.type === 'mpan') {
+        if (far > TAP_SLOP) g.moved = true;
+        panBy(g, e.offsetX, e.offsetY);
+      }
+    }
+    updateCursor();
+    return;
+  }
   if (!pointers.has(e.pointerId)) return;
   pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
   if (!gesture) return;
@@ -341,21 +481,23 @@ canvas.addEventListener('pointermove', (e) => {
   if (gesture.type === 'tap' && Math.hypot(e.offsetX - gesture.sx, e.offsetY - gesture.sy) > TAP_SLOP) {
     gesture.type = 'pan';
   }
-  if (gesture.type === 'pan') {
-    const now = performance.now();
-    const dx = e.offsetX - gesture.lx;
-    const dy = e.offsetY - gesture.ly;
-    cam.x -= dx / cam.scale;
-    cam.y -= dy / cam.scale;
-    const dt = Math.max(1, now - gesture.lt) / 1000;
-    cam.vx = (-dx / cam.scale) / dt;
-    cam.vy = (-dy / cam.scale) / dt;
-    Object.assign(gesture, { lx: e.offsetX, ly: e.offsetY, lt: now });
-    clampCam();
-  }
+  if (gesture.type === 'pan') panBy(gesture, e.offsetX, e.offsetY);
 });
 
+function endMouse(e) {
+  const g = gesture;
+  gesture = null;
+  if (!g || e.type !== 'pointerup') { cam.vx = cam.vy = 0; updateCursor(); return; }
+  if (g.type === 'click') (g.shift ? toggleUnitAt : handleTap)(e.offsetX, e.offsetY);
+  else if (g.type === 'box') boxSelect(g);
+  else if (g.type === 'mpan' && !g.moved && g.button === 2) handleCommand(e.offsetX, e.offsetY);
+  // A mouse drag stops where it's let go; no fling.
+  cam.vx = cam.vy = 0;
+  updateCursor();
+}
+
 function endPointer(e) {
+  if (e.pointerType === 'mouse') { endMouse(e); return; }
   if (!pointers.has(e.pointerId)) return;
   pointers.delete(e.pointerId);
   if (gesture?.type === 'tap' && e.type === 'pointerup') handleTap(e.offsetX, e.offsetY);
@@ -370,10 +512,27 @@ function endPointer(e) {
 }
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('pointerleave', (e) => {
+  if (e.pointerType !== 'mouse') return;
+  hover = null;
+  if (pendingBuild && !gesture) { hoverReason = ''; setStatus(`Click to place ${nameOf(pendingBuild)}`); }
+});
+// Clicking an on-screen button with the mouse doesn't focus it, so Space and
+// Enter stay game shortcuts instead of pressing that button again.
+$('app').addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
+// Right-click is an order, not the browser's menu.
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  zoomAt(Math.exp(-e.deltaY * 0.0015), e.offsetX, e.offsetY);
+  // Trackpads scroll sideways to pan; a wheel (or pinch, sent as ctrl+wheel) zooms.
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && !e.ctrlKey) {
+    cam.x += e.deltaX / cam.scale;
+    clampCam();
+    return;
+  }
+  const scale = e.deltaMode === 1 ? 30 : 1; // Firefox reports lines, not pixels
+  zoomAt(Math.exp(-e.deltaY * scale * (e.ctrlKey ? 0.01 : 0.0015)), e.offsetX, e.offsetY);
 }, { passive: false });
 
 // Block iOS Safari's page-level pinch/double-tap zoom.
@@ -392,13 +551,43 @@ function minimapPan(e) {
 mini.addEventListener('pointerdown', (e) => { try { mini.setPointerCapture(e.pointerId); } catch { /* ignore */ } minimapPan(e); });
 mini.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'touch') { if (mini.hasPointerCapture(e.pointerId)) minimapPan(e); } });
 
-// Keyboard (desktop convenience)
+// ── Keyboard ───────────────────────────────────────────────────────────────
+// WASD or arrow keys pan; the rest are shortcuts for buttons on screen (the
+// panel's buttons carry their key in data-key, and show it with a mouse).
 const keys = new Set();
+const OVERLAYS = ['overlay-title', 'overlay-sides', 'overlay-online', 'overlay-pause', 'overlay-gameover'];
+const openOverlay = () => OVERLAYS.find((o) => !$(o).classList.contains('hidden')) || null;
+const PANEL_KEYS = new Set(['1', '2', '3', '4', '5', '6', '7', '8', '9', 'h', 'c', 'r', 'q', 'f', 'x', 'enter']);
+
 window.addEventListener('keydown', (e) => {
-  keys.add(e.key.toLowerCase());
-  if (e.key === 'Escape') { cancelPlacement(); clearSelection(); }
+  if (e.target.closest?.('input, textarea, select')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  const overlay = openOverlay();
+  if (overlay) {
+    // Esc or P closes the pause menu.
+    if (overlay === 'overlay-pause' && (k === 'escape' || k === 'p')) $('btn-resume').click();
+    return;
+  }
+  if (!game || game.over) return;
+  keys.add(k);
+  if (k.startsWith('arrow') || k === ' ' || k === 'tab') e.preventDefault();
+  if (e.repeat && !k.startsWith('arrow') && !'wasd'.includes(k)) return;
+  if (k === 'escape') {
+    if (pendingBuild) { cancelPlacement(); setStatus(''); } else if (selectedBuilding || selectedUnits().length) clearSelection();
+    else $('btn-pause').click();
+  } else if (k === 'p') $('btn-pause').click();
+  else if (k === ' ' || k === 'home') focusHq();
+  else if (k === '+' || k === '=') zoomButton(1.4);
+  else if (k === '-' || k === '_') zoomButton(1 / 1.4);
+  else if (k === 'tab') { if (!$('btn-switch').classList.contains('hidden')) $('btn-switch').click(); }
+  else if (PANEL_KEYS.has(k)) {
+    renderPanel(); // bring the panel up to date first, so the key matches what's about to show
+    panel.querySelector(`button[data-key="${k}"]:not(:disabled)`)?.click();
+  }
 });
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+window.addEventListener('blur', () => keys.clear());
 
 // The buttons zoom about the middle of the battlefield, not the empty sky.
 function zoomButton(factor) {
@@ -407,6 +596,10 @@ function zoomButton(factor) {
 }
 $('btn-zoom-in').addEventListener('click', () => zoomButton(1.4));
 $('btn-zoom-out').addEventListener('click', () => zoomButton(1 / 1.4));
+
+// A reminder of the mouse controls, under the build menu on a PC.
+const CONTROLS_TIP = `<div class="controls-tip"><b>Drag</b> a box to select · <b>Right-click</b> to move or attack ·
+  <kbd>WASD</kbd> pan · <b>Wheel</b> zoom · <kbd>Space</kbd> your HQ · <kbd>Esc</kbd> deselect, then pause</div>`;
 
 // ── Bottom panel ───────────────────────────────────────────────────────────
 function renderPanel() {
@@ -442,10 +635,10 @@ function renderPanel() {
     panel.innerHTML = `
       <div class="panel-head"><div class="panel-title">${iconOf(pendingBuild)} Place ${nameOf(pendingBuild)}</div>
         <div class="panel-sub">💰 ${d.cost} · ${d.buildTime}s</div></div>
-      <div class="hint">Tap the battlefield to position it, then tap the same spot again or press Place. ${tip}${zoneTip}</div>
+      <div class="hint">${finePointer.matches ? 'Point at the battlefield and click to build. Right-click or Esc cancels.' : 'Tap the battlefield to position it, then tap the same spot again or press Place.'} ${tip}${zoneTip}</div>
       <div class="row" style="margin-top:auto">
-        <button class="act-btn" data-act="cancel">Cancel</button>
-        <button class="act-btn primary" data-act="place" ${ghost?.valid ? '' : 'disabled'}>Place</button>
+        <button class="act-btn" data-act="cancel">Cancel<kbd class="key">Esc</kbd></button>
+        <button class="act-btn primary" data-act="place" data-key="enter" ${ghost?.valid ? '' : 'disabled'}>Place<kbd class="key">Enter</kbd></button>
       </div>`;
     return;
   }
@@ -460,15 +653,15 @@ function renderPanel() {
       const counts = {};
       for (const t of b.queue) counts[t] = (counts[t] || 0) + 1;
       if (b.trainCurrent) counts[b.trainCurrent] = (counts[b.trainCurrent] || 0) + 1;
-      body = `<div class="grid ${b.canTrain.length <= 3 ? 'cols-3' : ''}">${b.canTrain.map((t) => {
+      body = `<div class="grid ${b.canTrain.length <= 3 ? 'cols-3' : ''}">${b.canTrain.map((t, i) => {
         const u = UNIT_TYPES[t];
-        return `<button class="tile-btn" data-train="${t}" ${money >= u.cost ? '' : 'disabled'}>
-          ${counts[t] ? `<span class="badge">${counts[t]}</span>` : ''}
+        return `<button class="tile-btn" data-train="${t}" data-key="${i + 1}" ${money >= u.cost ? '' : 'disabled'}>
+          <kbd class="key">${i + 1}</kbd>${counts[t] ? `<span class="badge">${counts[t]}</span>` : ''}
           <span class="ic">${iconOf(t)}</span><span class="nm">${nameOf(t)}</span>
           <span class="ct">💰${u.cost} · ${u.trainTime}s</span></button>`;
       }).join('')}</div>
       <div class="progress"><div style="width:${b.trainCurrent ? (1 - b.trainTimer / b.trainTotal) * 100 : 0}%"></div></div>
-      <div class="hint">${b.trainCurrent ? `Training ${nameOf(b.trainCurrent)}${b.queue.length ? ` · ${b.queue.length} queued` : ''}` : 'Tap a unit to queue it.'}</div>`;
+      <div class="hint">${b.trainCurrent ? `Training ${nameOf(b.trainCurrent)}${b.queue.length ? ` · ${b.queue.length} queued` : ''}` : `${tap(true)} a unit to queue it.`}</div>`;
     } else {
       const info = {
         hq: `Command centre. Earns +${BUILDING_TYPES.hq.income}/s. Lose it and you lose.`,
@@ -486,15 +679,15 @@ function renderPanel() {
         <button class="small-btn" data-act="deselect">✕</button></div>
       ${body}
       ${b.type === 'hq' ? '' : `<div class="row" style="margin-top:auto">
-        <button class="act-btn ${armed ? 'primary' : 'danger'}" data-act="sell">${armed ? `Tap again to sell for 💰${refund}` : `💲 Sell · 💰${refund}`}</button>
+        <button class="act-btn ${armed ? 'primary' : 'danger'}" data-act="sell" data-key="x">${armed ? `${tap(true)} again to sell for 💰${refund}` : `💲 Sell · 💰${refund}`}<kbd class="key">X</kbd></button>
       </div>`}`;
     return;
   }
 
-  const buildGrid = `<div class="grid">${BUILD_MENU.map((t) => {
+  const buildGrid = `<div class="grid">${BUILD_MENU.map((t, i) => {
     const d = BUILDING_TYPES[t];
-    return `<button class="tile-btn" data-build="${t}" ${money >= d.cost ? '' : 'disabled'}>
-      <span class="ic">${iconOf(t)}</span><span class="nm">${nameOf(t)}</span><span class="ct">💰${d.cost}</span></button>`;
+    return `<button class="tile-btn" data-build="${t}" data-key="${i + 1}" ${money >= d.cost ? '' : 'disabled'}>
+      <kbd class="key">${i + 1}</kbd><span class="ic">${iconOf(t)}</span><span class="nm">${nameOf(t)}</span><span class="ct">💰${d.cost}</span></button>`;
   }).join('')}</div>`;
 
   if (mode === 'units') {
@@ -504,20 +697,20 @@ function renderPanel() {
     panel.innerHTML = `
       <div class="panel-head"><div class="panel-title">${sel.length} selected <span class="panel-sub">${summary}</span></div>
         <button class="small-btn" data-act="deselect">✕</button></div>
-      <div class="hint">Tap ground to move (they fight on the way) · tap an enemy to attack${counts.engineer ? ' · tap a damaged building or vehicle to repair' : ''}</div>
+      <div class="hint">${finePointer.matches ? 'Right-click' : 'Tap'} ground to move (they fight on the way) · ${finePointer.matches ? 'right-click' : 'tap'} an enemy to attack${counts.engineer ? ` · ${finePointer.matches ? 'right-click' : 'tap'} a damaged building or vehicle to repair` : ''}</div>
       <div class="row">
-        <button class="act-btn" data-act="stop">✋ Hold</button>
-        <button class="act-btn" data-act="charge">⚔️ Charge</button>
-        <button class="act-btn" data-act="retreat">🏠 Retreat</button>
+        <button class="act-btn" data-act="stop" data-key="h">✋ Hold<kbd class="key">H</kbd></button>
+        <button class="act-btn" data-act="charge" data-key="c">⚔️ Charge<kbd class="key">C</kbd></button>
+        <button class="act-btn" data-act="retreat" data-key="r">🏠 Retreat<kbd class="key">R</kbd></button>
       </div>
       <div class="row">
-        <button class="act-btn" data-act="all">🎖️ All units</button>
-        <button class="act-btn" data-act="find">📍 Find</button>
+        <button class="act-btn" data-act="all" data-key="q">🎖️ All units<kbd class="key">Q</kbd></button>
+        <button class="act-btn" data-act="find" data-key="f">📍 Find<kbd class="key">F</kbd></button>
       </div>`;
     return;
   }
 
-  panel.innerHTML = `<div class="panel-head"><div class="panel-title">Build</div><div class="panel-sub">Tap one, then the map</div><button class="small-btn" data-act="all">🎖️ All units</button></div>${buildGrid}`;
+  panel.innerHTML = `<div class="panel-head"><div class="panel-title">Build</div><div class="panel-sub">${tap(true)} one, then the map</div><button class="small-btn" data-act="all" data-key="q">🎖️ All units<kbd class="key">Q</kbd></button></div>${buildGrid}${finePointer.matches ? CONTROLS_TIP : ''}`;
 }
 
 panel.addEventListener('click', (e) => {
@@ -530,7 +723,8 @@ panel.addEventListener('click', (e) => {
     clearSelection();
     pendingBuild = t;
     ghost = null;
-    setStatus(`Tap to place ${nameOf(t)}`);
+    hoverReason = '';
+    setStatus(`${tap(true)} to place ${nameOf(t)}`);
   } else if (btn.dataset.train) {
     const t = btn.dataset.train;
     if (selectedBuilding && p.money >= UNIT_TYPES[t].cost) {
@@ -880,7 +1074,7 @@ function renderLobby() {
     const me = net.slots[net.mySlot];
     main.disabled = false;
     main.textContent = me?.ready ? 'Not ready' : 'Ready';
-    $('lobby-status').textContent = me?.ready ? 'Waiting for the host to start…' : "Tap Ready when you're set.";
+    $('lobby-status').textContent = me?.ready ? 'Waiting for the host to start…' : `${tap(true)} Ready when you're set.`;
   }
 }
 
@@ -1473,6 +1667,7 @@ function frame(now) {
       if (Math.hypot(cam.vx, cam.vy) < 5) cam.vx = cam.vy = 0;
     }
     clampCam();
+    updateHoverGhost();
 
     draw(dt);
     renderHud();
@@ -1547,6 +1742,18 @@ function draw(dt) {
   if (top > 0) { ctx.fillStyle = skyTop(); ctx.fillRect(0, 0, canvas.width, top + 1); }
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(low, 0, 0, bw, bh, -offX, top, bw * P, bh * P);
+
+  if (gesture?.type === 'box') {
+    const x = Math.round(Math.min(gesture.sx, gesture.lx) * dpr) + 0.5;
+    const y = Math.round(Math.min(gesture.sy, gesture.ly) * dpr) + 0.5;
+    const w = Math.round(Math.abs(gesture.lx - gesture.sx) * dpr);
+    const h = Math.round(Math.abs(gesture.ly - gesture.sy) * dpr);
+    ctx.fillStyle = 'rgba(0, 255, 102, 0.12)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#00ff66';
+    ctx.lineWidth = Math.max(1, Math.round(dpr));
+    ctx.strokeRect(x, y, w, h);
+  }
 
   mctx.setTransform(1, 0, 0, 1, 0, 0);
   drawMinimap(mctx, game, mini.width, mini.height, v, minimapCache, pendingBuild ? game.buildZones(active) : null);
