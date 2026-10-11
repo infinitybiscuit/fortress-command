@@ -1,21 +1,23 @@
-MIT License
+Copyright (c) 2026 Tim Coles / infinitybiscuit. All rights reserved.
 
-Copyright (c) 2026 Tim Coles / infinitybiscuit
+Slop Wars: The Next Generation (formerly Fortress Command), including its
+source code, pixel art, themes, names, text and other content, is the
+proprietary work of Tim Coles.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+You may play the game at its official web address. No other permission is
+granted. Without prior written permission from the copyright holder, you may
+not copy, modify, distribute, publish, sublicense, sell, host or create
+derivative works from any part of it.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Viewing the source code on GitHub or in a web browser does not grant any
+licence to use it.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Third-party components keep their own licences, which still apply to those
+components only:
+  - PeerJS (web/vendor/peerjs-1.5.4.min.js): MIT, see web/vendor/peerjs-LICENSE
+  - Press Start 2P font (web/vendor/fonts/): SIL Open Font License 1.1,
+    see web/vendor/fonts/PressStart2P-OFL.txt
+
+THE GAME IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+
+For permissions, contact the copyright holder via https://github.com/infinitybiscuit

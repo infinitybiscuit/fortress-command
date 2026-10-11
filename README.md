@@ -86,7 +86,7 @@ Units are trained by selecting a barracks or workshop, then tapping a unit type 
 ├── foundation.txt             ← building/terrain definitions
 ├── SPEC.md                    ← design specification
 ├── README.md                  ← this file
-└── LICENSE                    ← MIT
+└── LICENSE                    ← All rights reserved
 ```
 
 ## Development
@@ -96,3 +96,6 @@ Open `godot/project.godot` in Godot 4. The project uses GDScript with Godot's bu
 ## Credits
 
 Slop Wars: The Next Generation (originally Fortress Command): inspired by Rick Dangerous, Lemmings and Command & Conquer. Made by humans and AI together.
+## Licence
+
+Copyright © 2026 Tim Coles / infinitybiscuit. **All rights reserved.** You're welcome to play the game, but the code, art and content may not be copied, modified or redistributed without written permission. See [LICENSE](LICENSE). Bundled third-party components (PeerJS, the Press Start 2P font) keep their own licences.

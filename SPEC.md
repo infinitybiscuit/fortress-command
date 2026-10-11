@@ -291,5 +291,5 @@ slop-wars/
 ├── foundation.txt             ← building/terrain definitions
 ├── SPEC.md                    ← this file
 ├── README.md                 ← how to play, setup, project layout
-└── LICENSE                   ← MIT
+└── LICENSE                   ← All rights reserved
 ```
