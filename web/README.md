@@ -73,7 +73,28 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
   - **Effects:** arrows, boulders and fireballs, and timber scaffolding while building.
   - **Menus:** oak, parchment and royal red.
 
-Each theme is one file in `js/themes/`. It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
+- **Gangsters:** 1930s Chicago at dusk with a Bugsy Malone-style twist: the guns splurge custard, and nobody gets hurt, they just get splatted.
+  - **Setting:** an art-deco skyline under a premiere spotlight, brick tenements with water towers and billboards, an elevated railway with a train rattling past, and streetlamps. The pavement has fire hydrants and dropped newspapers, and the platforms are L-train girders.
+  - **Infantry:**
+    - **Hoods** in pinstripes and fedoras with custard tommy guns (Soldier).
+    - **Muscle** with a custard blunderbuss (Heavy).
+    - **Newsies** with a pie to throw (Scout).
+    - **Mechanics** (Engineer).
+    - Trench-coated **Hitmen** (Sniper).
+  - **Vehicles:**
+    - **Getaway Car** with whitewall tyres (Jeep).
+    - **Pie Wagon** with a custard cannon on the roof (Tank).
+    - **Pie Lobber**, a truck-mounted pie catapult (Artillery).
+  - **Air:**
+    - **Autogyro** (Helicopter).
+    - **Blimp** dropping pies (Bomber).
+  - **Buildings:**
+    - A **Speakeasy** with a neon sign and chasing marquee lights (HQ).
+    - **Pool Hall**, a water-tower **Lookout**, stacked **Crates**, a **Bakery** for income, a **Garage**, a blimp **Air Dock**, a **Fire Escape** and **Stairs**.
+  - **Effects:** shots are custard blobs, cream pies and cakes that land with a SPLAT, and splatted gangsters sit in a puddle of custard.
+  - **Menus:** art-deco black, gold and burgundy.
+
+Each theme is one file in `js/themes/`. A theme can also replace the explosion drawing (`explode`). It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
 
 ## Free-for-All: looping map
 
@@ -201,7 +222,7 @@ After about 3 minutes the CPU builds an airbase and adds helicopters and bombers
 | `js/game.js` | `game/game_scene.gd` (economy, AI, spawning, win check) |
 | `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` (now theme-driven) |
 | `js/pixel.js` | new: pixel-art toolkit and the active palette |
-| `js/themes/*.js` | new: Classic, Rise of the Robots and Medieval artwork |
+| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval and Gangsters artwork |
 | `js/main.js` | new: camera, touch input, HUD and panels, overlays, main loop |
 
 ### Differences from the Godot build
