@@ -14,6 +14,10 @@ import {
   drawEffects, updateEffects, drawMarker, drawWeather, G, skyTop, setTheme, THEMES, currentTheme, unitIcon,
   themeSides, sideInfo, sideIcon, setFactionSides, setViewer,
 } from './render.js';
+import {
+  DEPTH, GROUND_Y, projX, projY, laneOf, depthOf, drawIsoBackground, drawIsoWorld, drawIsoZones, drawIsoGhost,
+  drawIsoMarker, isoRay, isoHitUnit, isoHitBuilding,
+} from './iso.js';
 
 // The game used to be called Fortress Command: move its saved settings (name,
 // theme, rejoin session) to the new key names once.
@@ -60,6 +64,13 @@ let panelKey = '';
 let eliminatedNoted = false; // told this player they're out but the game goes on
 let sellArmed = null;       // { id, until } — sell needs a second tap to confirm
 const minimapCache = {};
+// 2D (side-on) or isometric. Picked on the title screen and fixed for the
+// whole game; it's only how this device draws the battle, so players in one
+// online game can each use either.
+const VIEW_KEY = 'slop-view';
+let viewChoice = 'flat';
+try { if (localStorage.getItem(VIEW_KEY) === 'iso') viewChoice = 'iso'; } catch { /* storage unavailable */ }
+let iso = false;
 
 // ── Camera ─────────────────────────────────────────────────────────────────
 // scale = screen points per world unit. It's snapped so each art pixel
@@ -80,7 +91,13 @@ const VIEW_TOP = 24;
 const VIEW_BOTTOM = (MAP_H - GROUND_LEVEL_TILE) * TILE_SIZE + 24;
 const VIEW_SPAN = VIEW_BOTTOM - VIEW_TOP;
 
-function fitScale() { return Math.max(viewH / VIEW_SPAN, viewW / WORLD_W); }
+// Isometric: how much of the strip's height the fit zoom shows, from the
+// tallest platform (and aircraft) down to the strip's front edge.
+const ISO_UP = 520;
+const ISO_DOWN = DEPTH / 2 + 40;
+const ISO_SPAN = ISO_UP + ISO_DOWN;
+
+function fitScale() { return iso ? viewH / ISO_SPAN : Math.max(viewH / VIEW_SPAN, viewW / WORLD_W); }
 function maxScale() { return Math.max(MAX_SCALE, fitScale()); }
 function view() { return { x: cam.x, y: cam.y, w: viewW / cam.scale, h: viewH / cam.scale }; }
 
@@ -97,14 +114,48 @@ function clampCam() {
   cam.zoom = Math.min(maxScale(), Math.max(fitScale(), cam.zoom));
   cam.scale = snapScale(cam.zoom);
   const v = view();
+  if (iso) { clampIso(v); return; }
   // Looping maps pan forever; otherwise stop at the map edges.
   if (game?.wrap) cam.x = ((cam.x % WORLD_W) + WORLD_W) % WORLD_W;
   else cam.x = Math.min(Math.max(0, cam.x), WORLD_W - v.w);
   cam.y = Math.min(Math.max(VIEW_TOP, cam.y), VIEW_BOTTOM - v.h);
 }
 
+// Isometric: the strip runs diagonally down the screen. Keep the middle of
+// the screen over it (x along the map, from just above the platforms to just
+// below its front edge). Looping maps jump a whole map's width at the seam.
+const isoX = (X) => X - DEPTH / 2;           // strip x under projected X (mid-depth)
+const isoGroundY = (X) => projY(isoX(X), GROUND_Y, DEPTH / 2);
+function clampIso(v) {
+  let cx = cam.x + v.w / 2;
+  if (game?.wrap) {
+    const k = Math.floor(isoX(cx) / WORLD_W);
+    cam.x -= k * WORLD_W;
+    cam.y -= (k * WORLD_W) / 2;
+    cx -= k * WORLD_W;
+  } else {
+    const lo = Math.min(WORLD_W / 2, v.w * 0.3);
+    const x = Math.min(Math.max(lo, isoX(cx)), WORLD_W - lo);
+    cam.x = x + DEPTH / 2 - v.w / 2;
+    cx = cam.x + v.w / 2;
+  }
+  // The strip slopes down to the right, so allow for its rise and fall across the screen.
+  const gy = isoGroundY(cx);
+  const top = gy - ISO_UP - v.w / 4;
+  const bottom = gy + ISO_DOWN + v.w / 4;
+  if (v.h >= bottom - top) cam.y = (top + bottom) / 2 - v.h / 2;
+  else cam.y = Math.min(Math.max(top, cam.y), bottom - v.h);
+}
+
 function centreOn(wx, wy) {
   const v = view();
+  if (iso) {
+    const X = projX(wx, DEPTH / 2);
+    cam.x = X - v.w / 2;
+    cam.y = (wy == null ? isoGroundY(X) - v.h * 0.1 : projY(wx, wy, DEPTH / 2)) - v.h / 2;
+    clampCam();
+    return;
+  }
   cam.x = wx - v.w / 2;
   cam.y = wy == null ? VIEW_BOTTOM - v.h : wy - v.h / 2;
   clampCam();
@@ -120,7 +171,32 @@ function zoomAt(factor, sx, sy) {
   clampCam();
 }
 
-function screenToWorld(sx, sy) { return [cam.x + sx / cam.scale, cam.y + sy / cam.scale]; }
+// The world point under the screen point. In the isometric view that's the
+// first thing the line of sight meets (z is how deep into the strip).
+function screenToWorld(sx, sy) {
+  const X = cam.x + sx / cam.scale;
+  const Y = cam.y + sy / cam.scale;
+  if (!iso) return [X, Y];
+  const hit = isoRay(game, X, Y);
+  return [hit.x, hit.y, hit.z];
+}
+// A tap: the world point under it, plus (isometric) the projected point,
+// since units and buildings are picked by what's drawn there.
+function pointAt(sx, sy) {
+  const [rawX, wy, z] = screenToWorld(sx, sy);
+  return { wx: game.normX(rawX), wy, z, X: cam.x + sx / cam.scale, Y: cam.y + sy / cam.scale };
+}
+// Is a unit on screen (for double-tap's "every unit of this type")?
+function onScreen(u) {
+  const v = view();
+  if (!iso) return Math.abs(game.dx(v.x + v.w / 2, u.x)) <= v.w / 2;
+  return screenPos(u).some(([X, Y]) => X >= v.x && X <= v.x + v.w && Y >= v.y && Y <= v.y + v.h);
+}
+// A unit's centre in projected units (isometric), once per copy of a looping map.
+function screenPos(u) {
+  const z = laneOf(u);
+  return (game.wrap ? [-WORLD_W, 0, WORLD_W] : [0]).map((o) => [projX(u.x + o, z), projY(u.x + o, u.y - u.h / 2, z)]);
+}
 
 function resize() {
   const r = canvas.getBoundingClientRect();
@@ -218,28 +294,39 @@ function selectUnits(list) {
 function cancelPlacement() { pendingBuild = null; ghost = null; rampStart = null; hoverReason = ''; }
 
 // ── Hit testing (prefers the closest entity to the finger) ─────────────────
-function pickUnit(wx, wy, pred) {
+// pt is a pointAt() result.
+function pickUnit(pt, pred) {
   let best = null;
   let bestD = Infinity;
   for (const u of game.units) {
-    if (u.dead || !pred(u) || !u.containsPoint(wx, wy, HIT_PAD)) continue;
-    const [cx, cy] = u.centre();
-    const d = Math.hypot(game.dx(wx, cx), cy - wy);
-    if (d < bestD) { bestD = d; best = u; }
+    if (u.dead || !pred(u)) continue;
+    let d;
+    if (iso) d = isoHitUnit(game, u, pt.X, pt.Y, HIT_PAD);
+    else if (u.containsPoint(pt.wx, pt.wy, HIT_PAD)) {
+      const [cx, cy] = u.centre();
+      d = Math.hypot(game.dx(pt.wx, cx), cy - pt.wy);
+    }
+    if (d != null && d < bestD) { bestD = d; best = u; }
   }
   return best;
 }
-function pickBuilding(wx, wy, pred) {
-  return game.buildings.find((b) => !b.dead && pred(b) && b.containsPoint(wx, wy, 4)) || null;
+function pickBuilding(pt, pred) {
+  const hit = iso ? (b) => isoHitBuilding(game, b, pt.X, pt.Y, 2) : (b) => b.containsPoint(pt.wx, pt.wy, 4);
+  return game.buildings.find((b) => !b.dead && pred(b) && hit(b)) || null;
 }
+// Where an order marker goes: on the target, or where the tap pointed.
+const markAt = (e, color) => {
+  const [x, y] = e.centre();
+  markers.push({ x, y, z: iso ? depthOf(e) : 0, t: 0.6, color });
+};
 
 // ── Tap handling ───────────────────────────────────────────────────────────
 let lastTap = { t: 0, unit: null };
 
 function handleTap(sx, sy) {
   if (!game || paused || game.over) return;
-  const [rawX, wy] = screenToWorld(sx, sy);
-  const wx = game.normX(rawX);
+  const pt = pointAt(sx, sy);
+  const { wx, wy } = pt;
   const mine = (e) => e.faction === active;
   const enemy = (e) => e.faction !== active;
 
@@ -256,17 +343,17 @@ function handleTap(sx, sy) {
   }
 
   const sel = selectedUnits();
-  const enemyUnit = pickUnit(wx, wy, enemy);
-  const enemyBuilding = enemyUnit ? null : pickBuilding(wx, wy, enemy);
+  const enemyUnit = pickUnit(pt, enemy);
+  const enemyBuilding = enemyUnit ? null : pickBuilding(pt, enemy);
   const target = enemyUnit || enemyBuilding;
   if (target && sel.length) {
     if (!sel.some((u) => canReach(u, target))) { toast("Can't reach that — it's too high up"); return; }
     issue({ c: 'attack', ids: ids(sel), target: ref(target) });
-    markers.push({ x: target.centre()[0], y: target.centre()[1], t: 0.6, color: '#ff4d4d' });
+    markAt(target, '#ff4d4d');
     return;
   }
 
-  const ownUnit = pickUnit(wx, wy, mine);
+  const ownUnit = pickUnit(pt, mine);
   const repairers = sel.filter((u) => u.repairRate > 0 && u !== ownUnit);
   if (ownUnit?.vehicle && ownUnit.hp < ownUnit.maxHp && repairers.length) {
     issue({ c: 'repair', ids: ids(repairers), target: ref(ownUnit) });
@@ -277,9 +364,7 @@ function handleTap(sx, sy) {
     const now = performance.now();
     if (lastTap.unit === ownUnit && now - lastTap.t < DOUBLE_TAP_MS) {
       // Double-tap: every unit of the same type that's on screen.
-      const v = view();
-      selectUnits(game.units.filter((u) => mine(u) && u.type === ownUnit.type
-        && Math.abs(game.dx(v.x + v.w / 2, u.x)) <= v.w / 2));
+      selectUnits(game.units.filter((u) => mine(u) && u.type === ownUnit.type && onScreen(u)));
     } else {
       selectUnits([ownUnit]);
     }
@@ -287,7 +372,7 @@ function handleTap(sx, sy) {
     return;
   }
 
-  const ownBuilding = pickBuilding(wx, wy, mine);
+  const ownBuilding = pickBuilding(pt, mine);
   if (ownBuilding) {
     const engineers = sel.filter((u) => u.repairRate > 0);
     if (engineers.length && ownBuilding.hp < ownBuilding.maxHp) {
@@ -301,7 +386,7 @@ function handleTap(sx, sy) {
 
   if (sel.length) {
     issue({ c: 'move', ids: ids(sel), x: wx, y: wy });
-    markers.push({ x: wx, y: wy, t: 0.6, color: '#00ff66' });
+    markers.push({ x: wx, y: wy, z: pt.z, t: 0.6, color: '#00ff66' });
     return;
   }
   clearSelection();
@@ -380,21 +465,21 @@ function handleCommand(sx, sy) {
   if (pendingBuild) { cancelPlacement(); setStatus(''); return; }
   const sel = selectedUnits();
   if (!sel.length) { clearSelection(); return; }
-  const [rawX, wy] = screenToWorld(sx, sy);
-  const wx = game.normX(rawX);
+  const pt = pointAt(sx, sy);
+  const { wx, wy } = pt;
   const mine = (e) => e.faction === active;
   const enemy = (e) => e.faction !== active;
-  const target = pickUnit(wx, wy, enemy) || pickBuilding(wx, wy, enemy);
+  const target = pickUnit(pt, enemy) || pickBuilding(pt, enemy);
   if (target) {
     if (!sel.some((u) => canReach(u, target))) { toast("Can't reach that — it's too high up"); return; }
     issue({ c: 'attack', ids: ids(sel), target: ref(target) });
-    markers.push({ x: target.centre()[0], y: target.centre()[1], t: 0.6, color: '#ff4d4d' });
+    markAt(target, '#ff4d4d');
     return;
   }
   const engineers = sel.filter((u) => u.repairRate > 0);
-  const ownUnit = pickUnit(wx, wy, mine);
+  const ownUnit = pickUnit(pt, mine);
   const fixUnit = ownUnit?.vehicle && ownUnit.hp < ownUnit.maxHp ? ownUnit : null;
-  const ownBuilding = ownUnit ? null : pickBuilding(wx, wy, mine);
+  const ownBuilding = ownUnit ? null : pickBuilding(pt, mine);
   const fixBuilding = ownBuilding && ownBuilding.hp < ownBuilding.maxHp ? ownBuilding : null;
   const fixers = engineers.filter((u) => u !== fixUnit);
   if ((fixUnit || fixBuilding) && fixers.length) {
@@ -403,14 +488,13 @@ function handleCommand(sx, sy) {
     return;
   }
   issue({ c: 'move', ids: ids(sel), x: wx, y: wy });
-  markers.push({ x: wx, y: wy, t: 0.6, color: '#00ff66' });
+  markers.push({ x: wx, y: wy, z: pt.z, t: 0.6, color: '#00ff66' });
 }
 
 // Shift-click adds one of your units to the selection, or takes it out.
 function toggleUnitAt(sx, sy) {
   if (!game || paused || game.over || pendingBuild) return handleTap(sx, sy);
-  const [rawX, wy] = screenToWorld(sx, sy);
-  const u = pickUnit(game.normX(rawX), wy, (e) => e.faction === active);
+  const u = pickUnit(pointAt(sx, sy), (e) => e.faction === active);
   if (!u) return handleTap(sx, sy);
   if (selectedBuilding) { selectedBuilding.selected = false; selectedBuilding = null; }
   u.selected = !u.selected;
@@ -419,10 +503,11 @@ function toggleUnitAt(sx, sy) {
 // Drag a box to select every unit of yours inside it (shift adds to the selection).
 function boxSelect(g) {
   if (!game || paused || game.over) return;
-  const [x0, y0] = screenToWorld(Math.min(g.sx, g.lx), Math.min(g.sy, g.ly));
-  const [x1, y1] = screenToWorld(Math.max(g.sx, g.lx), Math.max(g.sy, g.ly));
+  const [x0, y0] = [cam.x + Math.min(g.sx, g.lx) / cam.scale, cam.y + Math.min(g.sy, g.ly) / cam.scale];
+  const [x1, y1] = [cam.x + Math.max(g.sx, g.lx) / cam.scale, cam.y + Math.max(g.sy, g.ly) / cam.scale];
   const inside = game.units.filter((u) => {
     if (u.dead || u.faction !== active) return false;
+    if (iso) return screenPos(u).some(([X, Y]) => X >= x0 - 4 && X <= x1 + 4 && Y >= y0 - 4 && Y <= y1 + 4);
     const [cx, cy] = u.centre();
     const dx = game.dx(game.normX(x0), cx);
     return dx >= -4 && dx <= x1 - x0 + 4 && cy >= y0 - 4 && cy <= y1 + 4;
@@ -444,11 +529,10 @@ function updateCursor() {
   if (gesture?.type === 'box') cursor = 'crosshair';
   else if (gesture?.type === 'mpan' && gesture.moved) cursor = 'grabbing';
   else if (hover && game && !paused && !game.over) {
-    const [rawX, wy] = screenToWorld(hover.x, hover.y);
-    const wx = game.normX(rawX);
+    const pt = pointAt(hover.x, hover.y);
     if (pendingBuild) cursor = 'copy';
-    else if (selectedUnits().length && (pickUnit(wx, wy, (e) => e.faction !== active) || pickBuilding(wx, wy, (e) => e.faction !== active))) cursor = 'crosshair';
-    else if (pickUnit(wx, wy, (e) => e.faction === active) || pickBuilding(wx, wy, (e) => e.faction === active)) cursor = 'pointer';
+    else if (selectedUnits().length && (pickUnit(pt, (e) => e.faction !== active) || pickBuilding(pt, (e) => e.faction !== active))) cursor = 'crosshair';
+    else if (pickUnit(pt, (e) => e.faction === active) || pickBuilding(pt, (e) => e.faction === active)) cursor = 'pointer';
   }
   if (canvas.style.cursor !== cursor) canvas.style.cursor = cursor;
 }
@@ -613,6 +697,7 @@ canvas.addEventListener('wheel', (e) => {
   // Trackpads scroll sideways to pan; a wheel (or pinch, sent as ctrl+wheel) zooms.
   if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && !e.ctrlKey) {
     cam.x += e.deltaX / cam.scale;
+    if (iso) cam.y += e.deltaX / cam.scale / 2; // along the strip
     clampCam();
     return;
   }
@@ -629,8 +714,13 @@ function minimapPan(e) {
   const r = mini.getBoundingClientRect();
   const wx = ((e.clientX - r.left) / r.width) * WORLD_W;
   const v = view();
-  cam.x = wx - v.w / 2;
   cam.vx = cam.vy = 0;
+  if (iso) {
+    // Slide along the strip, keeping the same height above it.
+    const dy = cam.y - isoGroundY(cam.x + v.w / 2);
+    cam.x = projX(wx, DEPTH / 2) - v.w / 2;
+    cam.y = isoGroundY(cam.x + v.w / 2) + dy;
+  } else cam.x = wx - v.w / 2;
   clampCam();
 }
 mini.addEventListener('pointerdown', (e) => { try { mini.setPointerCapture(e.pointerId); } catch { /* ignore */ } minimapPan(e); });
@@ -922,6 +1012,8 @@ function startGame(key, opts = {}) {
   $('btn-quit').textContent = online() ? 'Leave game' : 'Main Menu';
   showOverlay(null);
   paused = false;
+  iso = viewChoice === 'iso';
+  document.body.classList.toggle('iso', iso);
   resize();
   cam.zoom = fitScale();
   clampCam();
@@ -1736,7 +1828,7 @@ function frame(now) {
     const kx = (keys.has('arrowright') || keys.has('d')) - (keys.has('arrowleft') || keys.has('a'));
     const ky = (keys.has('arrowdown') || keys.has('s')) - (keys.has('arrowup') || keys.has('w'));
     cam.x += (kx * 800 * dt) / cam.scale;
-    cam.y += (ky * 800 * dt) / cam.scale;
+    cam.y += ((ky + (iso ? kx / 2 : 0)) * 800 * dt) / cam.scale; // isometric: left and right follow the strip
     if (!gesture && (cam.vx || cam.vy)) {
       cam.x += cam.vx * dt;
       cam.y += cam.vy * dt;
@@ -1772,7 +1864,7 @@ function draw(dt) {
   const P = cam.scale === fitScale() ? cam.scale * dpr * G : Math.max(1, Math.round(cam.scale * dpr * G));
   const camAX = Math.floor(cam.x / G);
   const camAY = Math.floor(cam.y / G);
-  const topA = Math.max(camAY, -SKY_PAD); // first art row in the buffer
+  const topA = iso ? camAY : Math.max(camAY, -SKY_PAD); // first art row in the buffer
   const bw = Math.ceil(canvas.width / P) + 2;
   const bh = Math.ceil(canvas.height / P) + 2 - (topA - camAY);
   if (low.width !== bw || low.height !== bh) { low.width = bw; low.height = bh; }
@@ -1780,9 +1872,64 @@ function draw(dt) {
   const offX = Math.round((cam.x / G - camAX) * P);
   const offY = Math.round((cam.y / G - camAY) * P);
 
+  const v = view();
+  if (iso) drawIsoScene(dt, bw, bh, camAX, camAY, v);
+  else drawFlatScene(dt, bw, bh, camAX, topA, v);
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const top = (topA - camAY) * P - offY;
+  if (top > 0) { ctx.fillStyle = skyTop(); ctx.fillRect(0, 0, canvas.width, top + 1); }
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(low, 0, 0, bw, bh, -offX, top, bw * P, bh * P);
+
+  if (gesture?.type === 'box') {
+    const x = Math.round(Math.min(gesture.sx, gesture.lx) * dpr) + 0.5;
+    const y = Math.round(Math.min(gesture.sy, gesture.ly) * dpr) + 0.5;
+    const w = Math.round(Math.abs(gesture.lx - gesture.sx) * dpr);
+    const h = Math.round(Math.abs(gesture.ly - gesture.sy) * dpr);
+    ctx.fillStyle = 'rgba(0, 255, 102, 0.12)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#00ff66';
+    ctx.lineWidth = Math.max(1, Math.round(dpr));
+    ctx.strokeRect(x, y, w, h);
+  }
+
+  // The minimap's box shows the stretch of map under the middle of the
+  // screen (in the isometric view, along the strip).
+  const mv = iso ? { x: game.normX(v.x + v.w / 2 - DEPTH / 2) - v.w / 2, y: VIEW_TOP, w: v.w, h: VIEW_SPAN } : v;
+  if (iso && !game.wrap) mv.x = Math.min(Math.max(0, mv.x), WORLD_W - mv.w);
+  mctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawMinimap(mctx, game, mini.width, mini.height, mv, minimapCache, pendingBuild ? game.buildZones(active) : null);
+}
+
+function drawIsoScene(dt, bw, bh, camAX, camAY, v) {
+  lctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawIsoBackground(lctx, bw, bh, camAX, camAY);
+  game.effects = updateEffects(game.effects, dt);
+  lctx.setTransform(1, 0, 0, 1, -camAX, -camAY);
+  drawIsoWorld(lctx, game, v);
+  if (pendingBuild) {
+    let zones = game.buildZones(active);
+    if (game.wrap) zones = [-1, 0, 1].flatMap((k) => zones.map(([a, b]) => [a + k * MAP_W, b + k * MAP_W]));
+    drawIsoZones(lctx, zones.sort((a, b) => a[0] - b[0]), v);
+  }
+  lctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawWeather(lctx, bw, bh, camAX, camAY);
+  markers = markers.filter((m) => (m.t -= dt) > 0);
+  // Ghosts and markers sit at the map position nearest the middle of the screen.
+  const shift = (x) => (game.wrap ? x + Math.round((v.x + v.w / 2 - DEPTH / 2 - x) / WORLD_W) * WORLD_W : x) - x;
+  const at = (x, fn) => {
+    const o = shift(x);
+    lctx.setTransform(1, 0, 0, 1, o / G - camAX, o / G / 2 - camAY);
+    fn();
+  };
+  if (pendingBuild && ghost) at(ghost.x ?? ghost.x1 ?? ghost.tx * TILE_SIZE, () => drawIsoGhost(lctx, ghost, drawGhost));
+  for (const m of markers) at(m.x, () => drawIsoMarker(lctx, m, drawMarker));
+}
+
+function drawFlatScene(dt, bw, bh, camAX, topA, v) {
   lctx.setTransform(1, 0, 0, 1, 0, 0);
   drawBackground(lctx, bw, bh, camAX, topA);
-  const v = view();
   // On looping maps the view can straddle the seam: draw the world again one
   // map-width over so both sides show.
   const offsets = game.wrap ? [0, WORLD_W, -WORLD_W].filter((o) => o + WORLD_W > v.x && o < v.x + v.w) : [0];
@@ -1816,27 +1963,6 @@ function draw(dt) {
     if (pendingBuild && ghost) drawGhost(lctx, ghost);
     for (const m of markers) drawMarker(lctx, m);
   });
-
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  const top = (topA - camAY) * P - offY;
-  if (top > 0) { ctx.fillStyle = skyTop(); ctx.fillRect(0, 0, canvas.width, top + 1); }
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(low, 0, 0, bw, bh, -offX, top, bw * P, bh * P);
-
-  if (gesture?.type === 'box') {
-    const x = Math.round(Math.min(gesture.sx, gesture.lx) * dpr) + 0.5;
-    const y = Math.round(Math.min(gesture.sy, gesture.ly) * dpr) + 0.5;
-    const w = Math.round(Math.abs(gesture.lx - gesture.sx) * dpr);
-    const h = Math.round(Math.abs(gesture.ly - gesture.sy) * dpr);
-    ctx.fillStyle = 'rgba(0, 255, 102, 0.12)';
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = '#00ff66';
-    ctx.lineWidth = Math.max(1, Math.round(dpr));
-    ctx.strokeRect(x, y, w, h);
-  }
-
-  mctx.setTransform(1, 0, 0, 1, 0, 0);
-  drawMinimap(mctx, game, mini.width, mini.height, v, minimapCache, pendingBuild ? game.buildZones(active) : null);
 }
 
 // ── Themes ─────────────────────────────────────────────────────────────────
@@ -1882,9 +2008,26 @@ $('btn-theme').addEventListener('click', () => {
 });
 applyTheme(savedTheme());
 
+// 2D or isometric, for the next game started from this device.
+function showView() {
+  for (const b of $('view-toggle').querySelectorAll('[data-view]')) {
+    const on = b.dataset.view === viewChoice;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-checked', on);
+  }
+}
+$('view-toggle').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-view]');
+  if (!b) return;
+  viewChoice = b.dataset.view;
+  try { localStorage.setItem(VIEW_KEY, viewChoice); } catch { /* storage unavailable */ }
+  showView();
+});
+showView();
+
 // ── Boot ───────────────────────────────────────────────────────────────────
 // Read-only handle for automated browser tests.
-window.__slop = { get game() { return game; }, cam, net };
+window.__slop = { get game() { return game; }, cam, net, get iso() { return iso; }, look: centreOn };
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 buildModeButtons();

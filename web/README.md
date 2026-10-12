@@ -33,6 +33,7 @@ The art style is a homage to early-90s home-computer war games: chunky, crisp pi
   - Buildings: a sandbagged HQ bunker, a corrugated barracks hut, a sandbag gun nest, a sandbag-and-barbed-wire wall, a mine pithead, a workshop garage, and an airbase hangar with a control tower.
   - Grass, dirt and rock tiles, jungle trees and clouds.
 - **Life and damage:** buildings rise behind scaffolding while under construction, smoke and burn when damaged, and have small animations (flag, pithead wheel, chimney smoke, tower beacon).
+- **2D or isometric:** the title screen picks the view for the next game. **Isometric** shows the same battle as a Syndicate-style diorama seen from above at an angle: the map becomes a long street, platforms and bridges are solid slabs, buildings are blocks along the back of the street, and units walk in lanes along the front. Platforms that hide a building turn see-through, and units behind something show through it faintly. The rules and every mode (including online) are the same, and each player in an online game can pick either view.
 - **UI:** the olive/khaki interface uses the bundled [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) pixel font (SIL Open Font License, see `vendor/fonts/`).
 
 ## Themes
@@ -584,6 +585,7 @@ The `.gd` paths are in the retired Godot project, under `archive/godot-era/godot
 | `js/entities.js` | `entities/unit.gd`, `building.gd`, `projectile.gd` (same AABB physics and ramp step-up) |
 | `js/game.js` | `game/game_scene.gd` (economy, AI, spawning, win check) |
 | `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` (now theme-driven) |
+| `js/iso.js` | new: the isometric view (projection, extruded blocks, draw order, picking) |
 | `js/pixel.js` | new: pixel-art toolkit and the active palette |
 | `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War, Cartel Wars, Trade Wars, Civil War, Ghost Wars and Alien Wars artwork |
 | `js/main.js` | new: camera, touch input, HUD and panels, overlays, main loop |
