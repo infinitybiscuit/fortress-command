@@ -4,7 +4,7 @@
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v47 · Isometric';
+export const VERSION = 'v48 · Square field';
 
 // Cloudflare Worker (see /relay; it keeps its original name, fortress-relay)
 // that hands out TURN relay credentials, used
@@ -22,6 +22,16 @@ export const MAP_H = 20;
 export const WORLD_W = MAP_W * TILE_SIZE; // 6400
 export const WORLD_H = MAP_H * TILE_SIZE; // 640
 export const GROUND_LEVEL_TILE = 3;
+// Isometric games are played on a flat square field instead of the long
+// side-on strip: x across it, z (depth) up it, both 0..FIELD_SIZE.
+export const FIELD_TILES = 96;
+export const FIELD_SIZE = FIELD_TILES * TILE_SIZE;
+// Where each HQ goes (top-left tile, x and z), by number of players.
+export const FIELD_SPOTS = {
+  2: [[6, 6], [86, 86]],
+  3: [[6, 6], [86, 6], [46, 86]],
+  4: [[6, 6], [86, 86], [86, 6], [6, 86]],
+};
 export const PLATFORM_ROWS = [3, 7, 11];
 
 export const TILE_EMPTY = 0;

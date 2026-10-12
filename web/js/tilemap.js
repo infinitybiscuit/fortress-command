@@ -8,7 +8,9 @@ const key = (tx, ty) => ty * MAP_W + tx;
 const modW = (tx) => ((tx % MAP_W) + MAP_W) % MAP_W;
 
 export class TileMap {
-  constructor() {
+  // flat: no platforms (the isometric field).
+  constructor(flat = false) {
+    this.flat = flat;
     this.tiles = new Uint8Array(MAP_W * MAP_H);
     this.buildingTiles = new Map(); // key -> building id (placement overlap check)
     this.wallTiles = new Map();     // key -> owning faction
@@ -29,6 +31,7 @@ export class TileMap {
     for (let x = 0; x < MAP_W; x++)
       for (let y = gt; y < MAP_H; y++) this.set(x, y, TILE_GROUND);
 
+    if (this.flat) { this.version++; return; }
     for (const delta of PLATFORM_ROWS) {
       const rowY = gt - delta - 1;
       if (rowY < 1 || rowY >= MAP_H - 1) continue;

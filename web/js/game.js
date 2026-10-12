@@ -1,6 +1,6 @@
 // Game state, economy, AI and win conditions. Ported from archive/godot-era/godot/scripts/game/game_scene.gd.
 import {
-  TILE_SIZE, TILE_EMPTY, WORLD_W, WORLD_H, RAMP_MAX_ANGLE, RAMP_MAX_LEN, RAMP_LEVEL_SNAP, MAP_W, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
+  TILE_SIZE, TILE_EMPTY, WORLD_W, FIELD_TILES, FIELD_SIZE, FIELD_SPOTS, WORLD_H, RAMP_MAX_ANGLE, RAMP_MAX_LEN, RAMP_LEVEL_SNAP, MAP_W, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
 } from './config.js';
 import { TileMap } from './tilemap.js';
 import { Unit, Building, Projectile, State, canReach, distTo } from './entities.js';
@@ -12,9 +12,13 @@ export class Game {
   constructor(mode, events = {}) {
     this.mode = typeof mode === 'string' ? MODES[mode] : mode;
     this.events = events; // { onGameOver(winnerIdx), onMessage(text) }
-    this.map = new TileMap();
+    // Isometric games are played on a flat square field: units move in x and
+    // z, buildings have square footprints, and there are no platforms, bridges
+    // or looping edges.
+    this.field = !!this.mode.field;
+    this.map = new TileMap(this.field);
     // Looping map (Free-for-All): x wraps around and distances take the short way.
-    this.wrap = !!this.mode.wrap;
+    this.wrap = !this.field && !!this.mode.wrap;
     this.map.wrap = this.wrap;
     this.units = [];
     this.buildings = [];
@@ -27,15 +31,25 @@ export class Game {
     this.time = 0;
 
     const hqY = this.map.groundTop - BUILDING_TYPES.hq.h;
+    const spots = FIELD_SPOTS[this.mode.players.length];
     this.mode.players.forEach(([hqX, isAi], i) => {
       const p = { faction: i, money: STARTING_MONEY, income: 0, isAi, hq: null, alive: true };
       this.players.push(p);
-      p.hq = this.spawnBuilding('hq', hqX, hqY, i);
+      p.hq = this.field
+        ? this.spawnBuilding('hq', spots[i][0], hqY, i, null, spots[i][1])
+        : this.spawnBuilding('hq', hqX, hqY, i);
     });
     // Everyone starts with two soldiers posted in front of their HQ.
     const y = this.map.groundTop * TILE_SIZE;
     this.players.forEach((p, i) => {
       const [hx] = p.hq.centre();
+      if (this.field) {
+        for (const side of [-24, 24]) {
+          const [x, z] = this.fieldExit(p.hq, 60, side);
+          this.spawnUnit('soldier', x, y, i).z = z;
+        }
+        return;
+      }
       const dir = this.wrap || hx < WORLD_W / 2 ? 1 : -1;
       for (const off of [122, 162]) this.spawnUnit('soldier', this.normX(hx + dir * off), y, i);
     });
@@ -54,6 +68,19 @@ export class Game {
 
   normX(x) { return this.wrap ? ((x % WORLD_W) + WORLD_W) % WORLD_W : x; }
 
+  // On the field: the spot `gap` beyond building b's footprint on the side
+  // facing the middle of the field, moved `side` across. Returns [x, z].
+  fieldExit(b, gap, side = 0) {
+    const cx = b.x + b.w / 2;
+    const cz = b.z + b.d / 2;
+    const mid = FIELD_SIZE / 2;
+    const len = Math.hypot(mid - cx, mid - cz) || 1;
+    const ux = (mid - cx) / len;
+    const uz = (mid - cz) / len;
+    const r = b.w / 2 / Math.max(Math.abs(ux), Math.abs(uz)) + gap;
+    return [cx + ux * r - uz * side, cz + uz * r + ux * side];
+  }
+
   get humanCount() { return this.players.filter((p) => !p.isAi).length; }
 
   spawnUnit(type, x, y, faction) {
@@ -64,17 +91,24 @@ export class Game {
 
   buildingById(id) { return this.buildings.find((b) => b.id === id && !b.dead) || null; }
 
-  spawnBuilding(type, tx, ty, faction, seg = null) {
-    const b = new Building(this, type, tx, ty, faction);
+  // tz: the footprint's depth row on the field (null on the side-on map).
+  spawnBuilding(type, tx, ty, faction, seg = null, tz = null) {
+    const b = new Building(this, type, tx, ty, faction, this.field ? tz ?? 0 : null);
     if (seg) b.setSeg(seg); // ramps: a plank between two points
     this.buildings.push(b);
-    this.map.occupy(b);
+    if (!this.field) this.map.occupy(b);
     return b;
   }
 
-  // Tile placement for a building centred on the touched tile, resting on that row.
-  placementFor(type, wx, wy, playerIdx) {
+  // Tile placement for a building centred on the touched tile, resting on that
+  // row. On the field the touched spot is (wx, wz) on the ground instead.
+  placementFor(type, wx, wy, playerIdx, wz = 0) {
     const d = BUILDING_TYPES[type];
+    if (this.field) {
+      const half = (d.w - 1) / 2;
+      return this.placementAt(type, Math.round(wx / TILE_SIZE - 0.5 - half), this.map.groundTop - d.h, playerIdx,
+        Math.round(wz / TILE_SIZE - 0.5 - half));
+    }
     const [tx, tapTy] = this.map.worldToTile(wx, wy);
     let ty = tapTy;
     // Fingers are imprecise: snap to the surface in the tapped column.
@@ -85,8 +119,16 @@ export class Game {
 
   // Validity of a footprint: terrain/overlap rules, plus (when a player is
   // given) the build-zone rule. `reason` is 'terrain' or 'zone' when invalid.
-  placementAt(type, tx, ty, playerIdx) {
+  placementAt(type, tx, ty, playerIdx, tz = 0) {
     const d = BUILDING_TYPES[type];
+    if (this.field) {
+      // Inside the field and clear of every other footprint.
+      const terrainOk = !d.isRamp && tx >= 0 && tz >= 0 && tx + d.w <= FIELD_TILES && tz + d.w <= FIELD_TILES
+        && !this.buildings.some((b) => !b.dead && tx < b.tx + b.wt && tx + d.w > b.tx && tz < b.tz + b.wt && tz + d.w > b.tz);
+      const zoneOk = playerIdx == null || this.inBuildZone(playerIdx, tx, d.w, tz);
+      const reason = !zoneOk ? 'zone' : !terrainOk ? 'terrain' : null;
+      return { tx, ty, tz, w: d.w, h: d.h, valid: !reason, reason };
+    }
     const terrainOk = this.map.canPlace(tx, ty, d.w, d.h, type);
     const zoneOk = playerIdx == null || this.inBuildZone(playerIdx, tx, d.w);
     const reason = !zoneOk ? 'zone' : !terrainOk ? 'terrain' : null;
@@ -94,10 +136,16 @@ export class Game {
   }
 
   // Tile ranges [from, to) where a player may build: around each of their
-  // zone-extending buildings, BUILD_RADIUS_TILES either side.
+  // zone-extending buildings, BUILD_RADIUS_TILES either side. On the field,
+  // squares [x0, z0, x1, z1) around each one instead.
   buildZones(playerIdx) {
-    const spans = this.buildings
-      .filter((b) => b.faction === playerIdx && !b.dead && !b.def.noZone)
+    const own = this.buildings.filter((b) => b.faction === playerIdx && !b.dead && !b.def.noZone);
+    if (this.field) {
+      const R = BUILD_RADIUS_TILES;
+      return own.map((b) => [Math.max(0, b.tx - R), Math.max(0, b.tz - R),
+        Math.min(FIELD_TILES, b.tx + b.wt + R), Math.min(FIELD_TILES, b.tz + b.wt + R)]);
+    }
+    const spans = own
       .map((b) => [b.tx - BUILD_RADIUS_TILES, b.tx + b.wt + BUILD_RADIUS_TILES])
       .sort((a, b) => a[0] - b[0]);
     const merged = [];
@@ -111,21 +159,26 @@ export class Game {
 
   // A footprint is in the zone if it overlaps any zone span (or, on looping
   // maps, a span's copy one map-width either side).
-  inBuildZone(playerIdx, tx, w) {
+  inBuildZone(playerIdx, tx, w, tz = 0) {
+    if (this.field) {
+      return this.buildZones(playerIdx).some(([x0, z0, x1, z1]) => tx < x1 && tx + w > x0 && tz < z1 && tz + w > z0);
+    }
     const shifts = this.wrap ? [-MAP_W, 0, MAP_W] : [0];
     return this.buildZones(playerIdx).some(([from, to]) => shifts.some((s) => tx < to + s && tx + w > from + s));
   }
 
-  tryPlaceAt(playerIdx, type, tx, ty) {
+  tryPlaceAt(playerIdx, type, tx, ty, tz = 0) {
     const p = this.players[playerIdx];
     const d = BUILDING_TYPES[type];
     if (!d || d.isRamp) return "Can't place here!"; // ramps go through tryPlaceRamp
+    if (this.field && !(Number.isInteger(tz) && Number.isInteger(tx))) return "Can't place here!";
     if (p.money < d.cost) return 'Not enough credits!';
-    const pl = this.placementAt(type, tx, ty, playerIdx);
+    const pl = this.placementAt(type, tx, ty, playerIdx, tz);
     if (pl.reason === 'zone') return 'Too far from your base!';
     if (!pl.valid) return "Can't place here!";
     p.money -= d.cost;
-    this.spawnBuilding(type, tx, ty, playerIdx);
+    if (this.field) ty = this.map.groundTop - d.h;
+    this.spawnBuilding(type, tx, ty, playerIdx, null, tz);
     return null;
   }
 
@@ -209,6 +262,7 @@ export class Game {
   }
 
   tryPlaceRamp(playerIdx, a, b) {
+    if (this.field) return "Can't place here!"; // no bridges on the flat field
     const num = (v) => typeof v === 'number' && Number.isFinite(v);
     if (!Array.isArray(a) || !Array.isArray(b) || !a.every(num) || !b.every(num)) return "Can't place here!";
     // Re-check the ends against this map (they were snapped on the sender's).
@@ -256,6 +310,14 @@ export class Game {
   }
 
   onUnitTrained(b, type) {
+    if (this.field) {
+      // Out of the side facing the middle, spread a little so they don't stack.
+      const [x, z] = this.fieldExit(b, 14, (Math.random() - 0.5) * b.w * 0.6);
+      const u = this.spawnUnit(type, x, b.y + b.h, b.faction);
+      u.z = z;
+      u.facing = x + z > b.x + b.z + b.w ? 1 : -1;
+      return;
+    }
     // Spawn beside the building on whichever side faces the map centre.
     const towardRight = this.wrap || b.x + b.w / 2 < WORLD_W / 2;
     const x = this.normX(towardRight ? b.x + b.w + 8 : b.x - 8);
@@ -271,10 +333,18 @@ export class Game {
       from = shooter.vehicle
         ? [shooter.x + shooter.facing * shooter.w * 0.45, shooter.y - shooter.h * 0.75]
         : [shooter.x, shooter.y - 14];
+      if (this.field) {
+        // The barrel points at the target across the ground, not along x.
+        const [ax, az] = shooter.aimAt(target);
+        const len = Math.hypot(ax - shooter.x, az - shooter.z) || 1;
+        const reach = shooter.vehicle ? shooter.w * 0.45 : 0;
+        from = [shooter.x + ((ax - shooter.x) / len) * reach, from[1], shooter.z + ((az - shooter.z) / len) * reach];
+      }
       opts = { kind: shooter.def.shot, splash: shooter.def.splash, vsBuildings: shooter.def.vsBuildings };
     } else {
       from = shooter.centre();
       from[1] = shooter.y + 10;
+      from[2] = shooter.z + shooter.d / 2;
     }
     opts.shooter = shooter;
     this.projectiles.push(new Projectile(this, from, target, damage, shooter.faction, opts));
@@ -283,7 +353,7 @@ export class Game {
 
   dropBomb(bomber) {
     const d = bomber.def;
-    this.projectiles.push(new Projectile(this, [bomber.x, bomber.y + 2], null, d.damage, bomber.faction,
+    this.projectiles.push(new Projectile(this, [bomber.x, bomber.y + 2, bomber.z], null, d.damage, bomber.faction,
       { kind: 'bomb', splash: d.splash, vsBuildings: d.vsBuildings, shooter: bomber }));
   }
 
@@ -296,9 +366,9 @@ export class Game {
     for (const u of this.units) {
       if (u.dead || u === victim || u.faction !== victim.faction || u.repairRate > 0) continue;
       if (u.state !== State.IDLE || u.hold) continue;
-      if (distTo(u.x, u.y - u.h / 2, victim) > radius || !canReach(u, source)) continue;
+      if (distTo(u.x, u.y - u.h / 2, victim, u.z) > radius || !canReach(u, source)) continue;
       u.attack(source);
-      u.home = u.x;
+      u.post();
     }
   }
 
@@ -378,35 +448,25 @@ export class Game {
     // Build toward the map centre so structures don't fall off the edge.
     const dir = this.wrap || hq.x < WORLD_W / 2 ? 1 : -1;
     const groundY = this.map.groundTop - 2;
+    // Buy and place a building at tile tx (on the field, wherever fits best).
+    const place = (type, tx) => {
+      const spot = this.field ? this.aiSpot(i, type) : { tx, tz: null };
+      if (!spot || !this.placementAt(type, spot.tx, groundY, i, spot.tz ?? 0).valid) return null;
+      p.money -= BUILDING_TYPES[type].cost;
+      return this.spawnBuilding(type, spot.tx, groundY, i, null, spot.tz);
+    };
 
-    if (!mine && p.money >= 200) {
-      const tx = dir > 0 ? hq.tx + hq.wt + 1 : hq.tx - 3;
-      if (this.placementAt('mine', tx, groundY, i).valid) { p.money -= 200; this.spawnBuilding('mine', tx, groundY, i); }
-    }
-    if (!barracks && p.money >= 150) {
-      const tx = dir > 0 ? hq.tx + hq.wt + 4 : hq.tx - 8;
-      if (this.placementAt('barracks', tx, groundY, i).valid) {
-        p.money -= 150;
-        barracks = this.spawnBuilding('barracks', tx, groundY, i);
-      }
-    }
+    if (!mine && p.money >= 200) place('mine', dir > 0 ? hq.tx + hq.wt + 1 : hq.tx - 3);
+    if (!barracks && p.money >= 150) barracks = place('barracks', dir > 0 ? hq.tx + hq.wt + 4 : hq.tx - 8);
     // Mid-game: add a workshop and save up for vehicles.
     let workshop = this.buildings.find((b) => b.faction === i && b.type === 'workshop');
     if (!workshop && barracks && this.time > 90 && p.money >= 200) {
-      const tx = dir > 0 ? hq.tx + hq.wt + 8 : hq.tx - 12;
-      if (this.placementAt('workshop', tx, groundY, i).valid) {
-        p.money -= 200;
-        workshop = this.spawnBuilding('workshop', tx, groundY, i);
-      }
+      workshop = place('workshop', dir > 0 ? hq.tx + hq.wt + 8 : hq.tx - 12);
     }
     // Late game: an airbase for helicopters and bombers (built before spending on vehicles).
     let airbase = this.buildings.find((b) => b.faction === i && b.type === 'airbase');
     if (!airbase && workshop && !workshop.constructing && this.time > 180 && p.money >= 300) {
-      const tx = dir > 0 ? hq.tx + hq.wt + 12 : hq.tx - 17;
-      if (this.placementAt('airbase', tx, groundY, i).valid) {
-        p.money -= 300;
-        airbase = this.spawnBuilding('airbase', tx, groundY, i);
-      }
+      airbase = place('airbase', dir > 0 ? hq.tx + hq.wt + 12 : hq.tx - 17);
     }
     const workshopIdle = workshop && !workshop.constructing && !workshop.trainCurrent && !workshop.queue.length;
     const airbaseIdle = airbase && !airbase.constructing && !airbase.trainCurrent && !airbase.queue.length;
@@ -441,15 +501,38 @@ export class Game {
     this.commandArmy(i);
   }
 
+  // On the field: the free spot in the CPU's zone nearest a point in front of
+  // its HQ (toward the middle), a tile clear of its other buildings.
+  aiSpot(i, type) {
+    const T = TILE_SIZE;
+    const w = BUILDING_TYPES[type].w;
+    const [fx, fz] = this.fieldExit(this.players[i].hq, 3 * T);
+    let best = null;
+    let bestD = Infinity;
+    for (const [x0, z0, x1, z1] of this.buildZones(i)) {
+      for (let tx = x0; tx + w <= x1; tx++) {
+        for (let tz = z0; tz + w <= z1; tz++) {
+          const d = Math.hypot((tx + w / 2) * T - fx, (tz + w / 2) * T - fz);
+          if (d >= bestD || !this.placementAt(type, tx, 0, i, tz).valid) continue;
+          if (this.buildings.some((b) => tx <= b.tx + b.wt && tx + w >= b.tx && tz <= b.tz + b.wt && tz + w >= b.tz)) continue;
+          bestD = d;
+          best = { tx, tz };
+        }
+      }
+    }
+    return best;
+  }
+
   // CPU army orders: defend the base when it's threatened, otherwise march on
   // the nearest enemy HQ and fight whatever gets in the way.
   commandArmy(i) {
     const hq = this.players[i].hq;
     const mine = this.buildings.filter((b) => b.faction === i);
     const threats = this.units.filter((e) => !e.dead && e.faction !== i
-      && mine.some((b) => distTo(e.x, e.y - e.h / 2, b) < 650));
+      && mine.some((b) => distTo(e.x, e.y - e.h / 2, b, e.z) < 650));
     const enemyHqs = this.players.filter((o, j) => j !== i && o.hq).map((o) => o.hq);
     const [hx] = hq.centre();
+    const hz = hq.z + hq.d / 2;
 
     for (const u of this.units) {
       if (u.faction !== i || u.dead || u.repairRate > 0) continue;
@@ -459,14 +542,14 @@ export class Game {
         let bestD = Infinity;
         for (const e of list) {
           if (e.dead || u.isIgnoring(e) || !canReach(u, e)) continue;
-          const d = distTo(u.x, u.y - u.h / 2, e);
+          const d = distTo(u.x, u.y - u.h / 2, e, u.z);
           if (d < bestD) { bestD = d; best = e; }
         }
         return best;
       };
 
       // Defence: units near home turn back on raiders.
-      if (threats.length && Math.abs(this.dx(hx, u.x)) < 1500) {
+      if (threats.length && u.away(hx, hz) < 1500) {
         if (busy && threats.includes(u.target)) continue;
         const t = nearest(threats);
         if (t) { u.attack(t); continue; }
@@ -474,7 +557,7 @@ export class Game {
       // Already fighting a unit, an HQ, or something blocking the way: carry on.
       if (busy && (u.target.kind === 'unit' || u.target.type === 'hq' || u.resume)) continue;
       // Offence: engage enemies close by, else push on the nearest enemy HQ.
-      const local = nearest(this.units.filter((e) => e.faction !== i && distTo(u.x, u.y - u.h / 2, e) < 350));
+      const local = nearest(this.units.filter((e) => e.faction !== i && distTo(u.x, u.y - u.h / 2, e, u.z) < 350));
       const target = local || nearest(enemyHqs);
       if (target && target !== u.target) u.attack(target);
     }
