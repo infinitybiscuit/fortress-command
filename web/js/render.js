@@ -174,20 +174,21 @@ export function drawWeather(ctx, bw, bh, camAX, camAY) { theme.weather?.(ctx, bw
 // ── Units ──────────────────────────────────────────────────────────────────
 // `hidden`: the unit is behind something (isometric view), so it's shown
 // faintly through it, with no shadow.
+// A unit's sprite for this moment: walking frame and the way it faces.
+export function unitSprite(u, frame = Math.floor(u.x / 6) & 1, facing = u.facing) {
+  if (u.air) return sprite(`a:${u.type}:${u.faction}`, facing, () => theme.aircraft[u.type](u.faction));
+  if (u.vehicle) return sprite(`v:${u.type}:${u.faction}:${frame}`, facing, () => theme.vehicle[u.type](u.faction, frame));
+  return sprite(`s:${u.type}:${u.faction}:${frame}`, facing, () => theme.soldier(u.type, u.faction, frame));
+}
+
 export function drawUnit(ctx, u, hidden = false) {
   const x = A(u.x);
   const y = A(u.y);
-  const frame = Math.floor(u.x / 6) & 1;
-  let s;
-  if (u.air) {
-    s = sprite(`a:${u.type}:${u.faction}`, u.facing, () => theme.aircraft[u.type](u.faction));
-    if (!hidden) drawAirShadow(ctx, u);
-  } else if (u.vehicle) {
-    s = sprite(`v:${u.type}:${u.faction}:${frame}`, u.facing, () => theme.vehicle[u.type](u.faction, frame));
-    if (!hidden) rect(ctx, x - Math.floor(s.c.width / 2) + 1, y, s.c.width - 2, 1, C.shadow);
-  } else {
-    s = sprite(`s:${u.type}:${u.faction}:${frame}`, u.facing, () => theme.soldier(u.type, u.faction, frame));
-    if (!hidden) rect(ctx, x - 5, y, 10, 1, C.shadow);
+  const s = unitSprite(u);
+  if (!hidden) {
+    if (u.air) drawAirShadow(ctx, u);
+    else if (u.vehicle) rect(ctx, x - Math.floor(s.c.width / 2) + 1, y, s.c.width - 2, 1, C.shadow);
+    else rect(ctx, x - 5, y, 10, 1, C.shadow);
   }
   if (hidden) ctx.globalAlpha = 0.45;
   ctx.drawImage(s.c, x - s.ax, y - s.ay);
