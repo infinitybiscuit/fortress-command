@@ -4,8 +4,9 @@
 // Game.field) with a fresh landscape each game (see terrain.js): x runs
 // across it, z (depth) up it, and y is height as on the side-on map. It's seen from above at the classic 2:1 angle: x runs
 // down-right across the screen, z runs up-right, and height is straight up.
-// Buildings are extruded back from their usual side-on art into blocks with
-// square footprints; units keep their sprites.
+// Buildings are carved from their usual side-on art into solid shapes with
+// square footprints, and units become small voxel models that turn to face
+// the way they're going.
 //
 // Projected world coordinates (what the camera pans over), in world units:
 //   X = x + z,  Y = y + (x - z) / 2
@@ -13,7 +14,7 @@
 import { TILE_SIZE, MAP_H, GROUND_LEVEL_TILE, FIELD_SIZE, FIELD_TILES } from './config.js';
 import { G, T, C, A, canvas, hash, rect, team } from './pixel.js';
 import {
-  currentTheme, buildingSprite, tile, drawUnit, drawProjectile, drawEffects, brackets, hpBar, progressBar,
+  currentTheme, buildingSprite, unitSprite, tile, drawProjectile, drawEffects, brackets, hpBar, progressBar,
 } from './render.js';
 
 export const GROUND_Y = (MAP_H - GROUND_LEVEL_TILE) * TILE_SIZE;
@@ -116,6 +117,14 @@ function voxelHull(src) {
     rgba[k + 2] = d[i + 2] * f;
     rgba[k + 3] = 255;
   };
+  // The side isn't the front again: it's walled with a doorless strip of the
+  // front (the stretch of wall darkest-free near the ground, so usually a
+  // window bay), repeated along it, with the art's own corners at each end.
+  const side = sideColumns(d, W, Hs, lum);
+  const sidePx = (c, r) => {
+    const i = px(side[c], r);
+    return i >= 0 && d[i + 3] >= 128 ? i : px(c, r);
+  };
   const front = new Int16Array(W * Hs).fill(-1); // front surface depth per art pixel
   const m = new Uint8Array(W * Hs);
   for (let k = 0; k < W * Hs; k++) m[k] = d[k * 4 + 3] >= 128 ? 1 : 0;
@@ -138,7 +147,7 @@ function voxelHull(src) {
         const Y = OY + Math.floor((x - z) / 2) + r;
         const near = x - z + h;
         if (showFront) put(X, Y, near, px(x, r), 0.92);
-        if (showRight) put(X + 1, OY + Math.floor((x + 1 - z) / 2) + r, near + 0.4, px(a, r), 0.68);
+        if (showRight) put(X + 1, OY + Math.floor((x + 1 - z) / 2) + r, near + 0.4, sidePx(a, r), 0.68);
         if (showRoof) {
           // Whichever outline stops here gives the roof its colour.
           const p = upX ? a : x;
@@ -186,6 +195,34 @@ function voxelHull(src) {
   return { c, oy: OY, ox: 1, front, col, W, Hs, D };
 }
 
+// Which column of the art paints each column of a building's side: the
+// end columns keep their own (the corners), and the rest repeat the strip
+// of wall with the least dark near the ground, where doors are.
+function sideColumns(d, W, Hs, lum) {
+  const map = Array.from({ length: W }, (_, c) => c);
+  const edge = Math.min(2, Math.floor(W / 8));
+  const L = Math.max(4, Math.floor(W / 3));
+  if (W - 2 * edge < L + 2) return map;
+  const low = Math.floor(Hs * 0.55);
+  const dark = (c) => {
+    let n = 0;
+    for (let r = low; r < Hs; r++) {
+      const i = (r * W + c) * 4;
+      if (d[i + 3] >= 128 && lum(i) < 70) n++;
+    }
+    return n;
+  };
+  let best = edge;
+  let least = Infinity;
+  for (let a = edge; a + L <= W - edge; a++) {
+    let n = 0;
+    for (let c = a; c < a + L; c++) n += dark(c);
+    if (n < least) { least = n; best = a; }
+  }
+  for (let c = edge; c < W - edge; c++) map[c] = best + ((c - edge) % L);
+  return map;
+}
+
 // Cached per source art (render.js rebuilds that when the theme or sides
 // change, so stale shapes simply stop being looked up).
 const hulls = new WeakMap();
@@ -222,6 +259,307 @@ function overlay(ctx, hl, X, Y, fn) {
       const style = `rgba(${data[k]},${data[k + 1]},${data[k + 2]},${data[k + 3] / 255})`;
       if (style !== last) { ctx.fillStyle = style; last = style; }
       ctx.fillRect(X + hl.ox + x + z, Y + Math.floor((x - z) / 2) + r, 1, 1);
+    }
+  }
+}
+
+// ── Units in 3D ───────────────────────────────────────────────────────────
+// A unit's side-on sprite becomes a little voxel model: the sprite is its
+// profile, and each part is given a thickness from how big it is (a body is
+// thick, a gun barrel or a leg thin; vehicles are much wider than they are
+// tall). The model is then turned to any of TURNS headings and drawn with
+// the same lit faces and outline as the buildings, so a soldier shows his
+// shoulders as he turns and a tank its hull.
+const TURNS = 16;
+
+function unitModel(src, ax, kind) {
+  const W = src.width;
+  const Hs = src.height;
+  const d = src.getContext('2d').getImageData(0, 0, W, Hs).data;
+  const solid = (x, y) => x >= 0 && y >= 0 && x < W && y < Hs && d[(y * W + x) * 4 + 3] >= 128;
+  const lum = (i) => d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11;
+  const col = new Int32Array(W * Hs).fill(-1);
+  for (let k = 0; k < W * Hs; k++) if (d[k * 4 + 3] >= 128) col[k] = k * 4;
+  // Thickness of each pixel from the runs of solid pixels through it.
+  const hrun = new Uint8Array(W * Hs);
+  const vrun = new Uint8Array(W * Hs);
+  const hs = new Uint8Array(W * Hs);
+  const vs = new Uint8Array(W * Hs);
+  for (let y = 0; y < Hs; y++) {
+    for (let x = 0; x < W;) {
+      if (!solid(x, y)) { x++; continue; }
+      let e = x;
+      while (solid(e, y)) e++;
+      for (let k = x; k < e; k++) { hrun[y * W + k] = e - x; hs[y * W + k] = x; }
+      x = e;
+    }
+  }
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < Hs;) {
+      if (!solid(x, y)) { y++; continue; }
+      let e = y;
+      while (solid(x, e)) e++;
+      for (let k = y; k < e; k++) { vrun[k * W + x] = e - y; vs[k * W + x] = y; }
+      y = e;
+    }
+  }
+  let top = Hs;
+  for (let i = 0; i < W * Hs && top === Hs; i++) if (col[i] >= 0) top = Math.floor(i / W);
+  const half = new Float32Array(W * Hs);
+  for (let y = 0; y < Hs; y++) {
+    const f = (y - top) / Math.max(1, Hs - top);
+    for (let x = 0; x < W; x++) {
+      const k = y * W + x;
+      if (col[k] < 0) continue;
+      let t;
+      if (kind === 'soldier') {
+        // As thick as the part is big, with heads narrower than shoulders.
+        t = Math.min(f < 0.32 ? 3 : 6, hrun[k], vrun[k]);
+      } else if (kind === 'vehicle') {
+        // Boxy and wider than tall; thin parts (barrels, poles) stay thin.
+        // Upper works (turrets, cabs) are narrower than the hull, and dark
+        // parts (barrels, tracks' teeth) no wider than they are tall.
+        const dark = lum(col[k]) < 45;
+        t = Math.min(Math.round(W * 0.45) * (f < 0.4 ? 0.55 : 1), hrun[k] * 0.6, vrun[k] <= 2 || dark ? vrun[k] : vrun[k] * 2.4);
+      } else {
+        // Aircraft are round: turned about their length where they're long
+        // (fuselages, airships), about the upright where tall (balloons).
+        const long = vrun[k] <= hrun[k];
+        const r = (long ? vrun[k] : hrun[k]) / 2;
+        const o = long ? y + 0.5 - vs[k] - r : x + 0.5 - hs[k] - r;
+        t = 2 * Math.sqrt(Math.max(0, r * r - o * o)) + 0.5;
+      }
+      half[k] = Math.max(1, t) / 2;
+    }
+  }
+  // Aeroplanes (long and slim, not helicopters) get wings: a thin slab out
+  // both sides through the middle of the longest row of the body.
+  if (kind === 'plane') {
+    let row = -1;
+    let len = 0;
+    for (let y = 0; y < Hs; y++) for (let x = 0; x < W; x++) if (hrun[y * W + x] > len) { len = hrun[y * W + x]; row = y; }
+    let deep = 0;
+    for (let k = 0; k < W * Hs; k++) deep = Math.max(deep, Math.min(vrun[k], hrun[k]));
+    if (row >= 0 && deep < W * 0.3) {
+      let x0 = 0;
+      while (col[row * W + x0] < 0) x0++;
+      for (let x = x0 + Math.floor(len * 0.36); x < x0 + Math.floor(len * 0.6); x++) {
+        const k = row * W + x;
+        half[k] = Math.max(half[k], W * 0.42);
+      }
+    }
+  }
+  // The art's dark outline would make a thick part's top and ends black, so
+  // there each outline pixel takes the nearest lighter colour inside (the
+  // model gets its own outline when it's drawn). Thin parts keep theirs.
+  const edge = (x, y) => !solid(x - 1, y) || !solid(x + 1, y) || !solid(x, y - 1) || !solid(x, y + 1)
+    || !solid(x - 2, y) || !solid(x + 2, y) || !solid(x, y - 2) || !solid(x, y + 2);
+  const paint = Int32Array.from(col);
+  for (let y = 0; y < Hs; y++) {
+    for (let x = 0; x < W; x++) {
+      const k = y * W + x;
+      if (col[k] < 0 || half[k] < 1.5 || lum(col[k]) >= 45 || !edge(x, y)) continue;
+      let best = -1;
+      let bd = 99;
+      for (let dy = -3; dy <= 3; dy++) {
+        for (let dx = -3; dx <= 3; dx++) {
+          const dd = Math.abs(dx) + Math.abs(dy);
+          if (dd >= bd || !solid(x + dx, y + dy)) continue;
+          const j = col[(y + dy) * W + x + dx];
+          if (lum(j) >= 45) { best = j; bd = dd; }
+        }
+      }
+      if (best >= 0) paint[k] = best;
+    }
+  }
+  col.set(paint);
+  // Thin dark parts (gun barrels, poles) would vanish into the outline, so
+  // they're drawn a little lighter.
+  const boost = new Uint8Array(W * Hs);
+  for (let k = 0; k < W * Hs; k++) if (col[k] >= 0 && half[k] <= 1.5 && lum(col[k]) < 45) boost[col[k] >> 2] = 1;
+  return { W, Hs, d, col, half, boost, ax, views: [] };
+}
+
+function unitView(m, k) {
+  if (m.views[k]) return m.views[k];
+  const { W, Hs, d, col, half, boost, ax } = m;
+  const R = Math.ceil(Math.max(ax, W - ax)) + 2;
+  const N = 2 * R;
+  const a = (k / TURNS) * Math.PI * 2;
+  const fx = Math.cos(a);
+  const fz = Math.sin(a);
+  // Turned into an upright grid: voxel (i, j, row) holds a colour or -1.
+  const grid = new Int32Array(N * N * Hs).fill(-1);
+  const at = (i, j, r) => (i < 0 || j < 0 || i >= N || j >= N || r < 0 || r >= Hs ? -1 : grid[(r * N + j) * N + i]);
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const px = i - R + 0.5;
+      const pz = j - R + 0.5;
+      const along = px * fx + pz * fz;
+      const across = -px * fz + pz * fx;
+      const x = Math.floor(ax + along);
+      if (x < 0 || x >= W) continue;
+      for (let r = 0; r < Hs; r++) {
+        const s = r * W + x;
+        if (col[s] >= 0 && Math.abs(across) < Math.max(0.75, half[s])) grid[(r * N + j) * N + i] = col[s];
+      }
+    }
+  }
+  const OY = R + 2;
+  const cw = 2 * N + 3;
+  const ch = OY + R + Hs + 3;
+  const depth = new Float32Array(cw * ch).fill(-Infinity);
+  const rgba = new Uint8ClampedArray(cw * ch * 4);
+  const put = (X, Y, z0, i, f) => {
+    X += 1;
+    if (X < 0 || Y < 0 || X >= cw || Y >= ch || z0 < depth[Y * cw + X]) return;
+    depth[Y * cw + X] = z0;
+    const q = (Y * cw + X) * 4;
+    const b = boost[i >> 2] ? 60 : 0;
+    rgba[q] = (d[i] + b) * f;
+    rgba[q + 1] = (d[i + 1] + b) * f;
+    rgba[q + 2] = (d[i + 2] + b) * f;
+    rgba[q + 3] = 255;
+  };
+  for (let r = 0; r < Hs; r++) {
+    const h = Hs - 1 - r;
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i < N; i++) {
+        const c = at(i, j, r);
+        if (c < 0) continue;
+        const X = i + j;
+        const Y = OY + Math.floor((i - j) / 2) + r;
+        const near = i - j + h;
+        if (at(i, j - 1, r) < 0) put(X, Y, near, c, 0.94);
+        if (at(i + 1, j, r) < 0) put(X + 1, OY + Math.floor((i + 1 - j) / 2) + r, near + 0.4, c, 0.72);
+        if (at(i, j, r - 1) < 0) put(X, Y - 1, near + 0.6, c, 1.08);
+      }
+    }
+  }
+  const filled = (X, Y) => X >= 0 && Y >= 0 && X < cw && Y < ch && rgba[(Y * cw + X) * 4 + 3] > 0;
+  const out = new Uint8ClampedArray(rgba);
+  let x0 = cw, x1 = 0, y0 = ch;
+  for (let Y = 0; Y < ch; Y++) {
+    for (let X = 0; X < cw; X++) {
+      if (filled(X, Y)) continue;
+      if (filled(X - 1, Y) || filled(X + 1, Y) || filled(X, Y - 1) || filled(X, Y + 1)) {
+        const q = (Y * cw + X) * 4;
+        out[q] = 24; out[q + 1] = 20; out[q + 2] = 18; out[q + 3] = 255;
+        x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y);
+      }
+    }
+  }
+  const [c, g] = canvas(cw, ch);
+  g.putImageData(new ImageData(out, cw, ch), 0, 0);
+  // (ox, oy): where the unit's foot point falls on the canvas.
+  return (m.views[k] = { c, ox: 2 * R + 1, oy: OY + m.ay, x0, x1, y0 });
+}
+
+const models = new WeakMap();
+function modelOf(u, s) {
+  let m = models.get(s.c);
+  if (!m) {
+    m = unitModel(s.c, s.ax, u.air ? (u.type === 'helicopter' ? 'air' : 'plane') : u.vehicle ? 'vehicle' : 'soldier');
+    m.ay = s.ay;
+    models.set(s.c, m);
+  }
+  return m;
+}
+
+// Which way each unit is turned, in radians on the field (0 is +x). It
+// swings toward where the unit is heading, or toward what it's shooting at,
+// at a few turns a second. Kept here, not on the unit: it's only looks.
+const turns = new WeakMap();
+const TURN_RATE = 9;
+function headingOf(u, now) {
+  let st = turns.get(u);
+  if (!st) {
+    st = { x: u.x, z: u.z, a: u.facing > 0 ? Math.PI / 4 : -3 * Math.PI / 4, t: now };
+    turns.set(u, st);
+  }
+  const dt = Math.min(0.1, Math.max(0, (now - st.t) / 1000));
+  st.t = now;
+  const dx = u.x - st.x;
+  const dz = u.z - st.z;
+  let want = null;
+  if (dx * dx + dz * dz > 0.01) want = Math.atan2(dz, dx);
+  else if (u.state === 2 && u.target && !u.target.dead && u.aimAt) {
+    const [tx, tz] = u.aimAt(u.target);
+    if (Math.abs(tx - u.x) + Math.abs(tz - u.z) > 1) want = Math.atan2(tz - u.z, tx - u.x);
+  } else if (Math.sign(Math.cos(st.a) + Math.sin(st.a)) !== u.facing) {
+    // Turned round on screen with no other clue (an online guest's view).
+    want = u.facing > 0 ? Math.PI / 4 : -3 * Math.PI / 4;
+  }
+  st.x = u.x;
+  st.z = u.z;
+  if (want != null) {
+    let diff = want - st.a;
+    diff -= Math.round(diff / (2 * Math.PI)) * 2 * Math.PI;
+    const step = TURN_RATE * dt;
+    st.a += Math.abs(diff) <= step ? diff : Math.sign(diff) * step;
+  }
+  return st.a;
+}
+
+// Draws unit u as its turned model with its foot at art pixel (x, y).
+function drawUnit3d(ctx, u, x, y, hidden) {
+  const a = headingOf(u, performance.now());
+  const frame = Math.floor((u.x + (u.z || 0)) / 6) & 1;
+  const s = unitSprite(u, frame, 1);
+  const m = modelOf(u, s);
+  const k = ((Math.round((a / (2 * Math.PI)) * TURNS) % TURNS) + TURNS) % TURNS;
+  const v = unitView(m, k);
+  const left = x - v.ox;
+  const topY = y - v.oy;
+  if (hidden) ctx.globalAlpha = 0.45;
+  ctx.drawImage(v.c, left, topY);
+  ctx.globalAlpha = 1;
+  if (u.air && !hidden) spinners(ctx, u, m, k, x, y);
+  if (u.flash > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(v.c, left, topY);
+    ctx.restore();
+  }
+  const w = Math.min(v.x1 - v.x0 + 1, 16);
+  const top = topY + v.y0;
+  const cx = left + Math.floor((v.x0 + v.x1) / 2);
+  if (u.selected) brackets(ctx, left + v.x0 - 1, top - 1, v.x1 - v.x0 + 3, y - top + 3);
+  if (u.hp < u.maxHp || u.selected) hpBar(ctx, cx - Math.floor(w / 2), top - 4, w, u.hp / u.maxHp);
+}
+
+// Rotors and propellers: the theme draws them on the side-on sprite, and
+// each of their pixels is carried round with the model's heading.
+let spinScratch = null;
+function spinners(ctx, u, m, k, x, y) {
+  const th = currentTheme();
+  if (!th.rotor) return;
+  const M = 24;
+  if (!spinScratch) {
+    const c = document.createElement('canvas');
+    spinScratch = [c, c.getContext('2d', { willReadFrequently: true })];
+  }
+  const [c, g] = spinScratch;
+  const cw = m.W + 2 * M;
+  const ch = m.Hs + 2 * M;
+  if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch; }
+  g.clearRect(0, 0, cw, ch);
+  th.rotor(g, Object.create(u, { facing: { value: 1 } }), m.ax + M, m.ay + M);
+  const data = g.getImageData(0, 0, cw, ch).data;
+  const a = (k / TURNS) * Math.PI * 2;
+  const kx = Math.cos(a) + Math.sin(a);
+  const ky = (Math.cos(a) - Math.sin(a)) / 2;
+  const wide = Math.max(1, Math.ceil(Math.abs(kx)));
+  let last = '';
+  for (let py = 0; py < ch; py++) {
+    for (let px = 0; px < cw; px++) {
+      const q = (py * cw + px) * 4;
+      if (data[q + 3] === 0) continue;
+      const along = px - M - m.ax + 0.5;
+      const style = `rgba(${data[q]},${data[q + 1]},${data[q + 2]},${data[q + 3] / 255})`;
+      if (style !== last) { ctx.fillStyle = style; last = style; }
+      ctx.fillRect(x + Math.round(along * kx), y + Math.round(along * ky) + py - M - m.ay, wide, 1);
     }
   }
 }
@@ -591,9 +929,10 @@ export function drawIsoWorld(ctx, game, v) {
     ctx.fillStyle = 'rgba(0,0,0,0.28)';
     ctx.fillRect(sx - sw / 2, sy - 1, sw, 2);
     ctx.fillRect(sx - sw / 2 + 1, sy - 2, sw - 2, 4);
-    items.push(item(u.x - 6, u.x + 6, z - 6, z + 6, h, h + u.h, () => at(ctx, u.x, y, z, () => drawUnit(ctx, u)), {
+    const [ux, uy] = art(u.x, y, z);
+    items.push(item(u.x - 6, u.x + 6, z - 6, z + 6, h, h + u.h, () => drawUnit3d(ctx, u, ux, uy, false), {
       pts: [[u.x, z, h + 3], [u.x, z, h + u.h * 0.6]],
-      xray: () => at(ctx, u.x, y, z, () => drawUnit(ctx, u, true)),
+      xray: () => drawUnit3d(ctx, u, ux, uy, true),
     }));
   }
   for (const e of game.effects || []) {
