@@ -32,81 +32,198 @@ function art(x, y, z) {
 // The field's corners in projected units: left (x = z = 0), bottom, right, top.
 export const FIELD_BOX = { x0: 0, x1: 2 * FIELD_SIZE, y0: GROUND_Y - FIELD_SIZE / 2, y1: GROUND_Y + FIELD_SIZE / 2 };
 
-// ── Extrusion ──────────────────────────────────────────────────────────────
-// Side-on art becomes a solid block by repeating it back through the depth.
-// Pixels along the top edge become the roof (lit), the rest the right-hand
-// walls (shaded); both take the colour from just inside the outline.
-function shade(src, seed = 0) {
-  const w = src.width;
-  const h = src.height;
-  const d = src.getContext('2d').getImageData(0, 0, w, h).data;
-  const [c, g] = canvas(w, h);
-  const img = g.createImageData(w, h);
-  const o = img.data;
-  const solid = (x, y) => x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] >= 128;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      if (d[i + 3] < 128) continue;
-      const top = !solid(x, y - 1);
-      let j = i;
-      let f;
-      if (top) { if (solid(x, y + 1)) j = i + w * 4; f = 1.04; } else { if (solid(x - 1, y)) j = i - 4; f = 0.62; }
-      // A little grain, different in each slice, so roofs and walls aren't flat.
-      f *= 0.93 + 0.1 * hash(seed * 7919 + y * 131 + x);
-      o[i] = Math.min(255, d[j] * f);
-      o[i + 1] = Math.min(255, d[j + 1] * f);
-      o[i + 2] = Math.min(255, d[j + 2] * f);
-      o[i + 3] = 255;
+// ── Solid buildings ────────────────────────────────────────────────────────
+// A building's side-on art becomes a real 3D shape: the art is its outline
+// seen from the front, and (mirrored) seen from the right as well, and the
+// building is everything inside both outlines. A tower at one end of the
+// art becomes a tower in a corner, a gable becomes a hipped roof, a flagpole
+// a pole. Every visible face is then painted: walls with the art itself
+// (darker on the right, which faces away from the light) and roofs in the
+// colour just under the art's top edge, lit, with a little grain.
+//
+// The result is drawn into a canvas with a 1 px dark outline. Its front
+// face's top-left corner sits at (0, oy), like the side-on art's top-left,
+// and `front` / `col` say how deep the front surface is, so animations
+// drawn on the art can be put on the right spot of the 3D shape.
+function voxelHull(src) {
+  const W = src.width;
+  const Hs = src.height;
+  const D = W;
+  const d = src.getContext('2d').getImageData(0, 0, W, Hs).data;
+  const solid2 = (x, row) => x >= 0 && x < W && row >= 0 && row < Hs && d[(row * W + x) * 4 + 3] >= 128;
+  // Height h counts up from the ground; row counts down from the art's top.
+  const row = (h) => Hs - 1 - h;
+  const OY = Math.ceil(D / 2) + 2;
+  const cw = W + D + 2;
+  const ch = OY + Hs + Math.ceil(W / 2) + 3;
+  const depth = new Float32Array(cw * ch).fill(-Infinity);
+  const rgba = new Uint8ClampedArray(cw * ch * 4);
+  const px = (x, y) => (x >= 0 && y >= 0 && x < W && y < Hs ? (y * W + x) * 4 : -1);
+  // The first light colour inside the outline below (x, r), for roofs, so
+  // dark trims and shadows in the art don't paint black stripes on top.
+  const lum = (i) => d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11;
+  const below = (x, r) => {
+    for (let k = 1; k <= 4; k++) {
+      const i = px(x, r + k);
+      if (i < 0 || d[i + 3] < 128) break;
+      if (lum(i) >= 56) return i;
+    }
+    return -1;
+  };
+  // The commonest roof colour for a roof at row r: a sign or stripe that
+  // happens to sit on the art's top edge shouldn't paint a band across it.
+  const tones = new Map();
+  const roofTone = (r) => {
+    if (tones.has(r)) return tones.get(r);
+    const n = new Map();
+    let best = -1, most = 0;
+    for (let x = 0; x < W; x++) {
+      if (!solid2(x, r) || solid2(x, r - 1)) continue;
+      const i = below(x, r);
+      if (i < 0) continue;
+      const key = (d[i] >> 4) << 8 | (d[i + 1] >> 4) << 4 | d[i + 2] >> 4;
+      const c = (n.get(key) || 0) + 1;
+      n.set(key, c);
+      if (c > most) { most = c; best = i; }
+    }
+    tones.set(r, best);
+    return best;
+  };
+  const far = (i, j) => j >= 0 && Math.abs(d[i] - d[j]) + Math.abs(d[i + 1] - d[j + 1]) + Math.abs(d[i + 2] - d[j + 2]) > 90;
+  // The art's own outline belongs to its silhouette; on a solid shape it
+  // would draw black stripes down every slope, so each outline pixel takes
+  // the colour of its nearest neighbour inside.
+  const lineOf = new Int32Array(W * Hs).fill(-1);
+  for (let y = 0; y < Hs; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (d[i + 3] < 128 || lum(i) >= 56) continue;
+      if ([1, 2].every((k) => solid2(x - k, y) && solid2(x + k, y) && solid2(x, y - k) && solid2(x, y + k))) continue;
+      for (const [dx, dy] of [[0, 1], [-1, 0], [1, 0], [0, -1], [-1, 1], [1, 1], [0, 2], [-2, 0], [2, 0], [0, 3], [-3, 0], [3, 0]]) {
+        const j = px(x + dx, y + dy);
+        if (j >= 0 && d[j + 3] >= 128 && lum(j) >= 56) { lineOf[y * W + x] = j; break; }
+      }
     }
   }
-  g.putImageData(img, 0, 0);
-  return c;
-}
-
-// The art sheared onto a plane running along x: column i drops floor((q + i) / 2).
-function shear(src, q) {
-  const w = src.width;
-  const h = src.height;
-  const [c, g] = canvas(w, h + Math.ceil(w / 2) + 1);
-  for (let i = 0; i < w; i++) g.drawImage(src, i, 0, 1, h, i, Math.floor((q + i) / 2), 1, h);
-  return c;
-}
-
-// Draw art on the face of a block that faces the viewer, column by column
-// so the pixels stay square. (X, Y) is the face's top-left in art pixels.
-function shearBlit(ctx, src, X, Y, p = 0) {
-  for (let i = 0; i < src.width; i++) ctx.drawImage(src, i, 0, 1, src.height, X + i, Y + Math.floor((p + i) / 2), 1, src.height);
-}
-
-// A block `depth` art px deep with `src` on its front face. p is the parity
-// of (x - z) at the front face's left edge, so the steps line up with the
-// world's. Returns { c, oy }: the front face's top-left sits at (0, oy).
-function extrude(src, depth, p = 0) {
-  const w = src.width;
-  const h = src.height;
-  const sides = [0, 1, 2, 3].map((n) => { const S = shade(src, n); return [shear(S, 0), shear(S, 1)]; });
-  const up = Math.ceil(depth / 2) + 1;
-  const [c, g] = canvas(w + depth, h + up + Math.ceil(w / 2) + 2);
-  for (let k = depth; k >= 1; k--) {
-    const side = sides[Math.floor(hash(k * 31 + w) * 4)];
-    if (k % 2 === 0) g.drawImage(side[p], k, up - k / 2);
-    else if (p === 1) g.drawImage(side[0], k, up - (k - 1) / 2);
-    else g.drawImage(side[1], k, up - 1 - (k - 1) / 2);
+  const put = (X, Y, z0, i, f) => {
+    if (i >= 0 && lineOf[i >> 2] >= 0) i = lineOf[i >> 2];
+    X += 1;
+    if (X < 0 || Y < 0 || X >= cw || Y >= ch || i < 0 || z0 < depth[Y * cw + X]) return;
+    depth[Y * cw + X] = z0;
+    const k = (Y * cw + X) * 4;
+    rgba[k] = d[i] * f;
+    rgba[k + 1] = d[i + 1] * f;
+    rgba[k + 2] = d[i + 2] * f;
+    rgba[k + 3] = 255;
+  };
+  const front = new Int16Array(W * Hs).fill(-1); // front surface depth per art pixel
+  const m = new Uint8Array(W * Hs);
+  for (let k = 0; k < W * Hs; k++) m[k] = d[k * 4 + 3] >= 128 ? 1 : 0;
+  for (let r = 0; r < Hs; r++) {
+    const h = row(r);
+    const o = r * W;
+    for (let x = 0; x < W; x++) {
+      if (!m[o + x]) continue;
+      const upX = r > 0 && m[o - W + x];
+      for (let z = 0; z < D; z++) {
+        const a = W - 1 - z;
+        if (!m[o + a]) continue;
+        // Faces show toward -z (front), +x (right) and up (roof).
+        const showFront = z === 0 || !m[o + a + 1];
+        const showRight = x === W - 1 || !m[o + x + 1];
+        const showRoof = !upX || !m[o - W + a];
+        if (front[o + x] < 0) front[o + x] = z;
+        if (!showFront && !showRight && !showRoof) continue;
+        const X = x + z;
+        const Y = OY + Math.floor((x - z) / 2) + r;
+        const near = x - z + h;
+        if (showFront) put(X, Y, near, px(x, r), 0.92);
+        if (showRight) put(X + 1, OY + Math.floor((x + 1 - z) / 2) + r, near + 0.4, px(a, r), 0.68);
+        if (showRoof) {
+          // Whichever outline stops here gives the roof its colour.
+          const p = upX ? a : x;
+          let i = below(p, r);
+          if (i < 0) i = below(p === x ? a : x, r);
+          if (i < 0 || far(i, roofTone(r))) i = roofTone(r);
+          if (i < 0) i = px(p, r);
+          put(X, Y - 1, near + 0.6, i, 1.06 * (0.94 + 0.08 * hash(x * 31 + z * 7 + h)));
+        }
+      }
+    }
   }
-  g.drawImage(shear(src, p), 0, up);
-  return { c, oy: up };
+  // Column depth for things drawn above the shape (smoke, beacons).
+  const col = new Int16Array(W).fill(-1);
+  for (let x = 0; x < W; x++) for (let r = 0; r < Hs && col[x] < 0; r++) if (front[r * W + x] >= 0) col[x] = front[r * W + x];
+  const filled = (X, Y) => X >= 0 && Y >= 0 && X < cw && Y < ch && rgba[(Y * cw + X) * 4 + 3] > 0;
+  // Slopes step in whole pixels, which leaves pinholes between the steps:
+  // fill each from a neighbour so they don't become outline.
+  const NB = [[0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+  for (let Y = 1; Y < ch; Y++) {
+    for (let X = 0; X < cw; X++) {
+      if (filled(X, Y)) continue;
+      const near = (dx, dy) => filled(X + dx, Y + dy) || filled(X + 2 * dx, Y + 2 * dy);
+      if (!(near(0, -1) && near(0, 1) && near(-1, 0) && near(1, 0))) continue;
+      const [dx, dy] = NB.find(([dx, dy]) => filled(X + dx, Y + dy)) || [0, 0];
+      if (!dx && !dy) continue;
+      const k = (Y * cw + X) * 4;
+      const a = ((Y + dy) * cw + X + dx) * 4;
+      rgba[k] = rgba[a]; rgba[k + 1] = rgba[a + 1]; rgba[k + 2] = rgba[a + 2]; rgba[k + 3] = 255;
+    }
+  }
+  // A dark outline round the whole shape.
+  const out = new Uint8ClampedArray(rgba);
+  for (let Y = 0; Y < ch; Y++) {
+    for (let X = 0; X < cw; X++) {
+      if (filled(X, Y)) continue;
+      if (filled(X - 1, Y) || filled(X + 1, Y) || filled(X, Y - 1) || filled(X, Y + 1)) {
+        const k = (Y * cw + X) * 4;
+        out[k] = 24; out[k + 1] = 20; out[k + 2] = 18; out[k + 3] = 255;
+      }
+    }
+  }
+  const [c, g] = canvas(cw, ch);
+  g.putImageData(new ImageData(out, cw, ch), 0, 0);
+  return { c, oy: OY, ox: 1, front, col, W, Hs, D };
 }
 
-// Caches, keyed by the source art (render.js rebuilds that when the theme or
-// sides change, so stale blocks simply stop being looked up).
-const blocks = new WeakMap();
-function block(src, depth, p = 0) {
-  let m = blocks.get(src);
-  if (!m) blocks.set(src, (m = new Map()));
-  const k = depth * 2 + p;
-  if (!m.has(k)) m.set(k, extrude(src, depth, p));
-  return m.get(k);
+// Cached per source art (render.js rebuilds that when the theme or sides
+// change, so stale shapes simply stop being looked up).
+const hulls = new WeakMap();
+function hull(src) {
+  let h = hulls.get(src);
+  if (!h) hulls.set(src, (h = voxelHull(src)));
+  return h;
+}
+
+// Animations and scaffolding are drawn by the theme onto a scratch canvas the
+// size of the art, then each pixel is put on the front of the 3D shape (or,
+// above it, over the middle of that column).
+let scratch = null;
+const MARGIN = 24;
+function overlay(ctx, hl, X, Y, fn) {
+  const { W, Hs } = hl;
+  if (!scratch) {
+    const c = document.createElement('canvas');
+    scratch = [c, c.getContext('2d', { willReadFrequently: true })];
+  }
+  const [c, g] = scratch;
+  if (c.width !== W || c.height !== Hs + MARGIN) { c.width = W; c.height = Hs + MARGIN; g.imageSmoothingEnabled = false; }
+  g.clearRect(0, 0, c.width, c.height);
+  fn(g, MARGIN);
+  const data = g.getImageData(0, 0, c.width, c.height).data;
+  let last = '';
+  for (let y = 0; y < c.height; y++) {
+    const r = y - MARGIN;
+    for (let x = 0; x < W; x++) {
+      const k = (y * W + x) * 4;
+      if (data[k + 3] === 0) continue;
+      let z = r >= 0 ? hl.front[r * W + x] : -1;
+      if (z < 0) z = hl.col[x] >= 0 ? hl.col[x] : hl.D >> 1;
+      const style = `rgba(${data[k]},${data[k + 1]},${data[k + 2]},${data[k + 3] / 255})`;
+      if (style !== last) { ctx.fillStyle = style; last = style; }
+      ctx.fillRect(X + hl.ox + x + z, Y + Math.floor((x - z) / 2) + r, 1, 1);
+    }
+  }
 }
 
 // ── Ground ─────────────────────────────────────────────────────────────────
@@ -518,19 +635,6 @@ function blocks3(b, [x, z, h]) {
   return lo < hi;
 }
 
-// Facade overlays (flags, smoke, scaffolding) are drawn by the theme onto a
-// scratch canvas the size of the building, then laid onto the front face.
-let scratch = null;
-const MARGIN = 24;
-function facade(ctx, w, h, X, Y, p, fn) {
-  const [c, g] = scratch || (scratch = canvas(1, 1));
-  if (c.width !== w || c.height !== h + MARGIN) { c.width = w; c.height = h + MARGIN; g.imageSmoothingEnabled = false; }
-  g.clearRect(0, 0, c.width, c.height);
-  fn(g, MARGIN);
-  shearBlit(ctx, c, X, Y - MARGIN, p);
-}
-
-
 // Buildings stand on the highest ground under them, on a soil foundation
 // down to the slope wherever it falls away.
 function buildingItem(ctx, b, terrain) {
@@ -541,7 +645,7 @@ function buildingItem(ctx, b, terrain) {
   return item(x, x + b.w, z0, z1, lo, hi + b.h, () => {
     const s = buildingSprite(b);
     const d = Math.round((z1 - z0) / G);
-    const blk = block(s.c, d);
+    const blk = hull(s.c);
     const [X, Y] = art(x, b.y - hi, z0);
     if (hi - lo >= G) foundation(ctx, terrain, b, hi);
     const w = s.c.width;
@@ -549,7 +653,7 @@ function buildingItem(ctx, b, terrain) {
     const th = currentTheme();
     if (b.constructing) {
       ctx.globalAlpha = 0.35;
-      ctx.drawImage(blk.c, X, Y - blk.oy);
+      ctx.drawImage(blk.c, X - blk.ox, Y - blk.oy);
       ctx.globalAlpha = 1;
       const built = Math.round(h * b.progress);
       if (built > 0) {
@@ -565,20 +669,20 @@ function buildingItem(ctx, b, terrain) {
         ctx.lineTo(X, bottom + 1);
         ctx.closePath();
         ctx.clip();
-        ctx.drawImage(blk.c, X, Y - blk.oy);
+        ctx.drawImage(blk.c, X - blk.ox, Y - blk.oy);
         ctx.restore();
       }
-      facade(ctx, w, h, X, Y, 0, (g, m) => th.construction(g, 0, m, w, h, b.progress));
+      overlay(ctx, blk, X - blk.ox, Y, (g, m) => th.construction(g, 0, m, w, h, b.progress));
       progressBar(ctx, X + Math.floor(w / 4), Y + h + Math.floor(w / 2) + 3, Math.ceil(w / 2), b.progress, C.yellow);
     } else {
-      ctx.drawImage(blk.c, X, Y - blk.oy);
-      facade(ctx, w, h, X, Y, 0, (g, m) => th.animate(g, b, 0, m, w));
+      ctx.drawImage(blk.c, X - blk.ox, Y - blk.oy);
+      overlay(ctx, blk, X - blk.ox, Y, (g, m) => th.animate(g, b, 0, m, w));
     }
     if (b.flash > 0) {
       ctx.save();
       ctx.globalAlpha = 0.6;
       ctx.globalCompositeOperation = 'lighter';
-      ctx.drawImage(blk.c, X, Y - blk.oy);
+      ctx.drawImage(blk.c, X - blk.ox, Y - blk.oy);
       ctx.restore();
     }
     // Box corners on screen, for the overlays.
