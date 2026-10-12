@@ -349,12 +349,40 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
   - **Shared buildings:** Sibley-tent **Muster Tents**, an earthwork **Battery**, a **Balloon Yard**, a **Pontoon Bridge** and a **Plank Ramp**.
   - **Effects:** Minié balls, cannonballs, fused bombs and mortar shells under clouds of gunsmoke.
   - **Menus:** Union blue, grey and gold. Tagline: "Brother against brother. Beard against beard." Each side has its own victory and defeat one-liners.
+- **Ghost Wars:** a haunted night out at the movies, loosely after Ghostbusters, Poltergeist, The Sixth Sense and The Ring. Nobody is named: it's all nods.
+  - **Setting:** a starry night under a full moon, with little ghosts drifting across it. A city skyline glows on the horizon, and a beam of light now and then shoots up from the temple on top of one tower. Haunted houses and dead trees line the hills, with iron railings, leaning headstones and a glowing well in front. Fog rolls low over the field and will-o'-the-wisps bob about. The ground is graveyard soil under dead grass (with the odd bone), the platforms are mossy crypt masonry, and the surface has tiny headstones, candles and glowing toadstools.
+  - **The Busters** (beige jumpsuits and proton packs):
+    - **Buster** with a proton wand (Soldier).
+    - **Proton Heavy** with a bigger pack and a hard hat (Heavy).
+    - **Kid Who Sees**, with a torch and very wide eyes (Scout).
+    - **Parapsychologist** with a meter, its arms up (Engineer).
+    - **Psychic Medium** in pearls with a crystal ball (Sniper).
+    - **Spook Wagon**, a tail-finned 1959 ambulance (Jeep).
+    - **Containment Truck** hauling a tank of trapped ghosts (Tank).
+    - **Slime Mortar** (Artillery).
+    - **Spook Copter** (Helicopter).
+    - **Trap Blimp**, which drops ghost traps (Bomber).
+    - The **Old Firehouse** (HQ), a **Recruiting Office** whose phone never stops ringing (Barracks), a crackling **Proton Tower** (Turret), a **Laser Fence** (Wall), the **Containment Unit**, billed by the ghost (Mine), a **Gadget Garage** with a Tesla coil (Workshop), a **Rooftop Pad** (Airbase) and a **Steel Gantry** (Bridge).
+  - **The Ghosts:**
+    - **Sheet Ghost** (Soldier).
+    - **Glutton**, a green blob of slime (Heavy).
+    - **Headless Horseman** with his jack-o'-lantern (Scout).
+    - **Poltergeist**, with a chair floating beside it (Engineer).
+    - **Girl in the Well** (Sniper).
+    - **Phantom Hearse** with a see-through driver (Jeep).
+    - **Marshmallow Giant** in a sailor's collar (Tank).
+    - **Cursed TV** on a squeaky trolley, which lobs videotapes (Artillery).
+    - **Clown Doll**, floating (Helicopter).
+    - **Ghost Ship**, a spectral galleon dropping jack-o'-lanterns (Bomber).
+    - The **Haunted Mansion**, where a face sometimes appears at the attic window (HQ), a **Graveyard** with a hand coming up for air (Barracks), a **Grabbing Tree** (Turret), a **Headstone** (Wall), the **Cursed Well** (Mine), a **Video Store** (Workshop), a **Bell Tower** with bats (Airbase) and **Rotten Planks** (Bridge).
+  - **Effects:** proton streams and slime globs, and blasts splash green. Fallen Busters lie slimed; fallen ghosts leave an empty sheet (or a puddle).
+  - **Menus:** night purple and slime green under a full moon. Tagline: "I see dead people. Lots of them. In formation." Each side has its own victory and defeat one-liners.
 
 Each theme is one file in `js/themes/`. A theme can also replace the explosion drawing (`explode`). It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
 
 ## Choosing sides
 
-Some themes split their armies into **sides**: the Union or the Confederacy in Civil War, Finns or Soviets in Winter War, the Cartel or the Cops in Cartel Wars, the Mob or the Feds in Gangsters, Knights or Vikings in Medieval, Humans or Machines in Rise of the Robots, the USA, China, Canada or the EU in Trade Wars, the Shogunate or the Sky Pirates in Steam Shogun, and any of the seven kingdoms in Warring States. Under the **Theme** button, the title screen shows which sides a theme has.
+Some themes split their armies into **sides**: the Union or the Confederacy in Civil War, Finns or Soviets in Winter War, the Cartel or the Cops in Cartel Wars, the Mob or the Feds in Gangsters, Knights or Vikings in Medieval, Humans or Machines in Rise of the Robots, the USA, China, Canada or the EU in Trade Wars, the Shogunate or the Sky Pirates in Steam Shogun, any of the seven kingdoms in Warring States, and the Busters or the Ghosts in Ghost Wars. Under the **Theme** button, the title screen shows which sides a theme has.
 
 - **Offline:** tapping a mode opens **Choose your side**. Each card previews that side's troops and vehicles in your team colour. **🎲 Surprise me** picks at random. In **1 vs 1 Local**, Blue picks first and then Red, and Red is steered towards the other side. CPUs take whichever sides are left, sharing them round in Free-for-All. Your last pick is remembered for each theme, and **Restart** keeps everyone's sides.
 - **Online:** the host's theme is the room's war for everyone, shown at the top of the lobby, and the host can change it with **Change ▸**. Each seat shows its side. Tap your own side to switch it; the host can also set each CPU's side. Guests see the host's war while they're in the room, and their own theme comes back when they leave.
@@ -529,7 +557,7 @@ The `.gd` paths are in the retired Godot project, under `archive/godot-era/godot
 | `js/game.js` | `game/game_scene.gd` (economy, AI, spawning, win check) |
 | `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` (now theme-driven) |
 | `js/pixel.js` | new: pixel-art toolkit and the active palette |
-| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War, Cartel Wars, Trade Wars and Civil War artwork |
+| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War, Cartel Wars, Trade Wars, Civil War and Ghost Wars artwork |
 | `js/main.js` | new: camera, touch input, HUD and panels, overlays, main loop |
 
 ### Differences from the Godot build

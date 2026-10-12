@@ -18,11 +18,12 @@ import winter from './themes/winter.js';
 import cartel from './themes/cartel.js';
 import tariff from './themes/tariff.js';
 import civil from './themes/civil.js';
+import ghost from './themes/ghost.js';
 
 export { G };
 
 // ── Themes ─────────────────────────────────────────────────────────────────
-export const THEMES = [classic, robots, medieval, gangster, warring, steampunk, winter, cartel, tariff, civil];
+export const THEMES = [classic, robots, medieval, gangster, warring, steampunk, winter, cartel, tariff, civil, ghost];
 let theme = null;
 const sprites = new Map();
 const iconCache = new Map();
