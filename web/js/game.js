@@ -3,6 +3,7 @@ import {
   TILE_SIZE, TILE_EMPTY, WORLD_W, FIELD_TILES, FIELD_SIZE, FIELD_SPOTS, WORLD_H, RAMP_MAX_ANGLE, RAMP_MAX_LEN, RAMP_LEVEL_SNAP, MAP_W, MODES, PLAYER_NAMES, BUILD_RADIUS_TILES, STARTING_MONEY, ECONOMY_TICK, AI_TICK, BUILDING_TYPES, UNIT_TYPES,
 } from './config.js';
 import { TileMap } from './tilemap.js';
+import { Terrain } from './terrain.js';
 import { Unit, Building, Projectile, State, canReach, distTo } from './entities.js';
 
 const MAX_PROJECTILES = 100;
@@ -32,6 +33,12 @@ export class Game {
 
     const hqY = this.map.groundTop - BUILDING_TYPES.hq.h;
     const spots = FIELD_SPOTS[this.mode.players.length];
+    if (this.field) {
+      // A fresh landscape every game. The seed rides along in the mode, so
+      // online guests (who get the host's mode) build the same one.
+      if (this.mode.seed == null) this.mode.seed = Math.floor(Math.random() * 2 ** 31);
+      this.terrain = new Terrain(this.mode.seed, spots, BUILDING_TYPES.hq.w);
+    }
     this.mode.players.forEach(([hqX, isAi], i) => {
       const p = { faction: i, money: STARTING_MONEY, income: 0, isAi, hq: null, alive: true };
       this.players.push(p);
@@ -124,6 +131,7 @@ export class Game {
     if (this.field) {
       // Inside the field and clear of every other footprint.
       const terrainOk = !d.isRamp && tx >= 0 && tz >= 0 && tx + d.w <= FIELD_TILES && tz + d.w <= FIELD_TILES
+        && this.terrain.buildable(tx, tz, d.w)
         && !this.buildings.some((b) => !b.dead && tx < b.tx + b.wt && tx + d.w > b.tx && tz < b.tz + b.wt && tz + d.w > b.tz);
       const zoneOk = playerIdx == null || this.inBuildZone(playerIdx, tx, d.w, tz);
       const reason = !zoneOk ? 'zone' : !terrainOk ? 'terrain' : null;

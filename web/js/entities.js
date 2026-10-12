@@ -496,12 +496,14 @@ export class Unit {
     this.y = newY;
   }
 
-  // The field is flat: walk across it, kept inside its edges and out of
+  // The field plays flat (its hills are only drawn): walk across it, kept inside its edges and out of
   // enemy walls (which the unit then knocks down, see update).
   walkField(dt) {
     const r = this.w / 4;
-    const nx = Math.min(FIELD_SIZE - r, Math.max(r, this.x + this.vx * dt));
-    const nz = Math.min(FIELD_SIZE - r, Math.max(r, this.z + this.vz * dt));
+    // Rivers are slow to wade, roads are quick, forests a little slow.
+    const k = this.game.terrain.speedAt(this.x, this.z) * dt;
+    const nx = Math.min(FIELD_SIZE - r, Math.max(r, this.x + this.vx * k));
+    const nz = Math.min(FIELD_SIZE - r, Math.max(r, this.z + this.vz * k));
     const wall = this.game.buildings.find((b) => b.def.blocksUnits && !b.dead && b.faction !== this.faction
       && nx > b.x - r && nx < b.x + b.w + r && nz > b.z - r && nz < b.z + b.d + r);
     if (wall) {
