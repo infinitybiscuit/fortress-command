@@ -377,12 +377,40 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
     - The **Haunted Mansion**, where a face sometimes appears at the attic window (HQ), a **Graveyard** with a hand coming up for air (Barracks), a **Grabbing Tree** (Turret), a **Headstone** (Wall), the **Cursed Well** (Mine), a **Video Store** (Workshop), a **Bell Tower** with bats (Airbase) and **Rotten Planks** (Bridge).
   - **Effects:** proton streams and slime globs, and blasts splash green. Fallen Busters lie slimed; fallen ghosts leave an empty sheet (or a puddle).
   - **Menus:** night purple and slime green under a full moon. Tagline: "I see dead people. Lots of them. In formation." Each side has its own victory and defeat one-liners.
+- **Alien Wars:** a stormy colony moon, loosely after Aliens, with Mars Attacks and ALF thrown in to keep it comic.
+  - **Setting:** a ringed gas giant hangs in a murky sky, storm clouds roll past and lightning flickers. Saucers lurk in the distance, and the colony's atmosphere processors puff steam and blink on the horizon behind rock spires, crates and pipes. Rain drives sideways. The ground is volcanic rock under ash, the platforms are steel deck plating with hazard edges, and once in a while a nervous cat sits on the surface.
+  - **The Colonial Marines** (olive armour, helmets with headlamps):
+    - **Marine** with a pulse rifle (Soldier).
+    - **Smartgunner** with a red eyepiece (Heavy).
+    - **Tracker** with a beeping motion tracker (Scout).
+    - **Synthetic** in white, doing the knife trick (Engineer).
+    - **Marksman** (Sniper).
+    - **Recon Buggy** (Jeep).
+    - **APC** (Tank).
+    - **Power Loader**, which throws cargo crates (Artillery).
+    - **Gunship** (Helicopter).
+    - **Dropship** (Bomber).
+    - The **Ops Centre** (HQ), a **Cryo Bay** (Barracks), a remote **Sentry Gun** whose ammo counter ticks down (Turret), a **Blast Door** (Wall), an **Atmosphere Processor** (Mine), a **Vehicle Bay** (Workshop), a **Landing Pad** (Airbase) and a **Catwalk** (Bridge).
+  - **The Aliens**, a hive that has teamed up with the Martians:
+    - **Martian Trooper**, a big brain in a glass dome with a ray gun (Soldier).
+    - **Xeno Warrior** (Heavy).
+    - **Facehugger** (Scout).
+    - **Melmacian**, a furry engineer with a wrench (Engineer).
+    - **Spitter**, which spits acid (Sniper).
+    - **Hover Scooter** (Jeep).
+    - **Hive Queen** (Tank).
+    - **Egg Launcher** (Artillery).
+    - **Flying Saucer** (Helicopter).
+    - **Mothership** (Bomber).
+    - **The Hive**, with a Martian flag planted on top (HQ), an **Egg Chamber** (Barracks), a **Ray Gun Tower** (Turret), a **Resin Wall** (Wall), a **Cow Abductor** (Mine), a **Brain Lab** (Workshop), a **Saucer Dock** (Airbase) and a **Resin Bridge** (Bridge).
+  - **Effects:** pulse-rifle tracers and ray-gun zaps, thrown crates and lobbed eggs, and acid globs. Nobody bleeds: fallen marines lie flat beside their helmet, Martians leave a cracked dome and xenos leave a fizzing puddle.
+  - **Menus:** olive, gunmetal and hazard yellow. Tagline: "They mostly come at night. Mostly. Ack ack!" Each side has its own victory and defeat one-liners.
 
 Each theme is one file in `js/themes/`. A theme can also replace the explosion drawing (`explode`). It supplies the palette, sprites, tiles, backdrop, effects and unit names, so adding another theme means adding a file and listing it in `THEMES` in `js/render.js`.
 
 ## Choosing sides
 
-Some themes split their armies into **sides**: the Union or the Confederacy in Civil War, Finns or Soviets in Winter War, the Cartel or the Cops in Cartel Wars, the Mob or the Feds in Gangsters, Knights or Vikings in Medieval, Humans or Machines in Rise of the Robots, the USA, China, Canada or the EU in Trade Wars, the Shogunate or the Sky Pirates in Steam Shogun, any of the seven kingdoms in Warring States, and the Busters or the Ghosts in Ghost Wars. Under the **Theme** button, the title screen shows which sides a theme has.
+Some themes split their armies into **sides**: the Union or the Confederacy in Civil War, Finns or Soviets in Winter War, the Cartel or the Cops in Cartel Wars, the Mob or the Feds in Gangsters, Knights or Vikings in Medieval, Humans or Machines in Rise of the Robots, the USA, China, Canada or the EU in Trade Wars, the Shogunate or the Sky Pirates in Steam Shogun, any of the seven kingdoms in Warring States, the Busters or the Ghosts in Ghost Wars, and the Colonial Marines or the Aliens in Alien Wars. Under the **Theme** button, the title screen shows which sides a theme has.
 
 - **Offline:** tapping a mode opens **Choose your side**. Each card previews that side's troops and vehicles in your team colour. **🎲 Surprise me** picks at random. In **1 vs 1 Local**, Blue picks first and then Red, and Red is steered towards the other side. CPUs take whichever sides are left, sharing them round in Free-for-All. Your last pick is remembered for each theme, and **Restart** keeps everyone's sides.
 - **Online:** the host's theme is the room's war for everyone, shown at the top of the lobby, and the host can change it with **Change ▸**. Each seat shows its side. Tap your own side to switch it; the host can also set each CPU's side. Guests see the host's war while they're in the room, and their own theme comes back when they leave.
@@ -557,7 +585,7 @@ The `.gd` paths are in the retired Godot project, under `archive/godot-era/godot
 | `js/game.js` | `game/game_scene.gd` (economy, AI, spawning, win check) |
 | `js/render.js` | `autoload/game_renderer.gd`, `minimap_renderer.gd` (now theme-driven) |
 | `js/pixel.js` | new: pixel-art toolkit and the active palette |
-| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War, Cartel Wars, Trade Wars, Civil War and Ghost Wars artwork |
+| `js/themes/*.js` | new: Classic, Rise of the Robots, Medieval, Gangsters, Warring States, Steam Shogun, Winter War, Cartel Wars, Trade Wars, Civil War, Ghost Wars and Alien Wars artwork |
 | `js/main.js` | new: camera, touch input, HUD and panels, overlays, main loop |
 
 ### Differences from the Godot build
