@@ -149,10 +149,18 @@ export class TileMap {
       const i = Math.floor(wx / C);
       return this.wrap ? ((i % n) + n) % n : Math.max(0, Math.min(n - 1, i));
     };
-    const i0 = colOf(x);
+    let i0 = colOf(x);
     const gi = colOf(toX);
     const near = (list, wy) => list.reduce((b, s, k) => (b < 0 || Math.abs(s.y - wy) < Math.abs(list[b].y - wy) ? k : b), -1);
     let k0 = key ? cols[i0].findIndex((s) => s.key === key) : -1;
+    // Feet still on a ledge ending just behind (a wide unit overhangs the
+    // next column well before it drops): start from the ledge.
+    for (const d of key ? [-1, 1, -2, 2] : []) {
+      if (k0 >= 0) break;
+      const j = colOf(x + d * C);
+      const k = cols[j].findIndex((s) => s.key === key);
+      if (k >= 0) [i0, k0] = [j, k];
+    }
     if (k0 < 0) k0 = near(cols[i0], y);
     if (k0 < 0) return null;
     // The surface pointed at: the first one at or below the point.
@@ -164,6 +172,7 @@ export class TileMap {
     // drop costs extra, so units walk round to a slope rather than jumping.
     const id = (i, k) => i * 64 + k;
     const prev = new Map([[id(i0, k0), -1]]);
+    const drops = new Set(); // nodes reached by stepping off an edge
     const cost = new Map([[id(i0, k0), 0]]);
     const buckets = [[id(i0, k0)]];
     let best = null;
@@ -190,8 +199,9 @@ export class TileMap {
           const xb = (d > 0 ? i + 1 : i) * C;
           let next = there.map((s, k) => k).filter((k) => there[k].key === cur.key || Math.abs(at(there[k], xb) - at(cur, xb)) <= 6);
           let step = 1;
+          const drop = !next.length;
           // Walked off the end: drop to whatever's below.
-          if (!next.length) {
+          if (drop) {
             const below = there.map((s, k) => k).filter((k) => there[k].y > cur.y);
             if (!below.length) continue;
             const k = below.reduce((b, k2) => (there[k2].y < there[b].y ? k2 : b));
@@ -203,6 +213,8 @@ export class TileMap {
             if (cost.has(nid) && cost.get(nid) <= c + step) continue;
             cost.set(nid, c + step);
             prev.set(nid, node);
+            if (drop) drops.add(nid);
+            else drops.delete(nid);
             (buckets[c + step] ||= []).push(nid);
           }
         }
@@ -212,7 +224,7 @@ export class TileMap {
     const path = [];
     for (let node = best; node !== -1; node = prev.get(node)) {
       const s = cols[Math.floor(node / 64)][node % 64];
-      path.push({ i: Math.floor(node / 64), x: Math.floor(node / 64) * C + C / 2, key: s.key });
+      path.push({ i: Math.floor(node / 64), x: Math.floor(node / 64) * C + C / 2, key: s.key, drop: drops.has(node) });
     }
     return path.reverse();
   }
