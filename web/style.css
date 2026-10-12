@@ -632,6 +632,33 @@ body[data-theme="ghost"] .toast.info { background: rgba(46, 154, 42, 0.95); }
 body[data-theme="ghost"] .code-input { background: #08060e; }
 body[data-theme="ghost"] .howto ul { color: var(--text); }
 body[data-theme="ghost"] .round-btn { background: rgba(30, 26, 46, 0.88); }
+body[data-theme="alien"] {
+  --bg: #121614;
+  --panel: #20261e;
+  --panel-2: #2e3628;
+  --bevel-light: #9aa27a;
+  --bevel-dark: #080a08;
+  --accent: #5a6a3a;
+  --accent-dim: #3e4a28;
+  --text: #eef0e4;
+  --dim: #a8ac98;
+  --good: #6ae04a;
+  --danger: #e8604a;
+  --gold: #e8c020;
+}
+body[data-theme="alien"] .menu-btn,
+body[data-theme="alien"] .act-btn.primary { border-color: #9aaa6a #1e260e #1e260e #9aaa6a; }
+body[data-theme="alien"] .menu-btn.secondary { border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light); }
+body[data-theme="alien"] .overlay { background: radial-gradient(circle at 18% 5%, #7a6a52 0 3%, transparent 3%), linear-gradient(#1a1e1c 0 10%, #2a322c 10% 20%, #40463a 20% 25%, #262a28 25% 28%, #2a2624 28% 31%, #6e625a 31% 33%, rgba(18, 22, 20, 0.96) 33%); }
+body[data-theme="alien"] #overlay-pause, body[data-theme="alien"] #overlay-gameover { background: rgba(18, 22, 20, 0.92); }
+body[data-theme="alien"] .overlay h1, body[data-theme="alien"] .overlay h2 { color: #e8c020; text-shadow: 3px 3px 0 #3e4a28, 6px 6px 0 #100e12; }
+body[data-theme="alien"] #tagline { color: #c8f03a; text-shadow: 1px 1px 0 #100e12, -1px -1px 0 #100e12, 1px -1px 0 #100e12, -1px 1px 0 #100e12, 2px 2px 0 #100e12; }
+body[data-theme="alien"] .status { background: rgba(32, 38, 30, 0.9); }
+body[data-theme="alien"] .toast { background: rgba(200, 50, 42, 0.95); }
+body[data-theme="alien"] .toast.info { background: rgba(90, 106, 58, 0.95); }
+body[data-theme="alien"] .code-input { background: #080a08; }
+body[data-theme="alien"] .howto ul { color: var(--text); }
+body[data-theme="alien"] .round-btn { background: rgba(32, 38, 30, 0.88); }
 
 /* ── Keyboard shortcut badges (only with a mouse) ─────────────────────── */
 .key { display: none; }

@@ -1855,6 +1855,7 @@ const TAGLINES = {
   tariff: 'The other countries pay. Believe me.',
   civil: 'Brother against brother. Beard against beard.',
   ghost: 'I see dead people. Lots of them. In formation.',
+  alien: 'They mostly come at night. Mostly. Ack ack!',
 };
 // persist: false when a guest is shown the host's war, so their own choice
 // comes back when they leave the room.
