@@ -70,7 +70,7 @@ function sprite(key, facing, build) {
   return facing < 0 ? s.left : s.right;
 }
 
-function buildingSprite(b) {
+export function buildingSprite(b) {
   return sprite(`b:${b.type}:${b.faction}`, 1, () => {
     const [c, g] = canvas(b.wt * T, b.ht * T);
     theme.buildings[b.type](g, team(b.faction), b.faction);
@@ -82,7 +82,7 @@ function buildingSprite(b) {
 // one column of its planking (with a slat every few pixels) laid along the
 // slope, one art pixel per column. Where the plank's underside would dip into
 // the ground or a platform it's trimmed, so the ends sit flush.
-function rampSprite(b) {
+export function rampSprite(b) {
   const key = `${theme.id}:${b.faction}`;
   if (b.rampSpr?.key === key) return b.rampSpr;
   const deck = buildingSprite({ type: 'bridge', faction: b.faction, wt: 1, ht: 1 }).c;
@@ -125,7 +125,7 @@ export function sideIcon(side, type, f) {
 }
 
 // ── Terrain ────────────────────────────────────────────────────────────────
-function tile(kind, variant) {
+export function tile(kind, variant) {
   const key = `${kind}${variant}`;
   if (tiles[key]) return tiles[key];
   const [c, g] = canvas(T, T);
@@ -172,22 +172,26 @@ export function drawBackground(ctx, bw, bh, camAX, camAY) { theme.background(ctx
 export function drawWeather(ctx, bw, bh, camAX, camAY) { theme.weather?.(ctx, bw, bh, camAX, camAY); }
 
 // ── Units ──────────────────────────────────────────────────────────────────
-export function drawUnit(ctx, u) {
+// `hidden`: the unit is behind something (isometric view), so it's shown
+// faintly through it, with no shadow.
+export function drawUnit(ctx, u, hidden = false) {
   const x = A(u.x);
   const y = A(u.y);
   const frame = Math.floor(u.x / 6) & 1;
   let s;
   if (u.air) {
     s = sprite(`a:${u.type}:${u.faction}`, u.facing, () => theme.aircraft[u.type](u.faction));
-    drawAirShadow(ctx, u);
+    if (!hidden) drawAirShadow(ctx, u);
   } else if (u.vehicle) {
     s = sprite(`v:${u.type}:${u.faction}:${frame}`, u.facing, () => theme.vehicle[u.type](u.faction, frame));
-    rect(ctx, x - Math.floor(s.c.width / 2) + 1, y, s.c.width - 2, 1, C.shadow);
+    if (!hidden) rect(ctx, x - Math.floor(s.c.width / 2) + 1, y, s.c.width - 2, 1, C.shadow);
   } else {
     s = sprite(`s:${u.type}:${u.faction}:${frame}`, u.facing, () => theme.soldier(u.type, u.faction, frame));
-    rect(ctx, x - 5, y, 10, 1, C.shadow);
+    if (!hidden) rect(ctx, x - 5, y, 10, 1, C.shadow);
   }
+  if (hidden) ctx.globalAlpha = 0.45;
   ctx.drawImage(s.c, x - s.ax, y - s.ay);
+  ctx.globalAlpha = 1;
   if (u.air) theme.rotor(ctx, u, x, y);
   if (u.flash > 0) flashSprite(ctx, s.c, x - s.ax, y - s.ay);
   const w = Math.min(s.c.width, 16);
@@ -198,7 +202,7 @@ export function drawUnit(ctx, u) {
 
 
 // Hit flash: redraw the sprite brightened.
-function flashSprite(ctx, img, x, y) {
+export function flashSprite(ctx, img, x, y) {
   ctx.globalAlpha = 0.6;
   ctx.globalCompositeOperation = 'lighter';
   ctx.drawImage(img, x, y);
@@ -217,7 +221,7 @@ function drawAirShadow(ctx, u) {
   ctx.globalAlpha = 1;
 }
 
-function brackets(ctx, x, y, w, h) {
+export function brackets(ctx, x, y, w, h) {
   ctx.fillStyle = C.white;
   const l = 3;
   ctx.fillRect(x, y, l, 1); ctx.fillRect(x, y, 1, l);
@@ -226,7 +230,7 @@ function brackets(ctx, x, y, w, h) {
   ctx.fillRect(x + w - l, y + h - 1, l, 1); ctx.fillRect(x + w - 1, y + h - l, 1, l);
 }
 
-function hpBar(ctx, x, y, w, ratio) {
+export function hpBar(ctx, x, y, w, ratio) {
   rect(ctx, x - 1, y - 1, w + 2, 3, C.O);
   rect(ctx, x, y, Math.max(1, Math.round(w * ratio)), 1, ratio > 0.5 ? '#5ee03a' : ratio > 0.25 ? C.yellow : C.red);
 }
@@ -274,7 +278,7 @@ export function drawBuilding(ctx, b) {
   if (b.hp < b.maxHp) hpBar(ctx, x, y - 4, w, r);
 }
 
-function progressBar(ctx, x, y, w, ratio, col) {
+export function progressBar(ctx, x, y, w, ratio, col) {
   rect(ctx, x - 1, y - 1, w + 2, 4, C.O);
   rect(ctx, x, y, Math.round(w * Math.max(0, Math.min(1, ratio))), 2, col);
 }
