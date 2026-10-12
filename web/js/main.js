@@ -16,7 +16,7 @@ import {
 } from './render.js';
 import {
   GROUND_Y, FIELD_BOX, projX, projY, drawIsoBackground, drawIsoWorld, drawIsoZones, drawIsoGhost,
-  drawIsoMarker, drawIsoMinimap, isoMinimapFrame, isoRay, isoHitUnit, isoHitBuilding,
+  drawIsoMarker, drawIsoMinimap, isoMinimapFrame, isoRay, isoHitUnit, isoHitBuilding, liftAt,
 } from './iso.js';
 
 // The game used to be called Fortress Command: move its saved settings (name,
@@ -134,7 +134,7 @@ function centreOn(wx, wy, wz = 0) {
   const v = view();
   if (iso) {
     cam.x = projX(wx, wz) - v.w / 2;
-    cam.y = projY(wx, wy ?? GROUND_Y, wz) - v.h / 2;
+    cam.y = projY(wx, (wy ?? GROUND_Y) - liftAt(game, wx, wz), wz) - v.h / 2;
     clampCam();
     return;
   }
@@ -159,7 +159,7 @@ function screenToWorld(sx, sy) {
   const X = cam.x + sx / cam.scale;
   const Y = cam.y + sy / cam.scale;
   if (!iso) return [X, Y];
-  const hit = isoRay(X, Y);
+  const hit = isoRay(game, X, Y);
   return [hit.x, hit.y, hit.z];
 }
 // A tap: the world point under it, plus (isometric) the projected point,
@@ -177,7 +177,7 @@ function onScreen(u) {
 // A unit's centre in projected units (isometric), in a list like a looping
 // map's copies would be.
 function screenPos(u) {
-  return [[projX(u.x, u.z), projY(u.x, u.y - u.h / 2, u.z)]];
+  return [[projX(u.x, u.z), projY(u.x, u.y - u.h / 2 - liftAt(game, u.x, u.z), u.z)]];
 }
 
 function resize() {
@@ -283,7 +283,7 @@ function pickUnit(pt, pred) {
   for (const u of game.units) {
     if (u.dead || !pred(u)) continue;
     let d;
-    if (iso) d = isoHitUnit(u, pt.X, pt.Y, HIT_PAD);
+    if (iso) d = isoHitUnit(game, u, pt.X, pt.Y, HIT_PAD);
     else if (u.containsPoint(pt.wx, pt.wy, HIT_PAD)) {
       const [cx, cy] = u.centre();
       d = Math.hypot(game.dx(pt.wx, cx), cy - pt.wy);
@@ -293,7 +293,7 @@ function pickUnit(pt, pred) {
   return best;
 }
 function pickBuilding(pt, pred) {
-  const hit = iso ? (b) => isoHitBuilding(b, pt.X, pt.Y, 2) : (b) => b.containsPoint(pt.wx, pt.wy, 4);
+  const hit = iso ? (b) => isoHitBuilding(game, b, pt.X, pt.Y, 2) : (b) => b.containsPoint(pt.wx, pt.wy, 4);
   return game.buildings.find((b) => !b.dead && pred(b) && hit(b)) || null;
 }
 // Where an order marker goes: on the target, or where the tap pointed.
@@ -1899,13 +1899,13 @@ function drawIsoScene(dt, bw, bh, camAX, camAY, v) {
   game.effects = updateEffects(game.effects, dt);
   lctx.setTransform(1, 0, 0, 1, -camAX, -camAY);
   drawIsoWorld(lctx, game, v);
-  if (pendingBuild) drawIsoZones(lctx, game.buildZones(active));
+  if (pendingBuild) drawIsoZones(lctx, game, game.buildZones(active), v);
   lctx.setTransform(1, 0, 0, 1, 0, 0);
   drawWeather(lctx, bw, bh, camAX, camAY);
   markers = markers.filter((m) => (m.t -= dt) > 0);
   lctx.setTransform(1, 0, 0, 1, -camAX, -camAY);
-  if (pendingBuild && ghost?.tz != null) drawIsoGhost(lctx, ghost);
-  for (const m of markers) drawIsoMarker(lctx, m, drawMarker);
+  if (pendingBuild && ghost?.tz != null) drawIsoGhost(lctx, game, ghost);
+  for (const m of markers) drawIsoMarker(lctx, game, m, drawMarker);
 }
 
 function drawFlatScene(dt, bw, bh, camAX, topA, v) {

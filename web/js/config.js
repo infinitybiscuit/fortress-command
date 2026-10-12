@@ -4,7 +4,7 @@
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v48 · Square field';
+export const VERSION = 'v49 · Landscapes';
 
 // Cloudflare Worker (see /relay; it keeps its original name, fortress-relay)
 // that hands out TURN relay credentials, used
