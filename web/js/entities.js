@@ -400,7 +400,8 @@ export class Unit {
       if (blocked) {
         newX = dir > 0 ? tx * ts - halfW : (tx + 1) * ts + halfW;
         this.vx = 0;
-        if (this.state === State.MOVING) this.state = State.IDLE;
+        // Clipping a ledge on the way down isn't the end of the walk.
+        if (this.state === State.MOVING && this.onGround) this.state = State.IDLE;
       }
     }
     this.x = this.game.normX(newX);
@@ -446,7 +447,15 @@ export class Unit {
   followRoute(dt) {
     if (this.moveY == null || this.air) return null;
     const key = this.ramp ? `r${this.ramp.id}` : this.onGround ? `t${Math.round(this.y / TILE_SIZE)}` : null;
-    if ((this.routeT -= dt) <= 0 || !this.route) {
+    // Not while falling (or stepping off a ledge), though: a plan from mid-air
+    // can't know what the unit will land on. Re-plan the moment it does. A
+    // frame or two off the ground, e.g. at the foot of a slope, isn't falling.
+    const wasFalling = this.airT > 0.1;
+    this.airT = key == null ? (this.airT || 0) + dt : 0;
+    const falling = this.airT > 0.1;
+    const dropping = key == null && this.route?.[this.routeP + 1]?.drop;
+    this.routeT -= dt;
+    if (!this.route || (key != null && wasFalling) || (this.routeT <= 0 && !falling && !dropping)) {
       this.routeT = 0.5;
       this.route = this.game.map.route(this.x, this.y, key, this.moveX, this.moveY, this.h) || [];
       this.routeP = 0;
@@ -454,10 +463,19 @@ export class Unit {
     const r = this.route;
     const C = TILE_SIZE / 2;
     const ci = Math.floor(this.game.normX(this.x) / C);
-    // Into the next column, on the surface it says: that step's done.
-    while (this.routeP + 1 < r.length && r[this.routeP + 1].i === ci && key === r[this.routeP + 1].key) this.routeP++;
+    // Into the next column, on the surface it says (or falling, as it can't be
+    // on one yet): that step's done. A drop is done on landing, wherever that is.
+    const done = (s) => (key === s.key ? s.i === ci || s.drop : falling && !s.drop && s.i === ci);
+    while (this.routeP + 1 < r.length && done(r[this.routeP + 1])) this.routeP++;
     if (this.routeP + 1 >= r.length) return null;
-    return r[this.routeP + 1].x;
+    const s = r[this.routeP + 1];
+    if (!s.drop) return s.x;
+    // Stepping off a ledge: the feet stay on it until the unit's back end is
+    // past the edge, so head that far out (not for the middle of the column
+    // beyond, or it turns back and forth at the edge), then fall straight.
+    const dir = Math.sign(this.game.dx(r[this.routeP].x, s.x));
+    const clear = this.game.normX(s.x + dir * (this.w / 2 + 2 - C / 2));
+    return key == null && dir * this.game.dx(clear, this.x) >= 0 ? this.x : clear;
   }
 
   // Is the unit headed somewhere above it (-1), below it (1), or neither (0)?
