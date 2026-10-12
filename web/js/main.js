@@ -1854,6 +1854,7 @@ const TAGLINES = {
   cartel: 'Totally legitimate business. Ask the taco stand.',
   tariff: 'The other countries pay. Believe me.',
   civil: 'Brother against brother. Beard against beard.',
+  ghost: 'I see dead people. Lots of them. In formation.',
 };
 // persist: false when a guest is shown the host's war, so their own choice
 // comes back when they leave the room.

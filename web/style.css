@@ -605,6 +605,33 @@ body[data-theme="civil"] .toast.info { background: rgba(46, 74, 138, 0.95); }
 body[data-theme="civil"] .code-input { background: #0c0e12; }
 body[data-theme="civil"] .howto ul { color: var(--text); }
 body[data-theme="civil"] .round-btn { background: rgba(36, 42, 54, 0.88); }
+body[data-theme="ghost"] {
+  --bg: #0e0c1a;
+  --panel: #1e1a2e;
+  --panel-2: #2c263e;
+  --bevel-light: #8a7ab0;
+  --bevel-dark: #08060e;
+  --accent: #2e9a2a;
+  --accent-dim: #1e6a1c;
+  --text: #eef0f8;
+  --dim: #a8a4c0;
+  --good: #6ae04a;
+  --danger: #e8604a;
+  --gold: #b8ff7e;
+}
+body[data-theme="ghost"] .menu-btn,
+body[data-theme="ghost"] .act-btn.primary { border-color: #b8ff7e #0e3a0c #0e3a0c #b8ff7e; }
+body[data-theme="ghost"] .menu-btn.secondary { border-color: var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light); }
+body[data-theme="ghost"] .overlay { background: radial-gradient(circle at 88% 4%, #f4f0d8 0 2.5%, rgba(200, 196, 240, 0.2) 2.5% 4.5%, transparent 4.5%), linear-gradient(#0c0a20 0 10%, #1e163a 10% 20%, #2e224c 20% 25%, #1e1834 25% 28%, #1c2226 28% 31%, #3a5440 31% 33%, rgba(14, 12, 26, 0.96) 33%); }
+body[data-theme="ghost"] #overlay-pause, body[data-theme="ghost"] #overlay-gameover { background: rgba(14, 12, 26, 0.92); }
+body[data-theme="ghost"] .overlay h1, body[data-theme="ghost"] .overlay h2 { color: #e8eef8; text-shadow: 3px 3px 0 #2e9a2a, 6px 6px 0 #3e2a62; }
+body[data-theme="ghost"] #tagline { color: #b8ff7e; text-shadow: 1px 1px 0 #120e1a, -1px -1px 0 #120e1a, 1px -1px 0 #120e1a, -1px 1px 0 #120e1a, 2px 2px 0 #120e1a; }
+body[data-theme="ghost"] .status { background: rgba(30, 26, 46, 0.9); }
+body[data-theme="ghost"] .toast { background: rgba(200, 50, 42, 0.95); }
+body[data-theme="ghost"] .toast.info { background: rgba(46, 154, 42, 0.95); }
+body[data-theme="ghost"] .code-input { background: #08060e; }
+body[data-theme="ghost"] .howto ul { color: var(--text); }
+body[data-theme="ghost"] .round-btn { background: rgba(30, 26, 46, 0.88); }
 
 /* ── Keyboard shortcut badges (only with a mouse) ─────────────────────── */
 .key { display: none; }
