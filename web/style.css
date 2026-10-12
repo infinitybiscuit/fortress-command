@@ -126,6 +126,8 @@ button {
   background: var(--panel); border-top: 1px solid var(--line);
 }
 #minimap { display: block; width: 100%; height: 44px; border-radius: 6px; touch-action: none; }
+/* Isometric: the square field shows as a diamond, so give it more height. */
+body.iso #minimap { height: 64px; }
 
 /* ── Bottom command panel ───────────────────────────────────────────── */
 #panel {
@@ -699,6 +701,7 @@ body.mouse .howto .mouse-only { display: block; }
   #stage { grid-area: stage; }
   #minimap-wrap { grid-area: mini; }
   #minimap { height: 64px; }
+  body.iso #minimap { height: 120px; }
   #panel {
     grid-area: panel; min-height: 0; overflow-y: auto;
     border-left: 3px solid var(--bevel-dark); box-shadow: inset 2px 0 0 var(--bevel-light);

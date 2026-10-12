@@ -313,12 +313,12 @@ export function encodeSnapshot(game) {
     time: r1(game.time),
     pl: game.players.map((p) => [Math.floor(p.money), p.income, p.alive ? 1 : 0]),
     u: game.units.map((u) => [u.id, UI[u.type], u.faction, r1(u.x), r1(u.y), Math.ceil(u.hp), u.facing,
-      u.flash > 0 ? 1 : 0, r2(u.cooldownTimer)]),
+      u.flash > 0 ? 1 : 0, r2(u.cooldownTimer), r1(u.z)]),
     b: game.buildings.map((b) => [b.id, BI[b.type], b.faction, b.tx, b.ty, Math.ceil(b.hp), r2(b.progress),
       b.constructing ? 1 : 0, b.queue.map((t) => UI[t]), b.trainCurrent ? UI[b.trainCurrent] : -1,
-      r2(b.trainTimer), b.trainTotal, b.flash > 0 ? 1 : 0, b.seg ? [b.seg.x1, b.seg.y1, b.seg.x2, b.seg.y2].map(r1) : 0]),
+      r2(b.trainTimer), b.trainTotal, b.flash > 0 ? 1 : 0, b.seg ? [b.seg.x1, b.seg.y1, b.seg.x2, b.seg.y2].map(r1) : 0, b.tz]),
     pr: game.projectiles.map((p) => [p.id, SHOT_KINDS.indexOf(p.kind), r1(p.x), r1(p.y), r2(p.angle),
-      r2(p.exploded), p.splash, p.radius]),
+      r2(p.exploded), p.splash, p.radius, r1(p.z || 0)]),
   };
   return snap;
 }
@@ -340,6 +340,7 @@ export function createMirror(mode) {
       if (e.nx == null) continue;
       e.x += (e.nx - e.x) * k;
       e.y += (e.ny - e.y) * k;
+      e.z += (e.nz - e.z) * k;
     }
     for (const e of [...g.units, ...g.buildings]) if (e.flash > 0) e.flash -= dt;
   };
@@ -357,25 +358,26 @@ export function applySnapshot(g, s) {
   const units = new Map(g.units.map((u) => [u.id, u]));
   const alive = new Set(s.u.map((r) => r[0]));
   for (const u of g.units) if (!alive.has(u.id)) g.effects.push(deathEffect(u));
-  g.units = s.u.map(([id, ti, f, x, y, hp, facing, flash, cd]) => {
+  g.units = s.u.map(([id, ti, f, x, y, hp, facing, flash, cd, z = 0]) => {
     let u = units.get(id);
     if (!u) {
       u = new Unit(g, UNIT_KEYS[ti], x, y, f);
       u.id = id;
+      u.z = z;
     }
     // Ease toward the new position; jump if it's far (e.g. just spawned).
-    if (Math.hypot(u.x - x, u.y - y) > 160) { u.x = x; u.y = y; }
-    Object.assign(u, { nx: x, ny: y, hp, facing, cooldownTimer: cd });
+    if (Math.hypot(u.x - x, u.y - y, u.z - z) > 160) { u.x = x; u.y = y; u.z = z; }
+    Object.assign(u, { nx: x, ny: y, nz: z, hp, facing, cooldownTimer: cd });
     if (flash) u.flash = 0.15;
     return u;
   });
 
   const blds = new Map(g.buildings.map((b) => [b.id, b]));
   let changed = s.b.length !== g.buildings.length;
-  g.buildings = s.b.map(([id, ti, f, tx, ty, hp, progress, constructing, queue, cur, timer, total, flash, seg]) => {
+  g.buildings = s.b.map(([id, ti, f, tx, ty, hp, progress, constructing, queue, cur, timer, total, flash, seg, tz = 0]) => {
     let b = blds.get(id);
     if (!b) {
-      b = new Building(g, BUILD_KEYS[ti], tx, ty, f);
+      b = new Building(g, BUILD_KEYS[ti], tx, ty, f, g.field ? tz : null);
       b.id = id;
       if (seg) b.setSeg({ x1: seg[0], y1: seg[1], x2: seg[2], y2: seg[3] });
       changed = true;
@@ -389,9 +391,9 @@ export function applySnapshot(g, s) {
   });
 
   const shots = new Map(g.projectiles.map((p) => [p.id, p]));
-  g.projectiles = s.pr.map(([id, kind, x, y, angle, exploded, splash, radius]) => {
-    const p = shots.get(id) || { id, x, y };
-    return Object.assign(p, { kind: SHOT_KINDS[kind], nx: x, ny: y, angle, exploded, splash, radius });
+  g.projectiles = s.pr.map(([id, kind, x, y, angle, exploded, splash, radius, z = 0]) => {
+    const p = shots.get(id) || { id, x, y, z };
+    return Object.assign(p, { kind: SHOT_KINDS[kind], nx: x, ny: y, nz: z, angle, exploded, splash, radius });
   });
 
   if (s.map) { fromBase64(s.map, g.map.tiles); changed = true; }
@@ -400,7 +402,7 @@ export function applySnapshot(g, s) {
     g.map.buildingTiles.clear();
     g.map.wallTiles.clear();
     g.map.ramps.clear();
-    for (const b of g.buildings) g.map.occupy(b);
+    if (!g.field) for (const b of g.buildings) g.map.occupy(b);
   }
   g.players.forEach((p, i) => { p.hq = g.buildings.find((b) => b.type === 'hq' && b.faction === i) || null; });
 }

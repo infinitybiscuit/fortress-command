@@ -15,8 +15,8 @@ import {
   themeSides, sideInfo, sideIcon, setFactionSides, setViewer,
 } from './render.js';
 import {
-  DEPTH, GROUND_Y, projX, projY, laneOf, depthOf, drawIsoBackground, drawIsoWorld, drawIsoZones, drawIsoGhost,
-  drawIsoMarker, isoRay, isoHitUnit, isoHitBuilding,
+  GROUND_Y, FIELD_BOX, projX, projY, drawIsoBackground, drawIsoWorld, drawIsoZones, drawIsoGhost,
+  drawIsoMarker, drawIsoMinimap, isoMinimapFrame, isoRay, isoHitUnit, isoHitBuilding,
 } from './iso.js';
 
 // The game used to be called Fortress Command: move its saved settings (name,
@@ -91,13 +91,11 @@ const VIEW_TOP = 24;
 const VIEW_BOTTOM = (MAP_H - GROUND_LEVEL_TILE) * TILE_SIZE + 24;
 const VIEW_SPAN = VIEW_BOTTOM - VIEW_TOP;
 
-// Isometric: how much of the strip's height the fit zoom shows, from the
-// tallest platform (and aircraft) down to the strip's front edge.
-const ISO_UP = 520;
-const ISO_DOWN = DEPTH / 2 + 40;
-const ISO_SPAN = ISO_UP + ISO_DOWN;
+// Isometric: the furthest the view zooms out shows this much of the field
+// (in projected units) across the shorter side of the screen.
+const ISO_SPAN = 1100;
 
-function fitScale() { return iso ? viewH / ISO_SPAN : Math.max(viewH / VIEW_SPAN, viewW / WORLD_W); }
+function fitScale() { return iso ? Math.min(viewW, viewH) / ISO_SPAN : Math.max(viewH / VIEW_SPAN, viewW / WORLD_W); }
 function maxScale() { return Math.max(MAX_SCALE, fitScale()); }
 function view() { return { x: cam.x, y: cam.y, w: viewW / cam.scale, h: viewH / cam.scale }; }
 
@@ -121,38 +119,22 @@ function clampCam() {
   cam.y = Math.min(Math.max(VIEW_TOP, cam.y), VIEW_BOTTOM - v.h);
 }
 
-// Isometric: the strip runs diagonally down the screen. Keep the middle of
-// the screen over it (x along the map, from just above the platforms to just
-// below its front edge). Looping maps jump a whole map's width at the seam.
-const isoX = (X) => X - DEPTH / 2;           // strip x under projected X (mid-depth)
-const isoGroundY = (X) => projY(isoX(X), GROUND_Y, DEPTH / 2);
+// Isometric: the field is a diamond on screen. Keep the middle of the
+// screen over it (with a little room above for tall buildings at the back).
 function clampIso(v) {
-  let cx = cam.x + v.w / 2;
-  if (game?.wrap) {
-    const k = Math.floor(isoX(cx) / WORLD_W);
-    cam.x -= k * WORLD_W;
-    cam.y -= (k * WORLD_W) / 2;
-    cx -= k * WORLD_W;
-  } else {
-    const lo = Math.min(WORLD_W / 2, v.w * 0.3);
-    const x = Math.min(Math.max(lo, isoX(cx)), WORLD_W - lo);
-    cam.x = x + DEPTH / 2 - v.w / 2;
-    cx = cam.x + v.w / 2;
-  }
-  // The strip slopes down to the right, so allow for its rise and fall across the screen.
-  const gy = isoGroundY(cx);
-  const top = gy - ISO_UP - v.w / 4;
-  const bottom = gy + ISO_DOWN + v.w / 4;
-  if (v.h >= bottom - top) cam.y = (top + bottom) / 2 - v.h / 2;
-  else cam.y = Math.min(Math.max(top, cam.y), bottom - v.h);
+  const b = FIELD_BOX;
+  const cx = Math.min(Math.max(b.x0, cam.x + v.w / 2), b.x1);
+  const cy = Math.min(Math.max(b.y0 - 60, cam.y + v.h / 2), b.y1);
+  cam.x = cx - v.w / 2;
+  cam.y = cy - v.h / 2;
 }
 
-function centreOn(wx, wy) {
+// wz: depth on the isometric field (ignored on the side-on map).
+function centreOn(wx, wy, wz = 0) {
   const v = view();
   if (iso) {
-    const X = projX(wx, DEPTH / 2);
-    cam.x = X - v.w / 2;
-    cam.y = (wy == null ? isoGroundY(X) - v.h * 0.1 : projY(wx, wy, DEPTH / 2)) - v.h / 2;
+    cam.x = projX(wx, wz) - v.w / 2;
+    cam.y = projY(wx, wy ?? GROUND_Y, wz) - v.h / 2;
     clampCam();
     return;
   }
@@ -177,7 +159,7 @@ function screenToWorld(sx, sy) {
   const X = cam.x + sx / cam.scale;
   const Y = cam.y + sy / cam.scale;
   if (!iso) return [X, Y];
-  const hit = isoRay(game, X, Y);
+  const hit = isoRay(X, Y);
   return [hit.x, hit.y, hit.z];
 }
 // A tap: the world point under it, plus (isometric) the projected point,
@@ -192,10 +174,10 @@ function onScreen(u) {
   if (!iso) return Math.abs(game.dx(v.x + v.w / 2, u.x)) <= v.w / 2;
   return screenPos(u).some(([X, Y]) => X >= v.x && X <= v.x + v.w && Y >= v.y && Y <= v.y + v.h);
 }
-// A unit's centre in projected units (isometric), once per copy of a looping map.
+// A unit's centre in projected units (isometric), in a list like a looping
+// map's copies would be.
 function screenPos(u) {
-  const z = laneOf(u);
-  return (game.wrap ? [-WORLD_W, 0, WORLD_W] : [0]).map((o) => [projX(u.x + o, z), projY(u.x + o, u.y - u.h / 2, z)]);
+  return [[projX(u.x, u.z), projY(u.x, u.y - u.h / 2, u.z)]];
 }
 
 function resize() {
@@ -301,7 +283,7 @@ function pickUnit(pt, pred) {
   for (const u of game.units) {
     if (u.dead || !pred(u)) continue;
     let d;
-    if (iso) d = isoHitUnit(game, u, pt.X, pt.Y, HIT_PAD);
+    if (iso) d = isoHitUnit(u, pt.X, pt.Y, HIT_PAD);
     else if (u.containsPoint(pt.wx, pt.wy, HIT_PAD)) {
       const [cx, cy] = u.centre();
       d = Math.hypot(game.dx(pt.wx, cx), cy - pt.wy);
@@ -311,13 +293,13 @@ function pickUnit(pt, pred) {
   return best;
 }
 function pickBuilding(pt, pred) {
-  const hit = iso ? (b) => isoHitBuilding(game, b, pt.X, pt.Y, 2) : (b) => b.containsPoint(pt.wx, pt.wy, 4);
+  const hit = iso ? (b) => isoHitBuilding(b, pt.X, pt.Y, 2) : (b) => b.containsPoint(pt.wx, pt.wy, 4);
   return game.buildings.find((b) => !b.dead && pred(b) && hit(b)) || null;
 }
 // Where an order marker goes: on the target, or where the tap pointed.
 const markAt = (e, color) => {
   const [x, y] = e.centre();
-  markers.push({ x, y, z: iso ? depthOf(e) : 0, t: 0.6, color });
+  markers.push({ x, y, z: iso ? (e.z || 0) + (e.d || 0) / 2 : 0, t: 0.6, color });
 };
 
 // ── Tap handling ───────────────────────────────────────────────────────────
@@ -332,8 +314,8 @@ function handleTap(sx, sy) {
 
   if (pendingBuild === 'bridge') { rampTap(wx, wy); return; }
   if (pendingBuild) {
-    const pl = game.placementFor(pendingBuild, wx, wy, active);
-    const sameSpot = ghost && ghost.tx === pl.tx && ghost.ty === pl.ty;
+    const pl = game.placementFor(pendingBuild, wx, wy, active, pt.z);
+    const sameSpot = ghost && ghost.tx === pl.tx && ghost.ty === pl.ty && ghost.tz === pl.tz;
     ghost = pl;
     if (sameSpot && pl.valid) confirmPlacement();
     else if (pl.reason === 'zone') setStatus('Too far from your base — build inside the green zone');
@@ -385,7 +367,7 @@ function handleTap(sx, sy) {
   }
 
   if (sel.length) {
-    issue({ c: 'move', ids: ids(sel), x: wx, y: wy });
+    issue({ c: 'move', ids: ids(sel), x: wx, y: wy, ...(iso ? { z: pt.z } : {}) });
     markers.push({ x: wx, y: wy, z: pt.z, t: 0.6, color: '#00ff66' });
     return;
   }
@@ -448,10 +430,10 @@ function confirmPlacement() {
     return;
   }
   if (game.players[active].money < BUILDING_TYPES[pendingBuild].cost) { toast('Not enough credits!'); return; }
-  const check = game.placementAt(pendingBuild, ghost.tx, ghost.ty, active);
+  const check = game.placementAt(pendingBuild, ghost.tx, ghost.ty, active, ghost.tz ?? 0);
   if (check.reason === 'zone') { toast('Too far from your base!'); return; }
   if (!check.valid) { toast("Can't place here!"); return; }
-  const err = issue({ c: 'place', type: pendingBuild, tx: ghost.tx, ty: ghost.ty });
+  const err = issue({ c: 'place', type: pendingBuild, tx: ghost.tx, ty: ghost.ty, ...(game.field ? { tz: ghost.tz } : {}) });
   if (err) { toast(err); return; }
   toast(`${nameOf(pendingBuild)} placed`, 'info');
   cancelPlacement();
@@ -487,7 +469,7 @@ function handleCommand(sx, sy) {
     toast('Repairing', 'info');
     return;
   }
-  issue({ c: 'move', ids: ids(sel), x: wx, y: wy });
+  issue({ c: 'move', ids: ids(sel), x: wx, y: wy, ...(iso ? { z: pt.z } : {}) });
   markers.push({ x: wx, y: wy, z: pt.z, t: 0.6, color: '#00ff66' });
 }
 
@@ -541,12 +523,12 @@ function updateCursor() {
 let hoverReason = '';
 function updateHoverGhost() {
   if (!pendingBuild || !hover || !game || gesture) return;
-  const [rawX, wy] = screenToWorld(hover.x, hover.y);
+  const [rawX, wy, wz] = screenToWorld(hover.x, hover.y);
   if (pendingBuild === 'bridge') {
     if (rampStart) { ghost = rampTo(game.normX(rawX), wy); showRampStatus(); } else ghost = { point: true, ...game.rampSnap(game.normX(rawX), wy, snapRadius()) };
     return;
   }
-  const pl = game.placementFor(pendingBuild, game.normX(rawX), wy, active);
+  const pl = game.placementFor(pendingBuild, game.normX(rawX), wy, active, wz);
   ghost = pl;
   const reason = pl.reason === 'zone' ? 'zone' : pl.valid ? 'ok' : 'bad';
   if (reason !== hoverReason) {
@@ -697,7 +679,7 @@ canvas.addEventListener('wheel', (e) => {
   // Trackpads scroll sideways to pan; a wheel (or pinch, sent as ctrl+wheel) zooms.
   if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && !e.ctrlKey) {
     cam.x += e.deltaX / cam.scale;
-    if (iso) cam.y += e.deltaX / cam.scale / 2; // along the strip
+    if (iso) cam.y += e.deltaY / cam.scale;
     clampCam();
     return;
   }
@@ -716,10 +698,12 @@ function minimapPan(e) {
   const v = view();
   cam.vx = cam.vy = 0;
   if (iso) {
-    // Slide along the strip, keeping the same height above it.
-    const dy = cam.y - isoGroundY(cam.x + v.w / 2);
-    cam.x = projX(wx, DEPTH / 2) - v.w / 2;
-    cam.y = isoGroundY(cam.x + v.w / 2) + dy;
+    // The minimap is the field seen the same way round: centre on the spot.
+    const { s, ox, oy } = isoMinimapFrame(mini.width, mini.height);
+    const mx = ((e.clientX - r.left) / r.width) * mini.width;
+    const my = ((e.clientY - r.top) / r.height) * mini.height;
+    cam.x = (mx - ox) / s - v.w / 2;
+    cam.y = (my - oy) / s + FIELD_BOX.y0 - v.h / 2;
   } else cam.x = wx - v.w / 2;
   clampCam();
 }
@@ -800,7 +784,7 @@ function renderPanel() {
   if (mode === 'place') {
     const d = BUILDING_TYPES[pendingBuild];
     const tip = pendingBuild === 'bridge' ? `${finePointer.matches ? 'Press where one end goes and drag to the other. Right-click or Esc cancels.' : 'Tap where one end goes, then tap or drag to the other, then press Place.'} Ends snap to the ground, platform edges and other bridges. Drag across to lie it level, or up to ${RAMP_MAX_ANGLE}° steep; 💰${BUILDING_TYPES.bridge.cost} per tile of length. Units only take a slope when you send them somewhere up or down it.`
-        : 'Must sit on solid ground or a platform.';
+        : game.field ? "Can't overlap another building." : 'Must sit on solid ground or a platform.';
     const zoneTip = ' Build inside the green zone near your base.';
     panel.innerHTML = `
       <div class="panel-head"><div class="panel-title">${iconOf(pendingBuild)} Place ${nameOf(pendingBuild)}</div>
@@ -853,7 +837,8 @@ function renderPanel() {
     return;
   }
 
-  const buildGrid = `<div class="grid">${BUILD_MENU.map((t, i) => {
+  // No bridges on the isometric field: there's nothing to climb.
+  const buildGrid = `<div class="grid">${BUILD_MENU.filter((t) => !(game.field && BUILDING_TYPES[t].isRamp)).map((t, i) => {
     const d = BUILDING_TYPES[t];
     return `<button class="tile-btn" data-build="${t}" data-key="${i + 1}" ${money >= d.cost ? '' : 'disabled'}>
       <kbd class="key">${i + 1}</kbd><span class="ic">${iconOf(t)}</span><span class="nm">${nameOf(t)}</span><span class="ct">💰${d.cost}</span></button>`;
@@ -982,7 +967,9 @@ function showOverlay(id) {
 // guest's snapshot-driven copy, { you } is the faction this device controls.
 function startGame(key, opts = {}) {
   modeKey = key;
-  const mode = opts.mode || MODES[key];
+  // Isometric games are played on the square field. Online, the host's
+  // choice goes out with the mode, so everyone plays the same map.
+  const mode = opts.mode || { ...MODES[key], field: viewChoice === 'iso' };
   if (opts.mirror) {
     game = createMirror(mode);
   } else {
@@ -1012,7 +999,7 @@ function startGame(key, opts = {}) {
   $('btn-quit').textContent = online() ? 'Leave game' : 'Main Menu';
   showOverlay(null);
   paused = false;
-  iso = viewChoice === 'iso';
+  iso = !!mode.field;
   document.body.classList.toggle('iso', iso);
   resize();
   cam.zoom = fitScale();
@@ -1024,6 +1011,11 @@ function focusHq() {
   const hq = game.players[active].hq;
   if (!hq) return;
   // Look out from the HQ toward the middle of the map.
+  if (iso) {
+    const [x, z] = game.fieldExit(hq, 120);
+    centreOn(x, null, z);
+    return;
+  }
   const towardRight = game.wrap || hq.x < WORLD_W / 2;
   centreOn(hq.x + hq.w / 2 + (towardRight ? 1 : -1) * view().w * 0.25, null);
 }
@@ -1196,7 +1188,8 @@ function renderLobby() {
   if (isHost) ensureSides();
   const sides = themeSides();
   const sideList = !sides ? '' : sides.length > 4 ? ` · ${sides.length} sides` : ` · ${sides.map((x) => esc(x.short)).join(' vs ')}`;
-  $('lobby-war').innerHTML = `War: <b>${esc(currentTheme().name)}</b>${sideList}`;
+  const view = (isHost ? viewChoice : net.hostView) === 'iso' ? 'Isometric' : '2D';
+  $('lobby-war').innerHTML = `War: <b>${esc(currentTheme().name)}</b>${sideList} · ${view}`;
   $('btn-lobby-theme').classList.toggle('hidden', !isHost);
   const order = seated(net.slots).map((sl) => sl.slot);
   $('lobby-slots').innerHTML = net.slots.map((sl, i) => {
@@ -1331,7 +1324,7 @@ function syncLobby() {
   ensureSides();
   const slots = net.slots.map(({ kind, name, ready, side }) => ({ kind, name, ready, side }));
   for (const p of net.peers) {
-    if (p.slot >= 0) p.transport.send({ t: 'lobby', theme: currentTheme().id, slots, you: p.slot });
+    if (p.slot >= 0) p.transport.send({ t: 'lobby', theme: currentTheme().id, view: viewChoice, slots, you: p.slot });
   }
   if (!$('online-lobby').classList.contains('hidden')) renderLobby();
 }
@@ -1462,7 +1455,7 @@ function startOnlineGame() {
   const players = seated(net.slots);
   const layout = ONLINE_LAYOUTS[players.length];
   const mode = {
-    label: layout.label, wrap: layout.wrap, online: true,
+    label: layout.label, wrap: layout.wrap, online: true, field: viewChoice === 'iso',
     players: players.map((sl, i) => [layout.hqs[i], sl.kind === 'cpu']),
     theme: currentTheme().id,
     sides: themeSides() ? players.map((sl) => sl.side) : undefined,
@@ -1553,7 +1546,7 @@ function onHostMessage(m) {
     case 'lobby': {
       if (m.theme) useRoomTheme(m.theme);
       const fromGame = net.phase !== 'lobby' || $('online-lobby').classList.contains('hidden');
-      Object.assign(net, { slots: m.slots, mySlot: m.you, phase: 'lobby', reconnecting: false });
+      Object.assign(net, { slots: m.slots, mySlot: m.you, hostView: m.view, phase: 'lobby', reconnecting: false });
       if (fromGame) {
         game = null;
         paused = true;
@@ -1828,7 +1821,7 @@ function frame(now) {
     const kx = (keys.has('arrowright') || keys.has('d')) - (keys.has('arrowleft') || keys.has('a'));
     const ky = (keys.has('arrowdown') || keys.has('s')) - (keys.has('arrowup') || keys.has('w'));
     cam.x += (kx * 800 * dt) / cam.scale;
-    cam.y += ((ky + (iso ? kx / 2 : 0)) * 800 * dt) / cam.scale; // isometric: left and right follow the strip
+    cam.y += (ky * 800 * dt) / cam.scale;
     if (!gesture && (cam.vx || cam.vy)) {
       cam.x += cam.vx * dt;
       cam.y += cam.vy * dt;
@@ -1894,12 +1887,10 @@ function draw(dt) {
     ctx.strokeRect(x, y, w, h);
   }
 
-  // The minimap's box shows the stretch of map under the middle of the
-  // screen (in the isometric view, along the strip).
-  const mv = iso ? { x: game.normX(v.x + v.w / 2 - DEPTH / 2) - v.w / 2, y: VIEW_TOP, w: v.w, h: VIEW_SPAN } : v;
-  if (iso && !game.wrap) mv.x = Math.min(Math.max(0, mv.x), WORLD_W - mv.w);
   mctx.setTransform(1, 0, 0, 1, 0, 0);
-  drawMinimap(mctx, game, mini.width, mini.height, mv, minimapCache, pendingBuild ? game.buildZones(active) : null);
+  const zones = pendingBuild ? game.buildZones(active) : null;
+  if (iso) drawIsoMinimap(mctx, game, mini.width, mini.height, v, zones);
+  else drawMinimap(mctx, game, mini.width, mini.height, v, minimapCache, zones);
 }
 
 function drawIsoScene(dt, bw, bh, camAX, camAY, v) {
@@ -1908,23 +1899,13 @@ function drawIsoScene(dt, bw, bh, camAX, camAY, v) {
   game.effects = updateEffects(game.effects, dt);
   lctx.setTransform(1, 0, 0, 1, -camAX, -camAY);
   drawIsoWorld(lctx, game, v);
-  if (pendingBuild) {
-    let zones = game.buildZones(active);
-    if (game.wrap) zones = [-1, 0, 1].flatMap((k) => zones.map(([a, b]) => [a + k * MAP_W, b + k * MAP_W]));
-    drawIsoZones(lctx, zones.sort((a, b) => a[0] - b[0]), v);
-  }
+  if (pendingBuild) drawIsoZones(lctx, game.buildZones(active));
   lctx.setTransform(1, 0, 0, 1, 0, 0);
   drawWeather(lctx, bw, bh, camAX, camAY);
   markers = markers.filter((m) => (m.t -= dt) > 0);
-  // Ghosts and markers sit at the map position nearest the middle of the screen.
-  const shift = (x) => (game.wrap ? x + Math.round((v.x + v.w / 2 - DEPTH / 2 - x) / WORLD_W) * WORLD_W : x) - x;
-  const at = (x, fn) => {
-    const o = shift(x);
-    lctx.setTransform(1, 0, 0, 1, o / G - camAX, o / G / 2 - camAY);
-    fn();
-  };
-  if (pendingBuild && ghost) at(ghost.x ?? ghost.x1 ?? ghost.tx * TILE_SIZE, () => drawIsoGhost(lctx, ghost, drawGhost));
-  for (const m of markers) at(m.x, () => drawIsoMarker(lctx, m, drawMarker));
+  lctx.setTransform(1, 0, 0, 1, -camAX, -camAY);
+  if (pendingBuild && ghost?.tz != null) drawIsoGhost(lctx, ghost);
+  for (const m of markers) drawIsoMarker(lctx, m, drawMarker);
 }
 
 function drawFlatScene(dt, bw, bh, camAX, topA, v) {
