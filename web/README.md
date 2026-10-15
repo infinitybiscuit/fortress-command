@@ -44,7 +44,7 @@ uses two pulse-wave channels (lead melody and fast arpeggios), a triangle-wave b
 - **Music:** a title theme on the menus, a driving battle theme in game (both loop), and short victory and defeat jingles. It plays quieter behind the pause menu.
 - **Effects:** gunfire, tank shells, artillery, falling bombs, explosions, soldiers falling, buildings collapsing, placing and finishing buildings, new units, orders, selections, error buzzes, button clicks and a klaxon when your HQ is under fire. Battle sounds only play for what's on or near the screen, and each is rate-limited so big fights don't turn into noise.
 - **Switches:** *Music* and *Sound FX* on the title screen and pause menu, remembered on the device. <kbd>M</kbd> toggles music on a PC.
-- Browsers only allow sound after a tap or key press, so the music starts on the first touch. Online, each player hears their own game.
+- Browsers only allow sound after a tap or key press, so the music starts on the first touch. On iPhone the game also plays a silent audio track from that tap, so it is heard even with the ring/silent switch on silent. Online, each player hears their own game.
 
 ## Themes
 

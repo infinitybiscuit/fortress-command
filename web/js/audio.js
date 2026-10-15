@@ -72,18 +72,46 @@ function init() {
   return true;
 }
 
+// A tiny silent WAV. Playing it through an <audio> element in a tap moves iOS
+// into its "media playback" audio session, so the game is heard even with
+// the ring/silent switch on silent (Web Audio alone counts as a ringer sound).
+function silentWav() {
+  const n = 800;
+  const b = new Uint8Array(44 + n);
+  const v = new DataView(b.buffer);
+  const str = (o, t) => [...t].forEach((c, i) => { b[o + i] = c.charCodeAt(0); });
+  str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  str(36, 'data'); v.setUint32(40, n, true);
+  b.fill(128, 44);
+  return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+}
+let keepAlive = null;
+
 // Call from any user gesture. Safe to call repeatedly.
 export function unlock() {
+  // Newer iOS lets a page ask for the playback session directly.
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* unsupported */ }
   if (!init()) return;
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  // iOS also reports 'interrupted' (after a call, or coming back to the app).
+  if (ctx.state !== 'running') ctx.resume().catch(() => {});
+  if (!keepAlive && typeof Audio !== 'undefined') {
+    keepAlive = new Audio(silentWav());
+    keepAlive.loop = true;
+    keepAlive.setAttribute('playsinline', '');
+  }
+  if (keepAlive?.paused && !document.hidden) keepAlive.play().catch(() => {});
   if (!timer && wanted) startTrack(wanted);
 }
 
 // Stop everything while the app is hidden (phones keep tabs alive).
 globalThis.document?.addEventListener('visibilitychange', () => {
   if (!ctx) return;
-  if (document.hidden) ctx.suspend().catch(() => {});
-  else if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  if (document.hidden) {
+    keepAlive?.pause();
+    ctx.suspend().catch(() => {});
+  } else if (ctx.state !== 'running') ctx.resume().catch(() => {});
 });
 
 export const musicOn = () => prefs.music;
