@@ -221,7 +221,7 @@ function setStatus(text) { statusText = text; $('status').textContent = text; }
 // ── Online session ─────────────────────────────────────────────────────────
 // role: null offline, 'host' (runs the game and the lobby, plays Blue) or
 // 'guest'. The host keeps one connection per guest in `peers`; a guest's only
-// connection is `host`. `slots` is the lobby: up to four seats, each
+// connection is `host`. `slots` is the lobby: up to five seats, each
 // { kind: 'host' | 'human' | 'cpu' | 'open' | 'closed', name, ready }.
 //
 // Phones drop off networks all the time (a lift, a Wi-Fi/5G hand-over, the
@@ -1314,7 +1314,7 @@ async function hostOnline() {
       net.room = await hostRoom(code, onGuestConnected);
       Object.assign(net, {
         role: 'host', phase: 'lobby', mySlot: 0, peers: [],
-        slots: [{ kind: 'host', name }, { kind: 'open' }, { kind: 'open' }, { kind: 'open' }],
+        slots: [{ kind: 'host', name }, { kind: 'open' }, { kind: 'open' }, { kind: 'open' }, { kind: 'open' }],
       });
       lobbyView('lobby');
       return;
