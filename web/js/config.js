@@ -4,7 +4,7 @@
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v55 · Settings';
+export const VERSION = 'v56 · Five-Way';
 
 // Cloudflare Worker (see /relay; it keeps its original name, fortress-relay)
 // that hands out TURN relay credentials, used
@@ -31,6 +31,8 @@ export const FIELD_SPOTS = {
   2: [[6, 6], [86, 86]],
   3: [[6, 6], [86, 6], [46, 86]],
   4: [[6, 6], [86, 86], [86, 6], [6, 86]],
+  // Five round a pentagon, so everyone has two neighbours the same way off.
+  5: [[46, 6], [86, 35], [71, 82], [21, 82], [6, 35]],
 };
 export const PLATFORM_ROWS = [3, 7, 11];
 
@@ -122,28 +124,30 @@ export const PLAYER_COLORS = [
   [1.0, 0.3, 0.3], // red
   [0.3, 0.9, 0.3], // green
   [1.0, 0.8, 0.2], // yellow
+  [0.75, 0.4, 1.0], // purple
 ];
-export const PLAYER_NAMES = ['Blue', 'Red', 'Green', 'Yellow'];
+export const PLAYER_NAMES = ['Blue', 'Red', 'Green', 'Yellow', 'Purple'];
 
 // Game modes. Each entry lists one player per HQ: [hq tile x, is AI].
 export const MODES = {
   cpu:  { label: '1 vs CPU',         players: [[2, false], [193, true]] },
   local:{ label: '1 vs 1 Local',     players: [[2, false], [193, false]] },
-  // Up to four phones over the internet. The host's lobby decides who plays;
+  // Up to five phones over the internet. The host's lobby decides who plays;
   // the map comes from ONLINE_LAYOUTS below.
-  online: { label: '🌐 Online (2–4 players)', players: [[2, false], [193, false]], online: true },
+  online: { label: '🌐 Online (2–5 players)', players: [[2, false], [193, false]], online: true },
   // Free-for-All maps loop: walk off one edge and you come back on the other,
   // so HQs are spaced evenly around the loop and nobody gets a safe edge.
   ffa3: { label: 'Free-for-All (3)', players: [[12, false], [79, true], [146, true]], wrap: true },
   ffa4: { label: 'Free-for-All (4)', players: [[12, false], [62, true], [112, true], [162, true]], wrap: true },
 };
 
-// HQ positions for an online game with 2, 3 or 4 players. Three or more loop
+// HQ positions for an online game with 2 to 5 players. Three or more loop
 // like the offline Free-for-All maps.
 export const ONLINE_LAYOUTS = {
   2: { hqs: [2, 193], wrap: false, label: '🌐 Online 1 vs 1' },
   3: { hqs: [12, 79, 146], wrap: true, label: '🌐 Online FFA (3)' },
   4: { hqs: [12, 62, 112, 162], wrap: true, label: '🌐 Online FFA (4)' },
+  5: { hqs: [12, 52, 92, 132, 172], wrap: true, label: '🌐 Online FFA (5)' },
 };
 
 export const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
