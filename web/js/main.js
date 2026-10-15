@@ -29,6 +29,7 @@ for (const k of ['name', 'theme', 'session']) {
   } catch { /* storage unavailable */ }
 }
 
+import * as audio from './audio.js';
 const $ = (id) => document.getElementById(id);
 const canvas = $('world');
 const ctx = canvas.getContext('2d');
@@ -201,6 +202,7 @@ function toast(text, kind = 'error') {
   const el = $('toast');
   el.textContent = text;
   el.className = `toast show ${kind === 'info' ? 'info' : ''}`;
+  if (kind !== 'info') audio.sfx('error');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.className = 'toast'; }, 1600);
 }
@@ -271,6 +273,7 @@ function selectBuilding(b) {
 function selectUnits(list) {
   clearSelection();
   for (const u of list) u.selected = true;
+  if (list.length) audio.sfx('select');
 }
 
 function cancelPlacement() { pendingBuild = null; ghost = null; rampStart = null; hoverReason = ''; }
@@ -300,6 +303,7 @@ function pickBuilding(pt, pred) {
 const markAt = (e, color) => {
   const [x, y] = e.centre();
   markers.push({ x, y, z: iso ? (e.z || 0) + (e.d || 0) / 2 : 0, t: 0.6, color });
+  audio.sfx('order');
 };
 
 // ── Tap handling ───────────────────────────────────────────────────────────
@@ -723,6 +727,7 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
   const overlay = openOverlay();
+  if (k === 'm' && !e.repeat) { toggleMusic(); return; }
   if (overlay) {
     // Esc or P closes the pause menu.
     if (overlay === 'overlay-pause' && (k === 'escape' || k === 'p')) $('btn-resume').click();
@@ -961,6 +966,9 @@ function renderHud() {
 // ── Game lifecycle ─────────────────────────────────────────────────────────
 function showOverlay(id) {
   for (const o of ['overlay-title', 'overlay-sides', 'overlay-online', 'overlay-pause', 'overlay-gameover']) $(o).classList.toggle('hidden', o !== id);
+  if (['overlay-title', 'overlay-sides', 'overlay-online'].includes(id)) audio.playMusic('title');
+  audio.duckMusic(id === 'overlay-pause');
+  showSound();
 }
 
 // opts: { mode } replaces MODES[key] (online games), { mirror } makes a
@@ -998,6 +1006,7 @@ function startGame(key, opts = {}) {
   $('btn-restart').classList.toggle('hidden', online());
   $('btn-quit').textContent = online() ? 'Leave game' : 'Main Menu';
   showOverlay(null);
+  audio.playMusic('battle');
   paused = false;
   iso = !!mode.field;
   document.body.classList.toggle('iso', iso);
@@ -1053,6 +1062,9 @@ function gameOver(winner) {
     label.style.color = 'var(--danger)';
     sub.textContent = `Your HQ was destroyed.${quip(0, 'lose')}`;
   }
+  // Hot-seat games always end with a winner among the players at the table.
+  const humanWon = online() || game.humanCount < 2 ? winner === active : winner >= 0 && !game.players[winner].isAi;
+  audio.playMusic(humanWon ? 'victory' : 'defeat');
   showOverlay('overlay-gameover');
 }
 
@@ -1792,12 +1804,28 @@ setInterval(() => {
 let last = performance.now();
 let panelTimer = 0;
 
+// Is something close enough to the view to be heard? Like onScreen, with a
+// margin, for anything with a position (shells, wrecks, buildings).
+function heard(e) {
+  const v = view();
+  const pad = 80 / cam.scale;
+  const w = e.w || 0;
+  if (!iso) return Math.abs(game.dx(v.x + v.w / 2, e.x + w / 2)) <= v.w / 2 + pad + w / 2;
+  const z = (e.z || 0) + (e.d || 0) / 2;
+  const X = projX(e.x + w / 2, z);
+  const Y = projY(e.x + w / 2, e.y, z);
+  return X >= v.x - pad && X <= v.x + v.w + pad && Y >= v.y - pad && Y <= v.y + v.h + pad;
+}
+
 function frame(now) {
   const dt = Math.min((now - last) / 1000, MAX_DELTA);
   last = now;
 
   if (game) {
-    if (!paused || online()) game.update(dt);
+    if (!paused || online()) {
+      game.update(dt);
+      audio.listen(game, active, heard);
+    }
     if (net.role === 'host' && net.phase === 'game' && !game.over) {
       net.snapTimer -= dt;
       if (net.snapTimer <= 0) {
@@ -2005,6 +2033,36 @@ $('view-toggle').addEventListener('click', (e) => {
   showView();
 });
 showView();
+
+// ── Sound ──────────────────────────────────────────────────────────────────
+// Music and effects each have an on/off switch on the title screen and in the
+// pause menu, kept on this device. Browsers only allow sound after a tap or a
+// key press, so the first one anywhere switches the sound on.
+function showSound() {
+  for (const b of document.querySelectorAll('[data-sound]')) {
+    const on = b.dataset.sound === 'music' ? audio.musicOn() : audio.sfxOn();
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on);
+    b.textContent = `${b.dataset.sound === 'music' ? '♪ Music' : 'Sound FX'}: ${on ? 'On' : 'Off'}`;
+  }
+}
+function toggleMusic() {
+  audio.setMusic(!audio.musicOn());
+  showSound();
+}
+for (const b of document.querySelectorAll('[data-sound]')) {
+  b.addEventListener('click', () => {
+    if (b.dataset.sound === 'music') toggleMusic();
+    else { audio.setSfx(!audio.sfxOn()); showSound(); }
+  });
+}
+for (const ev of ['pointerdown', 'touchend', 'keydown']) window.addEventListener(ev, audio.unlock, { capture: true, passive: true });
+document.addEventListener('click', (e) => {
+  audio.unlock();
+  if (e.target.closest?.('button')) audio.sfx('click');
+}, true);
+showSound();
+audio.playMusic('title');
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 // Read-only handle for automated browser tests.

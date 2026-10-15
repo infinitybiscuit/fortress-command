@@ -717,3 +717,8 @@ body.mouse .howto .mouse-only { display: block; }
   .overlay h1 { font-size: 40px; }
   #subtitle { font-size: 11px; }
 }
+
+/* Music and sound effects switches (title screen and pause menu) */
+.sound-row { display: flex; gap: 8px; margin-top: 12px; }
+.sound-row .menu-btn { flex: 1; min-height: 40px; font-size: 10px; color: var(--dim); }
+.sound-row .menu-btn.on { color: var(--text); }

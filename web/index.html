@@ -60,6 +60,10 @@
       <div class="menu-buttons" id="mode-buttons"></div>
       <button class="menu-btn secondary theme-btn" id="btn-theme">Theme: Classic</button>
       <p class="theme-sides" id="theme-sides"></p>
+      <div class="sound-row">
+        <button class="menu-btn secondary" data-sound="music" aria-pressed="true">♪ Music: On</button>
+        <button class="menu-btn secondary" data-sound="sfx" aria-pressed="true">Sound FX: On</button>
+      </div>
       <details class="howto">
         <summary>How to play</summary>
         <ul class="touch-only">
@@ -78,7 +82,7 @@
           <li><b>WASD</b> or the <b>arrow keys</b> pan, as does dragging with the right or middle button. The <b>wheel</b> zooms. <kbd>Space</kbd> jumps back to your HQ.</li>
           <li>Pick a structure with <kbd>1</kbd>–<kbd>8</kbd> or a click, point at the battlefield and click to build. Green means valid; right-click or <kbd>Esc</kbd> cancels.</li>
           <li>Select a <b>Barracks</b>, <b>Workshop</b> or <b>Airbase</b> and press <kbd>1</kbd>–<kbd>4</kbd> to train. With units selected: <kbd>H</kbd> hold, <kbd>C</kbd> charge, <kbd>R</kbd> retreat, <kbd>F</kbd> find. <kbd>X</kbd> twice sells a building.</li>
-          <li><kbd>Esc</kbd> clears your selection, then pauses. <kbd>P</kbd> pauses.</li>
+          <li><kbd>Esc</kbd> clears your selection, then pauses. <kbd>P</kbd> pauses. <kbd>M</kbd> turns the music on or off.</li>
           <li>Pick <b>2D</b> or <b>Isometric</b> above the game modes to choose how the battle looks. It's set when the game starts. Isometric battles are fought on a square field with a new landscape every game: hills, a river (slow to wade, so use the bridges), roads (quick) and forests (a little slow). Send units anywhere across it. Online, the host's choice is used.</li>
           <li>Destroy every enemy HQ to win.</li>
         </ul>
@@ -145,6 +149,10 @@
         <button class="menu-btn" id="btn-resume">Resume</button>
         <button class="menu-btn" id="btn-restart">Restart</button>
         <button class="menu-btn secondary" id="btn-quit">Main Menu</button>
+      </div>
+      <div class="sound-row">
+        <button class="menu-btn secondary" data-sound="music" aria-pressed="true">♪ Music: On</button>
+        <button class="menu-btn secondary" data-sound="sfx" aria-pressed="true">Sound FX: On</button>
       </div>
       <p class="version"></p>
     </div>

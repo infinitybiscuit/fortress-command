@@ -36,6 +36,16 @@ The art style is a homage to early-90s home-computer war games: chunky, crisp pi
 - **2D or isometric:** the title screen picks the view for the next game. **Isometric** is a Syndicate-style diorama seen from above at an angle, played on its own map: a square field (96 tiles each way) with no platforms or player-built bridges, and a fresh landscape every game: rolling hills, a river with bridges where the roads cross it, roads joining the bases, forests and rocks. Wading the river halves a unit's speed, roads speed it up by a fifth, and forests slow it a little; nothing can be built in the water. Hills are scenery only (buildings sit on a soil foundation where the ground slopes). The landscape comes from a seed in the game mode, so online players all get the host's. HQs start in the corners (opposite corners in 1 vs 1), units move anywhere across the field, and buildings are solid 3D shapes with square footprints, built inside a square zone around your base. Each one is carved from its art: the side-on picture is its front, the same picture mirrored is its side, and whatever fits both makes the building, so roofs slope, towers stand up and rooftop details are real blocks. The side wall isn't a copy of the front: it repeats the stretch of the front with no door. Units and vehicles are small 3D models too, made the same way from their sprites (soldiers slim, vehicles wide, aircraft round, aeroplanes with wings), and they turn smoothly to face where they're going or what they're shooting at. Units behind a building show through it faintly, and aircraft cast a shadow on the ground. Every mode works, including online, where the host's choice (shown in the lobby) is used by everyone. The minimap shows the field as a diamond, the same way round as the view.
 - **UI:** the olive/khaki interface uses the bundled [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) pixel font (SIL Open Font License, see `vendor/fonts/`).
 
+## Music and sound
+
+An original chiptune soundtrack and sound effects in the style of 8-bit NES war games, synthesised live
+with the Web Audio API (no audio files), in [`js/audio.js`](js/audio.js). Like the NES sound chip it
+uses two pulse-wave channels (lead melody and fast arpeggios), a triangle-wave bass and a noise drum kit.
+- **Music:** a title theme on the menus, a driving battle theme in game (both loop), and short victory and defeat jingles. It plays quieter behind the pause menu.
+- **Effects:** gunfire, tank shells, artillery, falling bombs, explosions, soldiers falling, buildings collapsing, placing and finishing buildings, new units, orders, selections, error buzzes, button clicks and a klaxon when your HQ is under fire. Battle sounds only play for what's on or near the screen, and each is rate-limited so big fights don't turn into noise.
+- **Switches:** *Music* and *Sound FX* on the title screen and pause menu, remembered on the device. <kbd>M</kbd> toggles music on a PC.
+- Browsers only allow sound after a tap or key press, so the music starts on the first touch. Online, each player hears their own game.
+
 ## Themes
 
 Tap **Theme** on the title screen to switch between looks. The choice is remembered on the device. Themes are cosmetic only: the units, buildings and rules are identical. Online, the host's theme is the room's war, and everyone plays in it.
