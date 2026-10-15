@@ -69,6 +69,7 @@ function init() {
   sfxBus.connect(master);
   waves[0.125] = pulseWave(0.125);
   waves[0.25] = pulseWave(0.25);
+  waves[0.5] = pulseWave(0.5);
   noiseBuf = noiseBuffer(1);
   crunchBuf = noiseBuffer(6);
   return true;
@@ -435,7 +436,9 @@ function startTrack(name) {
 // Follow the chosen theme: the menu music changes as you flick through them.
 export function setMusicTheme(id) {
   musicTheme = id;
-  if (timer && wanted && playing && trackKey(wanted) !== playing.key) startTrack(wanted);
+  try {
+    if (timer && wanted && playing && trackKey(wanted) !== playing.key) startTrack(wanted);
+  } catch { /* never let the music break the menus */ }
 }
 
 function stopTimer() {
