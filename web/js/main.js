@@ -2078,7 +2078,7 @@ for (const b of document.querySelectorAll('[data-open-settings]')) {
   });
 }
 $('btn-settings-back').addEventListener('click', () => showOverlay(settingsFrom));
-for (const ev of ['pointerdown', 'touchend', 'keydown']) window.addEventListener(ev, audio.unlock, { capture: true, passive: true });
+for (const ev of ['pointerup', 'touchend', 'keydown']) window.addEventListener(ev, audio.unlock, { capture: true, passive: true });
 document.addEventListener('click', (e) => {
   audio.unlock();
   if (e.target.closest?.('button')) audio.sfx('click');
