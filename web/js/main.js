@@ -2056,7 +2056,7 @@ for (const b of document.querySelectorAll('[data-sound]')) {
     else { audio.setSfx(!audio.sfxOn()); showSound(); }
   });
 }
-for (const ev of ['pointerdown', 'touchend', 'keydown']) window.addEventListener(ev, audio.unlock, { capture: true, passive: true });
+for (const ev of ['pointerup', 'touchend', 'keydown']) window.addEventListener(ev, audio.unlock, { capture: true, passive: true });
 document.addEventListener('click', (e) => {
   audio.unlock();
   if (e.target.closest?.('button')) audio.sfx('click');
