@@ -5,6 +5,8 @@
 // Browsers only allow sound after a tap or key press, so nothing plays until
 // unlock() runs from one; music asked for before then starts at that moment.
 
+import { THEME_SONGS } from './songs.js';
+
 const PREFS_KEY = 'slop-sound';
 const LOOKAHEAD = 0.15;  // seconds of music scheduled ahead of the clock
 const TICK_MS = 40;
@@ -67,6 +69,7 @@ function init() {
   sfxBus.connect(master);
   waves[0.125] = pulseWave(0.125);
   waves[0.25] = pulseWave(0.25);
+  waves[0.5] = pulseWave(0.5);
   noiseBuf = noiseBuffer(1);
   crunchBuf = noiseBuffer(6);
   return true;
@@ -197,20 +200,22 @@ function noise(bus, { t, dur, vol, rate = 1, gritty = false, cutoff = 0, cutoff2
 // or a drum string with one character per sixteenth (k kick, s snare, h hat).
 // Chords drive the bass and arpeggio channels.
 
-const CHORDS = {
-  Dm: ['D', 'F', 'A'], Bb: ['Bb', 'D', 'F'], C: ['C', 'E', 'G'], A: ['A', 'C#', 'E'],
-  Gm: ['G', 'Bb', 'D'], F: ['F', 'A', 'C'], Am: ['A', 'C', 'E'], D: ['D', 'F#', 'A'], G: ['G', 'B', 'D'],
-};
-const ROOT_OCT = { C: 2, 'C#': 2, D: 2, Eb: 2, E: 2, F: 2, 'F#': 2, G: 2, Ab: 2, A: 2, Bb: 1, B: 1 };
+// 'Dm', 'Bb', 'A7', 'Gaug', 'C#dim' → the bass root (MIDI) and the chord's
+// intervals above it.
+const QUALITY = { '': [0, 4, 7], m: [0, 3, 7], 7: [0, 4, 7, 10], aug: [0, 4, 8], dim: [0, 3, 6] };
+function chord(name) {
+  const [, r, q] = /^([A-G][#b]?)(.*)$/.exec(name);
+  let root = midi(`${r}2`);
+  if (root % 12 >= 10) root -= 12; // Bb and B sit an octave down
+  return { root, tones: QUALITY[q] };
+}
 
 // Driving octave bass: root low/high on every eighth, NES style.
-function octaveBass(chords, steps = 16) {
+function octaveBass(chords) {
   const out = [];
   for (const c of chords) {
-    const r = CHORDS[c][0];
-    const lo = `${r}${ROOT_OCT[r]}`;
-    const hi = `${r}${ROOT_OCT[r] + 1}`;
-    for (let i = 0; i < steps / 2; i++) out.push([i % 2 ? hi : lo, 2]);
+    const { root } = chord(c);
+    for (let i = 0; i < 8; i++) out.push([i % 2 ? root + 12 : root, 2]);
   }
   return out;
 }
@@ -218,28 +223,83 @@ function octaveBass(chords, steps = 16) {
 function walkBass(chords) {
   const out = [];
   for (const c of chords) {
-    const [r, , f] = CHORDS[c];
-    const lo = midi(`${r}${ROOT_OCT[r]}`);
-    let fifth = midi(`${f}${ROOT_OCT[r]}`);
-    if (fifth < lo) fifth += 12;
-    out.push([lo, 4], [fifth, 4], [lo + 12, 4], [fifth, 4]);
+    const { root, tones } = chord(c);
+    const fifth = root + tones[2];
+    out.push([root, 4], [fifth, 4], [root + 12, 4], [fifth, 4]);
+  }
+  return out;
+}
+// Oom-pah: root and the fifth below on the beats, gaps for the "pah".
+function oompahBass(chords) {
+  const out = [];
+  for (const c of chords) {
+    const { root, tones } = chord(c);
+    const low = root + tones[2] - 12;
+    out.push([root, 2], [null, 2], [low, 2], [null, 2], [root, 2], [null, 2], [low, 2], [null, 2]);
+  }
+  return out;
+}
+// Jazz walking bass: root, third, fifth, then a half-step into the next chord.
+function jazzBass(chords) {
+  return chords.flatMap((c, i) => {
+    const { root, tones } = chord(c);
+    const next = chord(chords[(i + 1) % chords.length]).root;
+    return [[root, 4], [root + tones[1], 4], [root + tones[2], 4], [next + (next > root ? -1 : 1), 4]];
+  });
+}
+// A galloping horseback rhythm on the root and fifth.
+function gallopBass(chords) {
+  const out = [];
+  for (const c of chords) {
+    const { root, tones } = chord(c);
+    for (const n of [root, root, root + tones[2], root + 12]) out.push([n, 2], [n, 1], [n, 1]);
+  }
+  return out;
+}
+const BASS = { octave: octaveBass, walk: walkBass, oompah: oompahBass, jazz: jazzBass, gallop: gallopBass };
+
+// The chord's notes from `oct` up, in the order of `pattern` (indexes into the
+// chord, wrapping), `len` sixteenths each.
+function broken(chords, oct, len, pattern) {
+  const out = [];
+  for (const c of chords) {
+    const { root, tones } = chord(c);
+    const base = root % 12 + 12 * (oct + 1);
+    for (let i = 0; i < 16 / len; i++) out.push([base + tones[pattern[i % pattern.length] % tones.length], len]);
   }
   return out;
 }
 // Fast broken chords on the quiet pulse channel.
-function arpeggio(chords, oct = 4) {
-  const out = [];
-  for (const c of chords) {
-    const [a, b, d] = CHORDS[c];
-    const notes = [a, b, d, b];
-    const base = midi(`${a}${oct}`);
-    for (let i = 0; i < 16; i++) {
-      let m = midi(`${notes[i % 4]}${oct}`);
-      while (m < base) m += 12;
-      out.push([m, 1]);
-    }
-  }
-  return out;
+function arpeggio(chords, oct = 4) { return broken(chords, oct, 1, [0, 1, 2, 1]); }
+// Off-beat chord stabs: the "pah" of oom-pah.
+function stabs(chords, oct = 4) {
+  return broken(chords, oct, 2, [1, 2]).map(([n], i) => (i % 2 ? [n, 2] : [null, 2]));
+}
+const ARP = {
+  up: (cs, o) => (chord(cs[0]).tones.length > 3 ? broken(cs, o, 1, [0, 1, 2, 3]) : arpeggio(cs, o)),
+  slow: (cs, o) => broken(cs, o, 2, [0, 1, 2, 1]),
+  stab: stabs,
+  none: (cs) => [[null, cs.length * 16]],
+};
+
+// 'E5:2 G5:2 -:4' → [['E5', 2], ['G5', 2], [null, 4]]
+const melody = (text) => text.trim().split(/\s+/).map((tok) => {
+  const [n, len] = tok.split(':');
+  return [n === '-' ? null : n, Number(len)];
+});
+
+// A theme's song from songs.js, in the same shape as the tracks below.
+function themeTrack(song) {
+  const sections = [song.A, song.B];
+  const chords = sections.map((sec) => sec.chords.split(' '));
+  return {
+    bpm: song.bpm,
+    voices: song.voices,
+    lead: sections.flatMap((sec) => melody(sec.lead)),
+    bass: chords.flatMap((cs) => BASS[song.bass](cs)),
+    arp: chords.flatMap((cs) => ARP[song.arp](cs, song.arpOct ?? 4)),
+    drums: sections.map((sec) => sec.drums[0].repeat(7) + sec.drums[1]).join(''),
+  };
 }
 
 const BEAT = 'k.h.s.h.kkh.s.hh';
@@ -322,6 +382,11 @@ function drum(ch, t) {
     noise(musicBus, { t, dur: 0.13, vol: 0.26, rate: 0.6, gritty: true });
   } else if (ch === 'h') {
     noise(musicBus, { t, dur: 0.035, vol: 0.06, rate: 1 });
+  } else if (ch === 't') {
+    tone(musicBus, { wave: 'triangle', f: 150, f2: 80, t, dur: 0.16, vol: 0.45 });
+  } else if (ch === 'c') {
+    noise(musicBus, { t, dur: 0.9, vol: 0.14, rate: 0.5, cutoff: 6000, cutoff2: 1200 });
+    tone(musicBus, { wave: 'triangle', f: 110, f2: 98, t, dur: 0.6, vol: 0.3 });
   }
 }
 
@@ -340,19 +405,40 @@ function compile(track) {
   [...track.drums].forEach((c, pos) => { if (c !== '.') events.push({ pos, ch: 'drum', d: c }); });
   length = Math.max(length, track.drums.length);
   events.sort((a, b) => a.pos - b.pos);
-  return { events, length, step: 60 / track.bpm / 4, once: !!track.once };
+  return { events, length, step: 60 / track.bpm / 4, once: !!track.once, voices: { ...CHANNELS, ...track.voices } };
 }
 
-let wanted = null;   // the track that should be playing
-let playing = null;  // { name, song, start, index, loop }
+let wanted = null;   // the track that should be playing: 'title', 'battle', …
+let playing = null;  // { key, song, start, index, loop }
 let timer = 0;
+let musicTheme = 'classic';
+
+// Classic has its own title and battle tunes; every other theme plays its
+// song from songs.js on the menus and in battle alike.
+function trackKey(name) {
+  if ((name === 'title' || name === 'battle') && THEME_SONGS[musicTheme]) return `theme:${musicTheme}`;
+  return name;
+}
+const compiled = {};
+function trackFor(key) {
+  compiled[key] ??= compile(key.startsWith('theme:') ? themeTrack(THEME_SONGS[key.slice(6)]) : TRACKS[key]);
+  return compiled[key];
+}
 
 function startTrack(name) {
   stopTimer();
-  const song = compile(TRACKS[name]);
-  playing = { name, song, start: ctx.currentTime + 0.08, index: 0, loop: 0 };
+  const key = trackKey(name);
+  playing = { key, song: trackFor(key), start: ctx.currentTime + 0.08, index: 0, loop: 0 };
   timer = setInterval(schedule, TICK_MS);
   schedule();
+}
+
+// Follow the chosen theme: the menu music changes as you flick through them.
+export function setMusicTheme(id) {
+  musicTheme = id;
+  try {
+    if (timer && wanted && playing && trackKey(wanted) !== playing.key) startTrack(wanted);
+  } catch { /* never let the music break the menus */ }
 }
 
 function stopTimer() {
@@ -379,7 +465,7 @@ function schedule() {
     if (t < ctx.currentTime - 0.05) continue; // fell behind (tab throttled): skip
     if (e.ch === 'drum') drum(e.d, t);
     else {
-      const c = CHANNELS[e.ch];
+      const c = { ...CHANNELS[e.ch], ...song.voices[e.ch] };
       const dur = e.len * song.step * (e.ch === 'arp' ? 0.9 : 0.94);
       tone(musicBus, { wave: c.wave, f: freq(e.m), t, dur, vol: c.vol, vibrato: c.vibrato });
     }

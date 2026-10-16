@@ -2007,6 +2007,7 @@ const TAGLINES = {
 // comes back when they leave the room.
 function applyTheme(id, persist = true) {
   const t = setTheme(id);
+  audio.setMusicTheme(t.id);
   document.body.dataset.theme = t.id;
   $('btn-theme').textContent = `Theme: ${t.name}`;
   $('tagline').textContent = TAGLINES[t.id] || TAGLINES.classic;

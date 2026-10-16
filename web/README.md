@@ -41,7 +41,22 @@ The art style is a homage to early-90s home-computer war games: chunky, crisp pi
 An original chiptune soundtrack and sound effects in the style of 8-bit NES war games, synthesised live
 with the Web Audio API (no audio files), in [`js/audio.js`](js/audio.js). Like the NES sound chip it
 uses two pulse-wave channels (lead melody and fast arpeggios), a triangle-wave bass and a noise drum kit.
-- **Music:** a title theme on the menus, a driving battle theme in game (both loop), and short victory and defeat jingles. It plays quieter behind the pause menu.
+- **Music:** every theme has its own tune, played on the menus (it changes as you flick through the themes) and in battle; Classic has a separate title theme and battle theme. Short victory and defeat jingles end the game, and the music plays quieter behind the pause menu. The theme tunes are in [`js/songs.js`](js/songs.js), written as chords, a melody and drum patterns:
+
+  | Theme | Style |
+  | --- | --- |
+  | Classic | heroic D-minor title anthem and a driving battle march |
+  | Rise of the Robots | cold, clipped E-minor machine march with high arpeggios |
+  | Medieval | Dorian lute-and-tabor marching song with a galloping bass |
+  | Gangsters | swinging 1930s speakeasy tune with a walking bass |
+  | Warring States | pentatonic flute over war drums and a gong |
+  | Steam Shogun | Japanese *in* scale over a chugging train beat |
+  | Winter War | breakneck Finnish humppa (oom-pah accordion) |
+  | Cartel Wars | mariachi trumpet ranchera |
+  | Trade Wars | pompous brass-band march |
+  | Civil War | fife and drum |
+  | Ghost Wars | wailing theremin over a haunted music box |
+  | Alien Wars | wobbling, off-kilter alien signals |
 - **Effects:** gunfire, tank shells, artillery, falling bombs, explosions, soldiers falling, buildings collapsing, placing and finishing buildings, new units, orders, selections, error buzzes, button clicks and a klaxon when your HQ is under fire. Battle sounds only play for what's on or near the screen, and each is rate-limited so big fights don't turn into noise.
 - **Switches:** *Music* and *Sound FX* on the title screen and pause menu, remembered on the device. <kbd>M</kbd> toggles music on a PC.
 - Browsers only allow sound after a tap or key press, so the music starts on the first touch. On iPhone the game also plays a silent audio track from that tap, so it is heard even with the ring/silent switch on silent. Online, each player hears their own game.
