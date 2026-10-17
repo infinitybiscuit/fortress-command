@@ -573,6 +573,7 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache, zones = null)
     ctx.fillRect(Math.floor(u.x * sx) - 1, Math.floor((u.y - UNIT_H) * sy), u.vehicle ? 5 : 3, Math.max(3, Math.ceil(UNIT_H * sy)));
   }
   for (const f of game.flags || []) {
+    if (f.out) continue;
     const [x, y] = flagSpot(f);
     for (const shift of game.wrap ? [-WORLD_W, 0, WORLD_W] : [0]) drawFlagMarker(ctx, f, (x + shift) * sx, Math.min(ch - 8, Math.max(8, (y - 12) * sy)));
   }

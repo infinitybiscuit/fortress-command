@@ -2,7 +2,8 @@
 // destroyed in this mode). Any ground unit can pick up an enemy flag by
 // walking into it, and wins the game by bringing it back to its own HQ. A
 // carrier that's killed drops the flag where it fell; if one of the flag's
-// own side picks it up, that unit carries it straight back home.
+// own side picks it up, that unit carries it straight back home. Capturing a
+// flag knocks that player out; the last one left wins.
 import { TILE_SIZE, PLAYER_NAMES } from './config.js';
 import { State, distTo } from './entities.js';
 
@@ -26,7 +27,8 @@ export function flagHome(game, hq) {
 export function makeFlags(game) {
   return game.players.map((p, f) => {
     const home = flagHome(game, p.hq);
-    return { faction: f, home, x: home.x, y: home.y, z: home.z, carrier: null, atHome: true };
+    // out: its side has been knocked out, so the flag is gone.
+    return { faction: f, home, x: home.x, y: home.y, z: home.z, carrier: null, atHome: true, out: false };
   });
 }
 
@@ -58,6 +60,7 @@ export const flagCarriedBy = (game, u) => game.flags?.find((fl) => fl.carrier ==
 export function updateFlags(game) {
   const say = (t) => game.events.onMessage?.(t);
   for (const fl of game.flags) {
+    if (fl.out) continue;
     const c = fl.carrier;
     if (c?.dead) {
       // Dropped where the carrier fell.
@@ -79,9 +82,12 @@ export function updateFlags(game) {
           say(`${PLAYER_NAMES[fl.faction]} flag returned!`);
         } else sendHome(game, c);
       } else if (isHome(game, c)) {
-        say(`${PLAYER_NAMES[c.faction]} captured the ${PLAYER_NAMES[fl.faction]} flag!`);
-        game.finish(c.faction);
-        return;
+        // Captured: that side is out. Its army collapses, dropping any other
+        // flags it was carrying, and the carrier is free again.
+        Object.assign(fl, { carrier: null, out: true });
+        c.forced = false;
+        game.eliminate(fl.faction, `${PLAYER_NAMES[c.faction]} captured the ${PLAYER_NAMES[fl.faction]} flag!`);
+        if (game.over) return;
       }
       continue;
     }

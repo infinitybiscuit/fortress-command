@@ -46,7 +46,7 @@ export function applyCommand(game, p, cmd) {
     case 'charge': {
       // Capture the Flag: go for the nearest enemy flag nobody on our side has yet.
       if (game.ctf) {
-        const flags = game.flags.filter((f) => f.faction !== p && f.carrier?.faction !== p);
+        const flags = game.flags.filter((f) => !f.out && f.faction !== p && f.carrier?.faction !== p);
         if (!flags.length || !own.length) return null;
         const u0 = own[0];
         flags.sort((a, b) => u0.away(a.x, a.z) - u0.away(b.x, b.z));
