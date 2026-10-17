@@ -41,6 +41,8 @@ const DOUBLE_TAP_MS = 320;
 const HIT_PAD = 12;         // extra world px around units for fat-finger taps
 const MAX_SCALE = 2.5;
 const BOX_MIN = 6;          // px a mouse drag must cover before it's a box selection
+const HOLD_MS = 350;        // ms a finger rests on the battlefield before dragging draws a box
+const SQUAD_SLOTS = 4;
 
 // A mouse or trackpad (not a touch screen): hints say "click", and the panel
 // shows keyboard shortcuts.
@@ -63,6 +65,8 @@ let statusText = '';
 let panelKey = '';
 let eliminatedNoted = false; // told this player they're out but the game goes on
 let sellArmed = null;       // { id, until } — sell needs a second tap to confirm
+let squads = {};            // faction → SQUAD_SLOTS lists of unit ids (null = empty slot)
+let squadKey = '';
 const minimapCache = {};
 // 2D (side-on) or isometric. Isometric is a preview feature: it's switched
 // on in Settings, under Preview features, and fixed for the whole game.
@@ -285,6 +289,45 @@ function selectUnits(list) {
   if (list.length) audio.sfx('select');
 }
 
+// ── Squads: saved groups of units, kept on this device only ───────────────
+function squadSlots() { return (squads[active] ||= Array(SQUAD_SLOTS).fill(null)); }
+// The living units in a squad (dead ones drop out; an empty squad frees its slot).
+function squadUnits(i) {
+  const slots = squadSlots();
+  if (!slots[i] || !game) return [];
+  const want = new Set(slots[i]);
+  const list = game.units.filter((u) => !u.dead && u.faction === active && want.has(u.id));
+  if (!list.length) slots[i] = null;
+  else if (list.length < want.size) slots[i] = ids(list);
+  return list;
+}
+function saveSquad(i) {
+  const sel = selectedUnits();
+  if (!sel.length) { toast('Select some units first, then save them as a squad'); return; }
+  squadSlots()[i] = ids(sel);
+  toast(`Squad ${i + 1} saved · ${sel.length} unit${sel.length > 1 ? 's' : ''}`, 'info');
+  squadKey = '';
+}
+// Pick a squad; picking the squad that's already selected jumps to it.
+function recallSquad(i) {
+  const list = squadUnits(i);
+  if (!list.length) { squadKey = ''; return; }
+  const sel = selectedUnits();
+  const same = sel.length === list.length && list.every((u) => u.selected);
+  if (same) findGroup(list);
+  else selectUnits(list);
+  panelKey = '';
+  renderPanel();
+}
+// Centre the camera on a group of units.
+function findGroup(sel) {
+  // Average relative to the first unit so groups straddling a looping seam centre correctly.
+  const ax = sel[0].x + sel.reduce((s, u) => s + game.dx(sel[0].x, u.x), 0) / sel.length;
+  const ay = sel.reduce((s, u) => s + u.y, 0) / sel.length;
+  const az = sel.reduce((s, u) => s + (u.z || 0), 0) / sel.length;
+  centreOn(ax, ay - 20, az);
+}
+
 function cancelPlacement() { pendingBuild = null; ghost = null; rampStart = null; hoverReason = ''; }
 
 // ── Hit testing (prefers the closest entity to the finger) ─────────────────
@@ -318,7 +361,7 @@ const markAt = (e, color) => {
 // ── Tap handling ───────────────────────────────────────────────────────────
 let lastTap = { t: 0, unit: null };
 
-function handleTap(sx, sy) {
+function handleTap(sx, sy, touch = false) {
   if (!game || paused || game.over) return;
   const pt = pointAt(sx, sy);
   const { wx, wy } = pt;
@@ -360,6 +403,11 @@ function handleTap(sx, sy) {
     if (lastTap.unit === ownUnit && now - lastTap.t < DOUBLE_TAP_MS) {
       // Double-tap: every unit of the same type that's on screen.
       selectUnits(game.units.filter((u) => mine(u) && u.type === ownUnit.type && onScreen(u)));
+    } else if (touch && sel.length > 1) {
+      // With a group selected, a finger adds a unit to it or takes it out
+      // (a mouse uses shift-click for this).
+      ownUnit.selected = !ownUnit.selected;
+      if (ownUnit.selected) audio.sfx('select');
     } else {
       selectUnits([ownUnit]);
     }
@@ -560,7 +608,7 @@ canvas.addEventListener('pointerdown', (e) => {
   cam.vx = cam.vy = 0;
   if (e.pointerType === 'mouse') {
     // Left button selects (or drags a box); right or middle button pans.
-    const base = { sx: e.offsetX, sy: e.offsetY, lx: e.offsetX, ly: e.offsetY, lt: performance.now(), shift: e.shiftKey, button: e.button };
+    const base = { sx: e.offsetX, sy: e.offsetY, lx: e.offsetX, ly: e.offsetY, lt: performance.now(), shift: e.shiftKey || e.ctrlKey || e.metaKey, button: e.button };
     gesture = e.button === 0 ? { type: 'click', ...base } : { type: 'mpan', moved: false, ...base };
     // Ramps: press where the slope starts and drag to where it ends.
     if (e.button === 0 && pendingBuild === 'bridge' && game && !paused && !rampStart) {
@@ -571,7 +619,17 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
   if (pointers.size === 1) {
-    gesture = { type: 'tap', sx: e.offsetX, sy: e.offsetY, lx: e.offsetX, ly: e.offsetY, lt: performance.now() };
+    const g = { type: 'tap', sx: e.offsetX, sy: e.offsetY, lx: e.offsetX, ly: e.offsetY, lt: performance.now() };
+    gesture = g;
+    // Hold the finger still for a moment, then drag: a box that selects a group.
+    if (game && !paused && !game.over && !pendingBuild) {
+      g.hold = setTimeout(() => {
+        if (gesture !== g || g.type !== 'tap') return;
+        g.type = 'box';
+        g.touch = true;
+        navigator.vibrate?.(15);
+      }, HOLD_MS);
+    }
     // A finger that goes down on a ramp's start point drags out its end.
     if (pendingBuild === 'bridge' && rampStart && game) {
       const [rawX, wy] = screenToWorld(e.offsetX, e.offsetY);
@@ -580,6 +638,7 @@ canvas.addEventListener('pointerdown', (e) => {
       if (near) gesture.type = 'ramp';
     }
   } else if (pointers.size === 2) {
+    clearTimeout(gesture?.hold);
     const [a, b] = [...pointers.values()];
     gesture = { type: 'pinch', d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
   }
@@ -641,8 +700,10 @@ canvas.addEventListener('pointermove', (e) => {
     showRampStatus();
     return;
   }
+  if (gesture.type === 'box') { Object.assign(gesture, { lx: e.offsetX, ly: e.offsetY }); return; }
   if (gesture.type === 'tap' && Math.hypot(e.offsetX - gesture.sx, e.offsetY - gesture.sy) > TAP_SLOP) {
     gesture.type = 'pan';
+    clearTimeout(gesture.hold);
   }
   if (gesture.type === 'pan') panBy(gesture, e.offsetX, e.offsetY);
 });
@@ -664,7 +725,13 @@ function endPointer(e) {
   if (e.pointerType === 'mouse') { endMouse(e); return; }
   if (!pointers.has(e.pointerId)) return;
   pointers.delete(e.pointerId);
-  if (gesture?.type === 'tap' && e.type === 'pointerup') handleTap(e.offsetX, e.offsetY);
+  clearTimeout(gesture?.hold);
+  if (gesture?.type === 'tap' && e.type === 'pointerup') handleTap(e.offsetX, e.offsetY, true);
+  if (gesture?.type === 'box' && e.type === 'pointerup') {
+    // A hold that never moved is just a slow tap.
+    if (Math.hypot(gesture.lx - gesture.sx, gesture.ly - gesture.sy) > TAP_SLOP) boxSelect(gesture);
+    else handleTap(e.offsetX, e.offsetY, true);
+  }
   if (gesture?.type === 'pan' && performance.now() - gesture.lt > 80) cam.vx = cam.vy = 0;
   if (pointers.size === 0) gesture = null;
   else if (pointers.size === 1) {
@@ -755,6 +822,13 @@ window.addEventListener('keydown', (e) => {
   else if (k === '+' || k === '=') zoomButton(1.4);
   else if (k === '-' || k === '_') zoomButton(1 / 1.4);
   else if (k === 'tab') { if (!$('btn-switch').classList.contains('hidden')) $('btn-switch').click(); }
+  else if (/^f[1-4]$/.test(k)) {
+    // F1–F4 pick a squad (twice jumps to it); Shift+F1–F4 saves the selection as one.
+    e.preventDefault();
+    const i = +k[1] - 1;
+    if (e.shiftKey) saveSquad(i); else recallSquad(i);
+    renderSquads();
+  }
   else if (PANEL_KEYS.has(k)) {
     renderPanel(); // bring the panel up to date first, so the key matches what's about to show
     panel.querySelector(`button[data-key="${k}"]:not(:disabled)`)?.click();
@@ -769,7 +843,7 @@ $('btn-zoom-out').addEventListener('click', () => zoomButton(1 / 1.4));
 
 // A reminder of the mouse controls, under the build menu on a PC.
 const CONTROLS_TIP = `<div class="controls-tip"><b>Drag</b> a box to select · <b>Right-click</b> to move or attack ·
-  <kbd>WASD</kbd> pan · <b>Wheel</b> zoom · <kbd>Space</kbd> your HQ · <kbd>Esc</kbd> deselect, then pause</div>`;
+  <kbd>WASD</kbd> pan · <b>Wheel</b> zoom · <kbd>Space</kbd> your HQ · <kbd>Shift</kbd>+<kbd>F1</kbd>–<kbd>F4</kbd> save a squad, <kbd>F1</kbd>–<kbd>F4</kbd> pick it · <kbd>Esc</kbd> deselect, then pause</div>`;
 
 // ── Bottom panel ───────────────────────────────────────────────────────────
 function renderPanel() {
@@ -869,7 +943,7 @@ function renderPanel() {
     panel.innerHTML = `
       <div class="panel-head"><div class="panel-title">${sel.length} selected <span class="panel-sub">${summary}</span></div>
         <button class="small-btn" data-act="deselect">✕</button></div>
-      <div class="hint">${finePointer.matches ? 'Right-click' : 'Tap'} ground to move (they fight on the way) · ${finePointer.matches ? 'right-click' : 'tap'} an enemy to attack${counts.engineer ? ` · ${finePointer.matches ? 'right-click' : 'tap'} a damaged building or vehicle to repair` : ''}</div>
+      <div class="hint">${finePointer.matches ? 'Right-click' : 'Tap'} ground to move (they fight on the way) · ${finePointer.matches ? 'right-click' : 'tap'} an enemy to attack${counts.engineer ? ` · ${finePointer.matches ? 'right-click' : 'tap'} a damaged building or vehicle to repair` : ''}${finePointer.matches ? '' : ' · hold, then drag, to box a group'}</div>
       <div class="row">
         <button class="act-btn" data-act="stop" data-key="h">✋ Hold<kbd class="key">H</kbd></button>
         <button class="act-btn" data-act="charge" data-key="c">⚔️ Charge<kbd class="key">C</kbd></button>
@@ -944,19 +1018,69 @@ panel.addEventListener('click', (e) => {
       case 'retreat':
         if (hq) issue({ c: 'retreat', ids: ids(sel) });
         break;
-      case 'find': {
-        if (!sel.length) break;
-        // Average relative to the first unit so groups straddling a looping seam centre correctly.
-        const ax = sel[0].x + sel.reduce((s, u) => s + game.dx(sel[0].x, u.x), 0) / sel.length;
-        const ay = sel.reduce((s, u) => s + u.y, 0) / sel.length;
-        centreOn(ax, ay - 20);
+      case 'find':
+        if (sel.length) findGroup(sel);
         break;
-      }
       default: break;
     }
   }
   panelKey = '';
   renderPanel();
+});
+
+// ── Squad bar: tap a squad to select it (again to jump to it); hold or
+// right-click a slot to save the selection there; + saves to a free slot.
+const squadBar = $('squads');
+function renderSquads() {
+  if (!game) return;
+  const sel = selectedUnits();
+  const slots = squadSlots();
+  const lists = slots.map((_, i) => squadUnits(i));
+  const isSel = (list) => list.length > 0 && list.length === sel.length && list.every((u) => u.selected);
+  const free = slots.indexOf(null);
+  const plus = sel.length > 0 && free >= 0 && !lists.some(isSel);
+  const key = `${active}|${lists.map((l) => `${l.length}${isSel(l) ? '*' : ''}`).join(',')}|${plus}|${finePointer.matches}`;
+  if (key === squadKey) return;
+  squadKey = key;
+  squadBar.innerHTML = lists.map((list, i) => {
+    if (!list.length) return '';
+    const counts = {};
+    for (const u of list) counts[u.type] = (counts[u.type] || 0) + 1;
+    const main = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+    return `<button class="round-btn squad-btn${isSel(list) ? ' on' : ''}" data-squad="${i}" aria-label="Squad ${i + 1}">
+      <kbd class="key">F${i + 1}</kbd><b>${i + 1}</b><span class="ic">${iconOf(main)}</span>${list.length}</button>`;
+  }).join('') + (plus ? `<button class="round-btn squad-btn add" data-squad="${free}" data-add="1" aria-label="Save as squad">＋ Squad</button>` : '');
+}
+let squadHold = null;
+squadBar.addEventListener('pointerdown', (e) => {
+  const btn = e.target.closest('[data-squad]');
+  if (!btn || e.button !== 0 || !game || paused) return;
+  const i = +btn.dataset.squad;
+  const h = { i, fired: false };
+  h.timer = setTimeout(() => { h.fired = true; navigator.vibrate?.(15); saveSquad(i); renderSquads(); }, 500);
+  squadHold = h;
+});
+function dropSquadHold() {
+  const h = squadHold;
+  if (h) clearTimeout(h.timer);
+  squadHold = null;
+  return h;
+}
+squadBar.addEventListener('pointerup', (e) => {
+  const h = dropSquadHold();
+  const btn = e.target.closest('[data-squad]');
+  if (!h || h.fired || !btn || +btn.dataset.squad !== h.i || !game || paused) return;
+  if (btn.dataset.add) saveSquad(h.i); else recallSquad(h.i);
+  renderSquads();
+});
+squadBar.addEventListener('pointercancel', dropSquadHold);
+squadBar.addEventListener('pointerleave', dropSquadHold);
+squadBar.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  const btn = e.target.closest('[data-squad]');
+  if (!btn || !game || paused) return;
+  saveSquad(+btn.dataset.squad);
+  renderSquads();
 });
 
 // ── HUD ────────────────────────────────────────────────────────────────────
@@ -1015,6 +1139,8 @@ function startGame(key, opts = {}) {
   cancelPlacement();
   markers = [];
   panelKey = '';
+  squads = {};
+  squadKey = '';
   $('mode-label').textContent = mode.label;
   $('btn-switch').classList.toggle('hidden', game.humanCount < 2 || online());
   $('btn-restart').classList.toggle('hidden', online());
@@ -1926,7 +2052,7 @@ function frame(now) {
     draw(dt);
     renderHud();
     panelTimer -= dt;
-    if (panelTimer <= 0) { panelTimer = 0.1; renderPanel(); }
+    if (panelTimer <= 0) { panelTimer = 0.1; renderPanel(); renderSquads(); }
   }
   requestAnimationFrame(frame);
 }
@@ -1975,6 +2101,13 @@ function draw(dt) {
     ctx.strokeStyle = '#00ff66';
     ctx.lineWidth = Math.max(1, Math.round(dpr));
     ctx.strokeRect(x, y, w, h);
+    // A finger held still: a ring shows it's ready to drag out a box.
+    if (gesture.touch && w < 4 && h < 4) {
+      ctx.beginPath();
+      ctx.arc(gesture.sx * dpr, gesture.sy * dpr, 18 * dpr, 0, Math.PI * 2);
+      ctx.lineWidth = Math.max(2, Math.round(2 * dpr));
+      ctx.stroke();
+    }
   }
 
   mctx.setTransform(1, 0, 0, 1, 0, 0);
