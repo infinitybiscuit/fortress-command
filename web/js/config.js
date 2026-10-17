@@ -4,7 +4,7 @@
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v66 · Squads in the panel';
+export const VERSION = 'v67 · Game speed';
 
 // Cloudflare Worker (see /relay; it keeps its original name, fortress-relay)
 // that hands out TURN relay credentials, used
@@ -59,6 +59,14 @@ export const TERMINAL_VELOCITY = 600;
 export const ECONOMY_TICK = 1.0;
 export const AI_TICK = 2.0;
 export const MAX_DELTA = 0.25;
+// Game speed, set in Settings: how much game time passes per real second.
+// Fast is the speed the game has always played at.
+export const SPEEDS = [
+  { id: 'slow', name: 'Slow', x: 0.5 },
+  { id: 'medium', name: 'Medium', x: 0.75 },
+  { id: 'fast', name: 'Fast', x: 1 },
+  { id: 'turbo', name: 'Turbo', x: 1.5 },
+];
 export const STARTING_MONEY = 500;
 // New structures must sit within this many tiles (sideways) of one of your
 // zone-extending buildings — no dropping a Barracks next to the enemy HQ.
