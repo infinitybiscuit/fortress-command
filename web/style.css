@@ -120,6 +120,17 @@ button {
   font-size: 20px; font-weight: 700;
 }
 .round-btn:active { background: var(--accent-dim); }
+/* Saved squads, bottom left of the battlefield */
+.squad-bar { position: absolute; left: 8px; bottom: 8px; right: 52px; display: flex; flex-wrap: wrap-reverse; gap: 6px; pointer-events: none; }
+.squad-btn {
+  pointer-events: auto; width: auto; height: 34px; padding: 0 8px; border-radius: 2px;
+  display: inline-flex; align-items: center; gap: 4px; font-size: 10px; touch-action: manipulation;
+}
+.squad-btn .ic { font-family: initial; font-size: 14px; display: inline-flex; }
+.squad-btn .ic .sprite-ic { width: 16px; height: 16px; image-rendering: pixelated; }
+.squad-btn .key { margin-right: 2px; }
+.squad-btn.on { outline: 2px solid #00ff66; outline-offset: -2px; }
+.squad-btn.add { opacity: 0.85; font-size: 9px; }
 
 #minimap-wrap {
   padding: 6px calc(var(--safe-right) + 10px) 6px calc(var(--safe-left) + 10px);
