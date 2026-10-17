@@ -21,7 +21,7 @@ export class Game {
     // or looping edges.
     this.field = !!this.mode.field;
     this.map = new TileMap(this.field);
-    // Looping map (Free-for-All): x wraps around and distances take the short way.
+    // Looping map (online games with 3+ players): x wraps around and distances take the short way.
     this.wrap = !this.field && !!this.mode.wrap;
     this.map.wrap = this.wrap;
     this.units = [];

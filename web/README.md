@@ -170,7 +170,7 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
     - **Bridge** with a vermilion rail, and stone **Steps** (Ramp).
   - **Effects:** shots are crossbow bolts, great bolts, stones and fire pots.
   - **Menus:** black lacquer, vermilion and gold.
-  - **Sides:** all seven kingdoms, each with its own colours, headgear, signature units, palace, barracks and income building. Free-for-All can field any four.
+  - **Sides:** all seven kingdoms, each with its own colours, headgear, signature units, palace, barracks and income building. Online games with three or more players can field several.
     - **Qin** (everything above): standard axles, standard coins, a Terracotta Guard and a Coin Foundry. Even the jokes are regulation length.
     - **Chu:** black-and-red lacquer, an antlered **Shaman**, a **Dragon Boat** on wheels, a **Zongzi Lobber** and a steaming Zongzi Kitchen.
     - **Qi:** salt and iron by the sea. A **Debater** who fires speech bubbles, a **Land Junk**, Salt Pans and the **Jixia Academy**, where two tiny scholars argue forever.
@@ -325,7 +325,7 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
     - **Burned Bridge** (Bridge) and **Price Ramp**, where everything only goes up (Ramp).
   - **Effects:** blasts burst into red, white, blue and gold confetti.
   - **Menus:** gold, red and navy. Tagline: "The other countries pay. Believe me."
-  - **Sides:** a four-way trade war, made for Free-for-All. Only the USA has a caricature: the other sides satirise policies and products, not people.
+  - **Sides:** a four-way trade war, made for online games with several players. Only the USA has a caricature: the other sides satirise policies and products, not people.
     - **The USA:** everything above.
     - **China:**
       - **Dock Hands**, a **Magnet Gunner** firing rare-earth magnets, a **Panda**, a **Solar Fitter** and a **Bullet Trainer**.
@@ -438,15 +438,15 @@ Each theme is one file in `js/themes/`. A theme can also replace the explosion d
 
 Some themes split their armies into **sides**: the Union or the Confederacy in Civil War, Finns or Soviets in Winter War, the Cartel or the Cops in Cartel Wars, the Mob or the Feds in Gangsters, Knights or Vikings in Medieval, Humans or Machines in Rise of the Robots, the USA, China, Canada or the EU in Trade Wars, the Shogunate or the Sky Pirates in Steam Shogun, any of the seven kingdoms in Warring States, the Busters or the Ghosts in Ghost Wars, and the Colonial Marines or the Aliens in Alien Wars. Under the **Theme** button, the title screen shows which sides a theme has.
 
-- **Offline:** tapping a mode opens **Choose your side**. Each card previews that side's troops and vehicles in your team colour. **🎲 Surprise me** picks at random. In **1 vs 1 Local**, Blue picks first and then Red, and Red is steered towards the other side. CPUs take whichever sides are left, sharing them round in Free-for-All. Your last pick is remembered for each theme, and **Restart** keeps everyone's sides.
+- **Offline:** tapping a mode opens **Choose your side**. Each card previews that side's troops and vehicles in your team colour. **🎲 Surprise me** picks at random. In **1 vs 1 Local**, Blue picks first and then Red, and Red is steered towards the other side. CPUs take whichever sides are left. Your last pick is remembered for each theme, and **Restart** keeps everyone's sides.
 - **Online:** the host's theme is the room's war for everyone, shown at the top of the lobby, and the host can change it with **Change ▸**. Each seat shows its side. Tap your own side to switch it; the host can also set each CPU's side. Guests see the host's war while they're in the room, and their own theme comes back when they leave.
 - **Cosmetic only:** sides look, sound and are named differently, but every side has the same units, costs and stats. Your **team colour** (Blue, Red, Green or Yellow) still marks your army, so two players can fight on the same side and still tell each other apart.
 
 **For theme authors:** list `sides: [{ id, name, short, blurb, names?, icons?, win?, lose?, preview? }]` (`preview` picks which units the side's picker card shows) on the theme. Sprite and building painters call `sideOf(f)` (from `pixel.js`) to draw a faction's side, building painters receive the faction as a third argument, and `background` receives the viewing player's side. A theme with fewer than two sides never shows the picker.
 
-## Free-for-All: looping map
+## Looping map (online, 3–5 players)
 
-In **Free-for-All (3)** and **(4)**, the battlefield is a loop. Walk, drive or fly off one edge and you come back on the other, and the camera pans endlessly. HQs are spaced evenly around the loop, so every player has a neighbour on each side and nobody gets a safe corner. Units, shots, artillery, aircraft, the minimap and build zones all work across the seam. Orders take the short way round. In 1 vs 1 modes the map still has edges.
+In online games with three or more players, the battlefield is a loop. Walk, drive or fly off one edge and you come back on the other, and the camera pans endlessly. HQs are spaced evenly around the loop, so every player has a neighbour on each side and nobody gets a safe corner. Units, shots, artillery, aircraft, the minimap and build zones all work across the seam. Orders take the short way round. In 1 vs 1 modes the map still has edges.
 
 Every player in every mode starts with two soldiers in front of their HQ.
 
@@ -462,7 +462,7 @@ Play friends on their own devices, anywhere with internet:
 
 **The battle.** The map depends on how many seats are filled:
 - 2 players get the normal 1 vs 1 map.
-- 3, 4 or 5 players get the looping Free-for-All map.
+- 3, 4 or 5 players get the looping map.
 - In isometric view everyone gets the square field: two in opposite corners, three or four round the corners, five round a pentagon.
 
 Colours follow seat order: Blue, Red, Green, Yellow, Purple. Everyone uses the normal controls. Online games can't be paused. ⏸ opens the menu, but the battle keeps going. The latency shows under your name; the host sees their slowest guest. If your HQ falls while others fight on, you can keep watching. When the battle ends, the host taps **Back to lobby** to bring everyone back for another round. New players can join then too.
@@ -625,7 +625,6 @@ The `.gd` paths are in the retired Godot project, under `archive/godot-era/godot
 
 ### Differences from the Godot build
 - **1 vs 1 Local** is real hot-seat play: the ⇄ button hands control to the other player.
-- **Free-for-All (3/4)** gives you one human player against 2 or 3 CPUs.
 - Game over: you lose when your HQ falls, and you win when every rival HQ is gone. When a
   player's HQ is destroyed, the rest of their units and buildings go with it.
 - Buildings can't overlap. The Godot version never recorded building footprints, so
