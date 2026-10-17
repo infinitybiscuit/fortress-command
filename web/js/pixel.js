@@ -103,3 +103,32 @@ export function hash(n) {
   x = Math.imul(x, 0xc2b2ae35);
   return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
 }
+
+// A surface-to-air launcher for the missile-site sprites: a rail tilted up and
+// to the right from a pivot at (x, y), `len` px long, carrying `n` missiles
+// side by side, plus an optional radar dish on a mast at dish = [x, y].
+// Colours: rail (frame), body, tip (nose), fin; dish and mast.
+export function missileRack(g, o) {
+  const { x, y, len = 12, n = 2, rail, body, tip, fin = tip, dish, mast = rail } = o;
+  const diag = (x0, y0, l, w, col) => { for (let i = 0; i < l; i++) g.fillRect(x0 + i, y0 - i, w, w); };
+  // Outline pass, then fills, like outlined() but along the diagonal.
+  g.fillStyle = C.O;
+  diag(x - 1, y - 1, len + 1, 4, C.O);
+  for (let k = 0; k < n; k++) diag(x - 1 + k * 3, y - 4 - k * 3 + 0, len - 1, 4, C.O);
+  g.fillStyle = rail; diag(x, y, len, 2);
+  for (let k = 0; k < n; k++) {
+    const mx = x + k * 3;
+    const my = y - 3 - k * 3;
+    g.fillStyle = body; diag(mx, my, len - 3, 2);
+    g.fillStyle = tip; g.fillRect(mx + len - 4, my - (len - 4), 2, 2);
+    g.fillStyle = fin; g.fillRect(mx - 1, my + 1, 1, 1); g.fillRect(mx + 2, my + 2, 1, 1);
+  }
+  if (dish) {
+    const [dx, dy] = dish;
+    g.fillStyle = C.O; g.fillRect(dx - 1, dy - 1, 3, y - dy + 6);
+    g.fillStyle = mast; g.fillRect(dx, dy, 1, y - dy + 5);
+    g.fillStyle = C.O; g.fillRect(dx - 4, dy - 5, 7, 2); g.fillRect(dx - 3, dy - 6, 5, 4);
+    g.fillStyle = o.dishCol || C.white; g.fillRect(dx - 3, dy - 5, 5, 1); g.fillRect(dx - 2, dy - 4, 3, 1);
+    g.fillStyle = o.tipLight || tip; g.fillRect(dx, dy - 7, 1, 2);
+  }
+}

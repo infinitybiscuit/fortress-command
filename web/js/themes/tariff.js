@@ -4,7 +4,7 @@
 // watchful eye of an orange caricature on a billboard and a baby balloon.
 // Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf, missileRack } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -333,6 +333,21 @@ const BUILD = {
     disc(g, 24, 7, 4, C.O); disc(g, 24, 7, 3, C.white); g.fillStyle = C.O; g.fillRect(24, 5, 1, 3); g.fillRect(24, 7, 2, 1);
     g.fillStyle = C.white; g.fillRect(16, 6, 5, 1); g.fillRect(16, 8, 4, 1); g.fillRect(27, 6, 5, 1); g.fillRect(28, 8, 4, 1);
     g.fillStyle = 'rgba(240,240,240,0.7)'; g.fillRect(8, 2, 1, 2); g.fillRect(11, 2, 1, 3); g.fillRect(9, 3, 2, 1);
+  },
+  sam(g, t, f) {
+    const side = sideId(f);
+    const look = {
+      // Freedom missiles on a gilded plinth, eagle-eyed radar on top
+      usa: { base: C.marble, lite: C.white, top: C.gold, rail: C.goldDark, body: C.white, tip: C.red, fin: C.navy, dish: true },
+      // A firework factory's export rack
+      china: { base: C.concrete, lite: C.concreteLight, top: C.red, rail: C.steelDark, body: C.red, tip: C.yellow, fin: C.gold },
+      // A puck launcher on a log stand
+      canada: { base: C.log, lite: C.logLight, top: C.serge, rail: C.woodDark, body: C.white, tip: C.serge, fin: C.red },
+      // The missile directive: blue cabinet, starry rockets, compliant radar
+      eu: { base: C.euBlue, lite: C.euBlueLight, top: C.cabinet, rail: C.euBlueDark, body: C.white, tip: C.star, fin: C.euBlue, dish: true },
+    }[side];
+    outlined(g, [[3, 22, 26, 10, look.base], [9, 18, 14, 5, look.top]], [[3, 22, 26, 1, look.lite], [3, 27, 26, 2, t.main]]);
+    missileRack(g, { x: 13, y: 19, len: 13, rail: look.rail, body: look.body, tip: look.tip, fin: look.fin, dish: look.dish ? [5, 13] : null, mast: C.steel, dishCol: C.white });
   },
   airbase(g, t) {
     // Gilded helipad: a marble colonnade under a gold deck, a red carpet, gold urns
@@ -1525,9 +1540,9 @@ export default {
         soldier: 'Dock Hand', heavy: 'Magnet Gunner', scout: 'Panda', engineer: 'Solar Fitter', sniper: 'Bullet Trainer',
         jeep: 'EV Runabout', tank: 'Container Crawler', artillery: 'Soy Return Catapult', helicopter: 'Delivery Drone', bomber: 'Dragon Kite',
         hq: 'Mega Factory', barracks: 'Night Shift Dorm', turret: 'Solar Sentry', wall: 'Container Wall', mine: 'Rare Earth Mine',
-        workshop: 'EV Gigaplant', airbase: 'Container Port',
+        workshop: 'EV Gigaplant', airbase: 'Container Port', sam: 'Firework Export Rack',
       },
-      icons: { hq: '🏭', barracks: '🏢', turret: '☀️', wall: '📦', mine: '🧲', workshop: '🔋', airbase: '🚢' },
+      icons: { hq: '🏭', barracks: '🏢', turret: '☀️', wall: '📦', mine: '🧲', workshop: '🔋', airbase: '🚢', sam: '🎆' },
       win: 'Shipped on time, under budget, tariff included.',
       lose: 'Return to sender. Soybeans not included.',
     },
@@ -1538,9 +1553,9 @@ export default {
         soldier: 'Mountie', heavy: 'Goalie', scout: 'Moose', engineer: 'Lumberjack', sniper: 'Slapshooter',
         jeep: 'Zamboni', tank: 'Syrup Tanker', artillery: 'Puck Launcher', helicopter: 'Honk Patrol', bomber: 'Bush Beaver',
         hq: 'Maple Parliament', barracks: 'Log Cabin', turret: 'Goal Net', wall: 'Beaver Dam', mine: 'Syrup Reserve', workshop: 'Bourbon-Free Shop',
-        airbase: 'Borrowed Helipad',
+        airbase: 'Borrowed Helipad', sam: 'Puck Launcher',
       },
-      icons: { hq: '🏛️', barracks: '🛖', turret: '🥅', wall: '🦫', mine: '🍁', workshop: '🥃' },
+      icons: { hq: '🏛️', barracks: '🛖', turret: '🥅', wall: '🦫', mine: '🍁', workshop: '🥃', sam: '🏒' },
       win: 'Sorry about your army, eh. Not that sorry.',
       lose: 'Sorry, eh. Elbows down… for now.',
     },
@@ -1551,9 +1566,9 @@ export default {
         soldier: 'Eurocrat', heavy: 'Rubber Stamper', scout: 'Brie Runner', engineer: 'Regulator', sniper: 'Sommelier',
         jeep: 'Vespa Patrol', tank: 'Regulation Tank', artillery: 'Champagne Cannon', helicopter: 'Red Tape Copter', bomber: 'Directive Glider',
         hq: 'Berlaymont', barracks: 'Committee Room', turret: 'Approval Desk', wall: 'Red Tape', mine: 'Fines Office',
-        workshop: 'Factory (Pending)', airbase: 'Shared Helipad',
+        workshop: 'Factory (Pending)', airbase: 'Shared Helipad', sam: 'Missile Directive',
       },
-      icons: { hq: '⭐', barracks: '🪑', turret: '🖋️', wall: '📚', mine: '💶' },
+      icons: { hq: '⭐', barracks: '🪑', turret: '🖋️', wall: '📚', mine: '💶', sam: '📜' },
       win: 'Victory approved, in all twenty-four official languages.',
       lose: 'Defeat noted. A committee will look into it in 2031.',
     },
@@ -1588,9 +1603,9 @@ export default {
     soldier: 'Tariff Agent', heavy: 'Steel Tariff', scout: 'Penguin', engineer: 'Lobbyist', sniper: 'Economist',
     jeep: 'Golf Cart', tank: 'Golden Tank', artillery: 'Tariff Launcher', helicopter: 'Spin Copter', bomber: 'Hot Air Blimp',
     hq: 'Golden Tower', barracks: 'Rally Tent', turret: 'Tariff Booth', wall: 'Beautiful Wall', mine: 'Golf Resort', workshop: 'Factory (Soon)',
-    airbase: 'Gilded Helipad', bridge: 'Burned Bridge', ramp: 'Price Ramp',
+    airbase: 'Gilded Helipad', sam: 'Freedom Missiles', bridge: 'Burned Bridge', ramp: 'Price Ramp',
   },
   // Units are shown with their own sprites in menus.
   spriteIcons: true,
-  icons: { hq: '🏆', barracks: '🎪', turret: '🚧', wall: '🧱', mine: '⛳', workshop: '🏭', airbase: '🚁', bridge: '🔥', ramp: '📈' },
+  icons: { hq: '🏆', barracks: '🎪', turret: '🚧', wall: '🧱', mine: '⛳', workshop: '🏭', airbase: '🚁', bridge: '🔥', ramp: '📈', sam: '🦅' },
 };

@@ -3,7 +3,7 @@
 // tape) and the Machines (chrome troopers, hunters and The Core). Same units
 // and rules as Classic, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf, missileRack } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -519,6 +519,19 @@ const BUILD = {
     ]);
     hazard(g, 1, 13, 14, 3);
     razorWire(g, 0, 3, 16);
+  },
+  sam(g, t, f) {
+    if (machines(f)) {
+      // Hunter missile array: a chrome plinth with a scanning red eye
+      outlined(g, [[6, 22, 22, 10, C.chromeDark], [10, 18, 14, 5, C.chrome]], [[6, 22, 22, 1, C.chrome], [10, 18, 14, 1, C.chromeLight], [6, 28, 22, 2, t.main]]);
+      missileRack(g, { x: 13, y: 19, len: 13, rail: C.chromeDark, body: C.chromeLight, tip: C.red, fin: C.cyan, dish: [5, 13], mast: C.chrome, dishCol: C.chromeLight });
+      g.fillStyle = C.red; g.fillRect(15, 25, 4, 1);
+    } else {
+      // Rocket nest: a launcher bolted onto scrap and oil drums
+      outlined(g, [[2, 22, 10, 10, C.rust], [20, 24, 10, 8, C.metalDark], [9, 19, 14, 5, C.metal]], [[2, 22, 10, 1, C.rustLight], [2, 26, 10, 1, C.O], [20, 24, 10, 1, C.metal], [9, 19, 14, 1, C.metalLight], [21, 28, 8, 2, t.main]]);
+      missileRack(g, { x: 13, y: 20, len: 12, rail: C.metalDark, body: C.bone, tip: C.red, fin: t.main, dish: [5, 13], mast: C.metal, dishCol: C.concreteLight });
+      g.fillStyle = C.tape; g.fillRect(10, 21, 4, 1);
+    }
   },
   airbase(g, t) {
     // Skyport: landing pad on pylons, control tower with neon band
@@ -1133,12 +1146,12 @@ export default {
     soldier: 'Rebel', heavy: 'Gunner', scout: 'Runner', engineer: 'Tech', sniper: 'Enforcer',
     jeep: 'Cruiser', tank: 'Scrap Truck', artillery: 'Rocket Pickup', helicopter: 'Gunship', bomber: 'Patchwork VTOL',
     hq: 'Bunker HQ', barracks: 'Sewer Den', turret: 'Pulse Gun', wall: 'Barricade', mine: 'Scrap Generator', workshop: 'Scrapyard',
-    airbase: 'Skyport', bridge: 'Girder', ramp: 'Ramp',
+    airbase: 'Skyport', sam: 'Rocket Nest', bridge: 'Girder', ramp: 'Ramp',
   },
   // Units are shown with their own sprites in menus (see unitIcon in render.js).
   spriteIcons: true,
   icons: {
-    hq: '🏚️', turret: '⚡', wall: '🚧', mine: '🔋', workshop: '🔧', airbase: '🛰️', barracks: '🕳️',
+    hq: '🏚️', turret: '⚡', wall: '🚧', mine: '🔋', workshop: '🔧', airbase: '🛰️', sam: '🚀', barracks: '🕳️',
   },
   sides: [
     {
@@ -1154,9 +1167,9 @@ export default {
         soldier: 'Trooper', heavy: 'Endo', scout: 'Spider-Bot', engineer: 'Repair-Bot', sniper: 'Infiltrator',
         jeep: 'Prowler', tank: 'Hunter', artillery: 'Walker', helicopter: 'Drone', bomber: 'Dropship',
         hq: 'The Core', barracks: 'Assembly Line', turret: 'Sensor Tower', wall: 'Firewall', mine: 'Power Plant', workshop: 'Robot Factory',
-        airbase: 'Skyport', bridge: 'Girder', ramp: 'Ramp',
+        airbase: 'Skyport', sam: 'Hunter Missile Array', bridge: 'Girder', ramp: 'Ramp',
       },
-      icons: { hq: '🖥️', barracks: '🤖', turret: '👁️', wall: '🔥', mine: '⚡', workshop: '🏭', airbase: '🛰️' },
+      icons: { hq: '🖥️', barracks: '🤖', turret: '👁️', wall: '🔥', mine: '⚡', workshop: '🏭', airbase: '🛰️', sam: '📡' },
       win: 'Humanity: deprecated. Uploading victory dance…',
       lose: 'Critical failure. Rebooting. We will return… after this update.',
     },

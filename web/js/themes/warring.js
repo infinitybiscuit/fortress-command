@@ -3,7 +3,7 @@
 // siege engines, Mohist engineers, spies — and kites and sky lanterns for an
 // air force. Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf, missileRack } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -333,6 +333,13 @@ const BUILD = {
     for (const x of [33, 36, 39]) { g.fillStyle = C.O; g.fillRect(x - 1, 20, 3, 12); g.fillStyle = C.wood; g.fillRect(x, 21, 1, 11); g.fillStyle = C.bronzeLight; g.fillRect(x, 20, 1, 1); }
     g.fillStyle = C.vermilion; g.fillRect(32, 25, 9, 1);
     flag(g, 6, 14, t, 7);
+  },
+  sam(g, t) {
+    // Fire arrow rack: a bamboo frame of rockets on a stone-footed cart
+    outlined(g, [[3, 22, 26, 6, C.wood], [5, 28, 22, 3, C.stone]], [[3, 22, 26, 1, C.woodLight], [5, 24, 22, 2, t.main], [5, 28, 22, 1, C.stoneLight]]);
+    disc(g, 8, 29, 2, C.O); disc(g, 8, 29, 1, C.woodDark); disc(g, 24, 29, 2, C.O); disc(g, 24, 29, 1, C.woodDark);
+    missileRack(g, { x: 9, y: 19, len: 14, n: 3, rail: C.bambooDark, body: C.bamboo, tip: C.vermilion, fin: C.paper });
+    g.fillStyle = C.O; g.fillRect(27, 4, 1, 18); g.fillStyle = t.main; g.fillRect(28, 4, 3, 6);
   },
   airbase(g, t) {
     // Kite tower: a bamboo scaffold launch platform, kites at rest, a winch
@@ -1437,7 +1444,7 @@ const SIDES = [
       soldier: 'Halberdier', heavy: 'Terracotta Guard', scout: 'Spy', engineer: 'Mohist', sniper: 'Crossbow',
       jeep: 'Chariot', tank: 'Bolt Cart', artillery: 'Stone Thrower', helicopter: 'War Kite', bomber: 'Sky Lantern',
       hq: 'Standard Palace', barracks: 'Garrison', turret: 'Watchtower', wall: 'Long Rampart', mine: 'Coin Foundry',
-      workshop: 'Axle Works', airbase: 'Kite Tower', bridge: 'Bridge (Std.)', ramp: 'Steps (Std.)',
+      workshop: 'Axle Works', airbase: 'Kite Tower', sam: 'Fire Arrow Rack (Std.)', bridge: 'Bridge (Std.)', ramp: 'Steps (Std.)',
     },
     icons: { hq: '👑', barracks: '🛡️', mine: '🪙', workshop: '⚙️' },
     win: 'All under heaven, unified. Please fill in form 7B in triplicate.',
@@ -1450,7 +1457,7 @@ const SIDES = [
       soldier: 'Dagger-Axe', heavy: 'Lacquer Guard', scout: 'Shaman', engineer: 'Lacquerer', sniper: 'Chu Bowman',
       jeep: 'Chariot', tank: 'Dragon Boat', artillery: 'Zongzi Lobber', helicopter: 'Phoenix Kite', bomber: 'Poem Lantern',
       hq: 'Lacquer Palace', barracks: 'Boathouse', turret: 'Drum Tower', wall: 'Marsh Rampart', mine: 'Zongzi Kitchen',
-      workshop: 'Bell Foundry', airbase: 'Kite Marsh', bridge: 'Lotus Bridge', ramp: 'Paddy Steps',
+      workshop: 'Bell Foundry', airbase: 'Kite Marsh', sam: 'Fire Dragon Rack', bridge: 'Lotus Bridge', ramp: 'Paddy Steps',
     },
     icons: { hq: '🏮', barracks: '🐉', mine: '🍙', workshop: '🔔', airbase: '🪁' },
     win: 'Victory! A poet is already writing a very long, very sad poem about it.',
@@ -1463,7 +1470,7 @@ const SIDES = [
       soldier: 'Spearman', heavy: 'Salt Guard', scout: 'Salt Smuggler', engineer: 'Salt Hauler', sniper: 'Debater',
       jeep: 'Chariot', tank: 'Land Junk', artillery: 'Iron Thrower', helicopter: 'Sea Kite', bomber: 'Fish Lantern',
       hq: 'Jixia Academy', barracks: 'Harbour Hall', turret: 'Sea Watch', wall: 'Sea Wall', mine: 'Salt Pans',
-      workshop: 'Ironworks', airbase: 'Kite Pier', bridge: 'Jetty', ramp: 'Quay Steps',
+      workshop: 'Ironworks', airbase: 'Kite Pier', sam: 'Sea Rocket Pier', bridge: 'Jetty', ramp: 'Quay Steps',
     },
     icons: { hq: '📜', barracks: '⚓', mine: '🧂', workshop: '⚒️', airbase: '🪁' },
     win: 'Victory, as argued convincingly over three hundred scrolls.',
@@ -1477,7 +1484,7 @@ const SIDES = [
       soldier: 'Trouser Guard', heavy: 'Felt Guard', scout: 'Horse Archer', engineer: 'Stable Hand', sniper: 'Trouser Archer',
       jeep: 'Not-a-Chariot', tank: 'Bolt Cart', artillery: 'Stone Thrower', helicopter: 'Steppe Kite', bomber: 'Saddle Lantern',
       hq: 'Congtai Terrace', barracks: 'Stables', turret: 'Watchtower', wall: 'Rampart', mine: 'Trouser Tailor',
-      workshop: 'Saddlery', airbase: 'Kite Paddock', bridge: 'Bridge', ramp: 'Mounting Block',
+      workshop: 'Saddlery', airbase: 'Kite Paddock', sam: 'Rocket Cart', bridge: 'Bridge', ramp: 'Mounting Block',
     },
     icons: { hq: '🏯', barracks: '🐎', mine: '👖', workshop: '🏇', airbase: '🪁' },
     win: 'Victory! Trousers: officially the future.',
@@ -1491,7 +1498,7 @@ const SIDES = [
       soldier: 'Fur Spearman', heavy: 'Bear Hat', scout: 'Ski Scout', engineer: 'Snow Shoveller', sniper: 'Frost Crossbow',
       jeep: 'Horse Sled', tank: 'Bolt Cart', artillery: 'Snowball Engine', helicopter: 'Blizzard Kite', bomber: 'Snow Lantern',
       hq: 'Snow Palace', barracks: 'Fur Lodge', turret: 'Frost Tower', wall: 'Northern Wall', mine: 'Fur Trader',
-      workshop: 'Sled Works', airbase: 'Kite Drift', bridge: 'Ice Bridge', ramp: 'Icy Steps',
+      workshop: 'Sled Works', airbase: 'Kite Drift', sam: 'Frost Rocket Rack', bridge: 'Ice Bridge', ramp: 'Icy Steps',
     },
     icons: { hq: '❄️', barracks: '🛖', wall: '🧱', mine: '🦊', workshop: '🛷', airbase: '🪁' },
     win: 'Victory! Everyone gets an extra fur hat.',
@@ -1504,7 +1511,7 @@ const SIDES = [
       soldier: 'Wuzu Halberd', heavy: 'Wuzu Ironclad', scout: 'Ration Runner', engineer: 'Canal Digger', sniper: 'Heavy Crossbow',
       jeep: 'Chariot', tank: 'Iron Tortoise', artillery: 'Stone Thrower', helicopter: 'Iron Kite', bomber: 'Ration Lantern',
       hq: 'Iron Citadel', barracks: 'Wuzu Armoury', turret: 'Watchtower', wall: 'Rampart', mine: 'Canal Toll',
-      workshop: 'Armour Smithy', airbase: 'Kite Tower', bridge: 'Canal Bridge', ramp: 'Lock Steps',
+      workshop: 'Armour Smithy', airbase: 'Kite Tower', sam: 'Fire Arrow Cart', bridge: 'Canal Bridge', ramp: 'Lock Steps',
     },
     icons: { hq: '🏰', barracks: '🎒', mine: '🚣', workshop: '⚒️' },
     win: 'Victory, and there are still two days of rations left!',
@@ -1517,7 +1524,7 @@ const SIDES = [
       soldier: 'Iron Swordsman', heavy: 'Big Shield', scout: 'Nervous Lookout', engineer: 'Essayist', sniper: 'Best Crossbow',
       jeep: 'Chariot', tank: 'Triple Crossbow', artillery: 'Worried Thrower', helicopter: 'Peek Kite', bomber: 'Panic Lantern',
       hq: 'Tiny Palace', barracks: 'Crossbow Range', turret: 'Extra Tower', wall: 'Extra Rampart', mine: 'Iron Forge',
-      workshop: 'Crossbow Works', airbase: 'Kite Tower', bridge: 'Escape Bridge', ramp: 'Escape Steps',
+      workshop: 'Crossbow Works', airbase: 'Kite Tower', sam: 'Extra Rockets', bridge: 'Escape Bridge', ramp: 'Escape Steps',
     },
     icons: { hq: '🏠', barracks: '🎯', mine: '🗡️', workshop: '🏹', turret: '🗼' },
     win: 'We won?! Quick, someone write an essay about it.',
@@ -1535,6 +1542,7 @@ export default {
   soldier: buildSoldier,
   vehicle: { jeep: veh('jeep'), tank: veh('tank'), artillery: veh('artillery') },
   aircraft: { helicopter: buildKite, bomber: buildLantern },
+  missile: { body: '#c8a050', tip: '#d8402a', flame: '#f28a30' },
   buildings: Object.fromEntries(Object.keys(BUILD).map((k) => [k, (g, t, f) => (SIDE_BUILD[sideId(f)]?.[k] || BUILD[k])(g, t, f)])),
   drawTile,
   surface,
@@ -1553,9 +1561,9 @@ export default {
     soldier: 'Halberdier', heavy: 'Guardsman', scout: 'Spy', engineer: 'Mohist', sniper: 'Crossbow',
     jeep: 'Chariot', tank: 'Bolt Cart', artillery: 'Stone Thrower', helicopter: 'War Kite', bomber: 'Sky Lantern',
     hq: 'Palace', barracks: 'Garrison', turret: 'Watchtower', wall: 'Rampart', mine: 'Foundry', workshop: 'Arsenal',
-    airbase: 'Kite Tower', bridge: 'Bridge', ramp: 'Steps',
+    airbase: 'Kite Tower', sam: 'Fire Arrow Rack', bridge: 'Bridge', ramp: 'Steps',
   },
   // Units are shown with their own sprites in menus.
   spriteIcons: true,
-  icons: { hq: '👑', barracks: '🛡️', turret: '🏹', wall: '🧱', mine: '⚒️', workshop: '🪚', airbase: '🪁', bridge: '🌉', ramp: '🪜' },
+  icons: { hq: '👑', barracks: '🛡️', turret: '🏹', wall: '🧱', mine: '⚒️', workshop: '🪚', airbase: '🪁', bridge: '🌉', ramp: '🪜', sam: '🎇' },
 };

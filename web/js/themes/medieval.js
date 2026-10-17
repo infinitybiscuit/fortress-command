@@ -2,7 +2,7 @@
 // men-at-arms, peasants and plague carriers, catapults and trebuchets, with
 // griffins and dragons for an air force. Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf, missileRack } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -592,6 +592,19 @@ const BUILD = {
     for (const [x, y] of [[38, 28], [42, 28], [40, 25]]) { disc(g, x + 1, y + 1, 2, C.O); disc(g, x + 1, y + 1, 1, C.woodLight); }
     banner(g, 4, 14, t, 7);
   },
+  sam(g, t, f) {
+    if (viking(f)) {
+      // Thunderbolt rack: Thor's rockets on a turf-roofed timber stand
+      outlined(g, [[3, 22, 26, 10, C.wood], [1, 19, 30, 4, C.turf]], [[3, 22, 26, 1, C.woodLight], [1, 19, 30, 1, C.turfLight], [5, 26, 22, 2, t.main]]);
+      g.fillStyle = C.woodDark; for (const x of [8, 16, 24]) g.fillRect(x, 23, 1, 9);
+      missileRack(g, { x: 9, y: 17, len: 13, rail: C.woodDark, body: C.barrel, tip: C.fire, fin: C.metalLight });
+    } else {
+      // Firework battery: rockets in a frame on a crenellated stone platform
+      outlined(g, [[3, 20, 26, 12, C.stone], [3, 17, 4, 3, C.stone], [12, 17, 4, 3, C.stone], [25, 17, 4, 3, C.stone]], [[3, 20, 26, 1, C.stoneLight], [3, 17, 4, 1, C.stoneLight], [12, 17, 4, 1, C.stoneLight], [25, 17, 4, 1, C.stoneLight], [6, 25, 20, 3, t.main]]);
+      g.fillStyle = C.stoneDark; for (const [x, y] of [[6, 22], [16, 22], [11, 29], [21, 29]]) g.fillRect(x, y, 4, 1);
+      missileRack(g, { x: 13, y: 16, len: 13, rail: C.wood, body: C.red, tip: C.yellow, fin: C.woodLight });
+    }
+  },
   airbase(g, t) {
     // Aerie: a rocky crag topped with a great nest, beside timber stables
     outlined(g, [[0, 18, 36, 14, C.wood], [44, 8, 16, 24, C.stone], [40, 3, 24, 6, '#7a5a32']], [
@@ -1117,9 +1130,9 @@ export default {
         soldier: 'Shieldmaiden', heavy: 'Berserker', scout: 'Speedy Skald', engineer: 'Shipwright', sniper: 'Axe Flinger',
         jeep: 'Goat Cart', tank: 'Landlubber Longship', artillery: 'Mead-a-Pult', helicopter: 'Raven Rider', bomber: 'Flying Longship',
         hq: 'Mead Hall', barracks: 'Longhouse', turret: 'Lookout', wall: 'Shield Wall', mine: 'Mead Brewery', workshop: 'Boathouse',
-        airbase: 'Raven Roost', bridge: 'Plank Bridge', ramp: 'Steps',
+        airbase: 'Raven Roost', sam: 'Thunderbolt Rack', bridge: 'Plank Bridge', ramp: 'Steps',
       },
-      icons: { barracks: '🛖', turret: '🪓', wall: '🛡️', mine: '🍺', workshop: '⛵', airbase: '🪶' },
+      icons: { barracks: '🛖', turret: '🪓', wall: '🛡️', mine: '🍺', workshop: '⛵', airbase: '🪶', sam: '⚡' },
       win: 'Valhalla can wait, the mead can’t.',
       lose: 'Off to Valhalla. Somebody save the mead.',
     },
@@ -1130,6 +1143,7 @@ export default {
   soldier: buildSoldier,
   vehicle: { jeep: buildJeep, tank: buildTank, artillery: buildArtillery },
   aircraft: { helicopter: buildFlyer, bomber: buildHeavyFlyer },
+  missile: { body: '#c8302a', tip: '#f2c230', flame: '#f28a30' },
   buildings: Object.fromEntries(Object.keys(BUILD).map((k) => [k, (g, t, f) => (viking(f) && VIKING_BUILD[k] ? VIKING_BUILD[k] : BUILD[k])(g, t, f)])),
   drawTile,
   surface,
@@ -1148,9 +1162,9 @@ export default {
     soldier: 'Man-at-Arms', heavy: 'Knight', scout: 'Plague Carrier', engineer: 'Peasant', sniper: 'Longbow',
     jeep: 'Horseman', tank: 'Catapult', artillery: 'Trebuchet', helicopter: 'Griffin', bomber: 'Dragon',
     hq: 'Castle', barracks: 'Barracks', turret: 'Tower', wall: 'Wall', mine: 'Well', workshop: 'Siege Works',
-    airbase: 'Aerie', bridge: 'Bridge', ramp: 'Steps',
+    airbase: 'Aerie', sam: 'Firework Battery', bridge: 'Bridge', ramp: 'Steps',
   },
   // Units are shown with their own sprites in menus.
   spriteIcons: true,
-  icons: { barracks: '⚔️', turret: '🏹', wall: '🧱', mine: '🪣', workshop: '🔨', airbase: '🐉', bridge: '🌉', ramp: '🪜' },
+  icons: { barracks: '⚔️', turret: '🏹', wall: '🧱', mine: '🪣', workshop: '🔨', airbase: '🐉', bridge: '🌉', ramp: '🪜', sam: '🎆' },
 };

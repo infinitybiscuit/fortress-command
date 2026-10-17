@@ -2,7 +2,7 @@
 // airships under Mount Fuji, with cherry blossom drifting through the steam.
 // Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf, missileRack } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -567,6 +567,17 @@ const BUILD = {
     g.fillStyle = C.O; g.fillRect(39, 14, 1, 10);
     noren(g, 4, 14, 8, t);
   },
+  sam(g, t, f) {
+    if (pirate(f)) {
+      // Harpoon rockets: a brass-banded launcher on a ship's deck, with a spyglass
+      outlined(g, [[2, 24, 28, 8, C.wood], [9, 19, 14, 5, C.iron]], [[2, 24, 28, 1, C.woodLight], [2, 28, 28, 1, C.woodDark], [9, 19, 14, 1, C.ironLight], [4, 26, 24, 1, t.main]]);
+      missileRack(g, { x: 13, y: 20, len: 13, rail: C.iron, body: C.ironLight, tip: C.red, fin: C.gold, dish: [5, 13], mast: C.woodDark, dishCol: C.lens });
+    } else {
+      // Rocket pagoda: copper rockets under a little tiled roof, steam venting
+      outlined(g, [[4, 21, 24, 11, C.stone], [8, 18, 16, 4, C.lacquer]], [[4, 21, 24, 1, C.stoneLight], [8, 18, 16, 1, C.lacquerLight], [4, 27, 24, 2, t.main]]);
+      missileRack(g, { x: 13, y: 19, len: 13, rail: C.brassDark, body: C.copper, tip: C.brass, fin: C.brassLight, dish: [5, 12], mast: C.brassDark, dishCol: C.brassLight });
+    }
+  },
   airbase(g, t) {
     // Sky dock: a brass mooring mast with lanterns and a koinobori windsock
     outlined(g, [[0, 20, 36, 12, C.wood]], [[0, 20, 36, 1, C.woodLight]]);
@@ -1107,9 +1118,9 @@ export default {
         soldier: 'Deckhand', heavy: 'Boiler-Belly', scout: 'Robo-Parrot', engineer: 'Grease Monkey', sniper: 'Spyglass',
         jeep: 'Steam Hog', tank: 'Land Galleon', artillery: 'Broadside Wagon', helicopter: 'Gyro-Gull', bomber: 'Patchwork Zeppelin',
         hq: 'Pirate Cove', barracks: 'Grog Hall', turret: "Crow's Nest", wall: 'Barrel Stack', mine: 'Plunder Pile',
-        workshop: 'Salvage Yard', airbase: 'Sky Harbour', bridge: 'Taiko Bridge', ramp: 'Steps',
+        workshop: 'Salvage Yard', airbase: 'Sky Harbour', sam: 'Harpoon Rockets', bridge: 'Taiko Bridge', ramp: 'Steps',
       },
-      icons: { hq: '⚓', barracks: '🥤', turret: '🔭', wall: '🛢️', mine: '💰', workshop: '🔧', airbase: '🎈' },
+      icons: { hq: '⚓', barracks: '🥤', turret: '🔭', wall: '🛢️', mine: '💰', workshop: '🔧', airbase: '🎈', sam: '🚀' },
       win: 'Arr, the sky be ours! Ginger beer for the whole crew!',
       lose: 'Abandon zeppelin! Mind the parrot!',
     },
@@ -1120,6 +1131,7 @@ export default {
   soldier: buildSoldier,
   vehicle: { jeep: buildRickshaw, tank: buildBeetle, artillery: buildMortar },
   aircraft: { helicopter: buildTengu, bomber: buildKoi },
+  missile: { body: '#c87a3a', tip: '#e8c050', flame: '#f28a30', smoke: '#e8e4dc' },
   buildings: Object.fromEntries(Object.keys(BUILD).map((k) => [k, (g, t, f) => (pirate(f) && PIRATE_BUILD[k] ? PIRATE_BUILD[k] : BUILD[k])(g, t, f)])),
   drawTile,
   surface,
@@ -1139,9 +1151,9 @@ export default {
     soldier: 'Ashigaru', heavy: 'Steam Samurai', scout: 'Ninja', engineer: 'Tinkerer', sniper: 'Teppo',
     jeep: 'Rickshaw', tank: 'Kabuto Tank', artillery: 'Hanabi Mortar', helicopter: 'Tengu Flyer', bomber: 'Koi Airship',
     hq: 'Castle', barracks: 'Dojo', turret: 'Yagura', wall: 'Ishigaki', mine: 'Boiler', workshop: 'Karakuri Works',
-    airbase: 'Sky Dock', bridge: 'Taiko Bridge', ramp: 'Steps',
+    airbase: 'Sky Dock', sam: 'Rocket Pagoda', bridge: 'Taiko Bridge', ramp: 'Steps',
   },
   // Units are shown with their own sprites in menus.
   spriteIcons: true,
-  icons: { hq: '🏯', barracks: '🥋', turret: '💥', wall: '🧱', mine: '♨️', workshop: '⚙️', airbase: '🎏', bridge: '🌉', ramp: '🪜' },
+  icons: { hq: '🏯', barracks: '🥋', turret: '💥', wall: '🧱', mine: '♨️', workshop: '⚙️', airbase: '🎏', bridge: '🌉', ramp: '🪜', sam: '🎆' },
 };

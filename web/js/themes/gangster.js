@@ -2,7 +2,7 @@
 // tommy guns splurge custard, the artillery lobs cream pies, and nobody gets
 // hurt, they just get splatted. Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf, missileRack } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -511,6 +511,18 @@ const BUILD = {
     outlined(g, [[12, 6, 20, 5, t.dark]], [[13, 7, 18, 3, t.main], [14, 8, 16, 1, C.white]]);
     outlined(g, [[43, 18, 4, 14, C.red], [42, 15, 6, 4, C.white]], [[44, 20, 2, 3, C.glass], [43, 16, 4, 1, C.red]]);
     outlined(g, [[3, 26, 4, 6, C.redDark], [3, 22, 4, 4, '#3a5a8a']], [[3, 28, 4, 1, C.yellow]]);
+  },
+  sam(g, t, f) {
+    if (feds(f)) {
+      // Flak rocket post: a concrete emplacement with a radar dish
+      outlined(g, [[3, 22, 26, 10, C.concrete], [9, 18, 14, 5, C.slate]], [[3, 22, 26, 1, C.concreteLight], [9, 18, 14, 1, C.slateLight], [3, 27, 26, 2, t.main]]);
+      missileRack(g, { x: 13, y: 19, len: 13, rail: C.navy, body: C.white, tip: C.red, fin: C.navyLight, dish: [5, 13], mast: C.slate, dishCol: C.concreteLight });
+    } else {
+      // Firework stand: rockets on a rack over stacked crates
+      outlined(g, [[2, 22, 13, 10, C.wood], [15, 24, 15, 8, C.woodDark], [8, 19, 16, 4, C.woodLight]], [[2, 22, 13, 1, C.woodLight], [15, 24, 15, 1, C.wood], [4, 25, 9, 1, C.woodDark], [17, 27, 11, 2, t.main]]);
+      g.fillStyle = C.red; g.fillRect(4, 28, 3, 2); g.fillStyle = C.yellow; g.fillRect(8, 28, 3, 2);
+      missileRack(g, { x: 13, y: 20, len: 12, rail: C.woodDark, body: C.red, tip: C.yellow, fin: C.white });
+    }
   },
   airbase(g, t) {
     // Air dock: a lattice mooring mast for blimps beside a small hangar
@@ -1042,9 +1054,9 @@ export default {
         soldier: 'G-Man', heavy: 'Dry Agent', scout: 'Stool Pigeon', engineer: 'Accountant', sniper: 'Marksman',
         jeep: 'Squad Car', tank: 'Paddy Wagon', artillery: 'Pie Trebuchet', helicopter: 'Seaplane', bomber: 'Bureau Blimp',
         hq: 'The Bureau', barracks: 'Academy', turret: 'Searchlight', wall: 'Roadblock', mine: 'Tax Office',
-        workshop: 'Evidence Locker', airbase: 'Air Dock', bridge: 'Fire Escape', ramp: 'Stairs',
+        workshop: 'Evidence Locker', airbase: 'Air Dock', sam: 'Flak Rocket Post', bridge: 'Fire Escape', ramp: 'Stairs',
       },
-      icons: { hq: '🏛️', barracks: '🎯', turret: '🔦', wall: '🚧', mine: '🧾', workshop: '🗄️' },
+      icons: { hq: '🏛️', barracks: '🎯', turret: '🔦', wall: '🚧', mine: '🧾', workshop: '🗄️', sam: '🚀' },
       win: 'We got him on the tax forms.',
       lose: 'The paperwork got lost. All of it. In triplicate.',
     },
@@ -1055,6 +1067,7 @@ export default {
   soldier: buildSoldier,
   vehicle: { jeep: buildCar, tank: buildPieWagon, artillery: buildPieLobber },
   aircraft: { helicopter: buildAutogyro, bomber: buildBlimp },
+  missile: { body: '#d0322a', tip: '#f2d040', flame: '#f2d040' },
   buildings: Object.fromEntries(Object.keys(BUILD).map((k) => [k, (g, t, f) => (feds(f) && FEDS_BUILD[k] ? FEDS_BUILD[k] : BUILD[k])(g, t, f)])),
   drawTile,
   surface,
@@ -1074,9 +1087,9 @@ export default {
     soldier: 'Hood', heavy: 'Muscle', scout: 'Newsie', engineer: 'Mechanic', sniper: 'Hitman',
     jeep: 'Getaway Car', tank: 'Pie Wagon', artillery: 'Pie Lobber', helicopter: 'Autogyro', bomber: 'Blimp',
     hq: 'Speakeasy', barracks: 'Pool Hall', turret: 'Lookout', wall: 'Crates', mine: 'Bakery', workshop: 'Garage',
-    airbase: 'Air Dock', bridge: 'Fire Escape', ramp: 'Stairs',
+    airbase: 'Air Dock', sam: 'Firework Stand', bridge: 'Fire Escape', ramp: 'Stairs',
   },
   // Units are shown with their own sprites in menus.
   spriteIcons: true,
-  icons: { hq: '🎺', barracks: '🎱', turret: '🔭', wall: '📦', mine: '🥧', workshop: '🔧', airbase: '🎈', bridge: '🏗️', ramp: '🪜' },
+  icons: { hq: '🎺', barracks: '🎱', turret: '🔭', wall: '📦', mine: '🥧', workshop: '🔧', airbase: '🎈', bridge: '🏗️', ramp: '🪜', sam: '🎆' },
 };

@@ -4,7 +4,7 @@
 // split-rail fences, gunsmoke, and picnickers on the hill who came to watch.
 // Same units and rules for both sides, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf, missileRack } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -403,6 +403,12 @@ const BUILD = {
     outlined(g, [[28, 22, 12, 4, C.iron], [30, 26, 2, 6, C.iron], [36, 26, 2, 6, C.iron]], [[28, 22, 12, 1, C.ironLight]]);
     g.fillStyle = t.main; g.fillRect(4, 14, 40, 2);
   },
+  sam(g, t, f) {
+    // Hale rocket battery: rockets in an iron trough on a trestle, behind earthworks
+    outlined(g, [[8, 19, 3, 9, C.wood], [20, 19, 3, 9, C.wood]], [[8, 19, 1, 9, C.woodLight], [20, 19, 1, 9, C.woodLight]]);
+    missileRack(g, { x: 9, y: 20, len: 14, rail: C.iron, body: C.ironLight, tip: rebel(f) ? C.butternut : C.blue, fin: C.brass });
+    outlined(g, [[0, 26, 32, 6, C.dirt]], [[0, 26, 32, 1, C.grass], [4, 28, 24, 2, t.main]]);
+  },
   airbase(g, t, f) {
     // Balloon yard: a gas-generator wagon, barrels, and a balloon tethered overhead
     disc(g, 40, 9, 9, C.O); disc(g, 40, 9, 8, rebel(f) ? '#c86a8a' : C.white);
@@ -670,7 +676,7 @@ const UNION = {
   soldier: 'Bluecoat', heavy: 'Zouave', scout: 'Cavalry', engineer: 'Pioneer', sniper: 'Sharpshooter',
   jeep: 'Gatling Wagon', tank: 'Land Monitor', artillery: 'The Dictator', helicopter: 'Balloon Corps', bomber: 'Aereon Airship',
   hq: 'Capitol (Unfinished)', barracks: 'Muster Tents', turret: 'Battery', wall: 'Breastworks', mine: 'Greenback Press',
-  workshop: 'Foundry', airbase: 'Balloon Yard', bridge: 'Pontoon Bridge', ramp: 'Plank Ramp',
+  workshop: 'Foundry', airbase: 'Balloon Yard', sam: 'Hale Rocket Battery', bridge: 'Pontoon Bridge', ramp: 'Plank Ramp',
 };
 
 export default {
@@ -691,7 +697,7 @@ export default {
         soldier: 'Greyback', heavy: 'Tiger Zouave', scout: 'Plumed Cavalry', engineer: 'Sapper', sniper: 'Whitworth Marksman',
         jeep: 'Mule Howitzer', tank: 'Land Merrimack', artillery: 'Napoleon', helicopter: 'Silk Dress Balloon', bomber: 'Flying Hunley',
         hq: 'Statehouse', barracks: 'Muster Tents', turret: 'Battery', wall: 'Stone Wall', mine: 'Paper Money Press',
-        workshop: 'Tredegar Works', airbase: 'Balloon Yard', bridge: 'Pontoon Bridge', ramp: 'Plank Ramp',
+        workshop: 'Tredegar Works', airbase: 'Balloon Yard', sam: 'Hale Rocket Battery', bridge: 'Pontoon Bridge', ramp: 'Plank Ramp',
       },
       icons: { wall: '🧱', mine: '💸' },
       win: 'Print more money to celebrate! (Lots more money.)',
@@ -721,5 +727,5 @@ export default {
   minimap: { sky: '#7aa8da', ground: '#7a5a3a', platform: '#a8a49a', bridge: '#a47a4c', ramp: '#7a5634', surface: '#5a9a3a' },
   names: UNION,
   spriteIcons: true,
-  icons: { hq: '🏛️', barracks: '⛺', turret: '💣', wall: '🪵', mine: '💵', workshop: '🏭', airbase: '🎈', bridge: '🛶', ramp: '🪜' },
+  icons: { hq: '🏛️', barracks: '⛺', turret: '💣', wall: '🪵', mine: '💵', workshop: '🏭', airbase: '🎈', bridge: '🛶', ramp: '🪜', sam: '🚀' },
 };

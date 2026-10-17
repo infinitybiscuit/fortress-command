@@ -15,6 +15,9 @@ const LEASH = 450;                // how far an idle unit chases before returnin
 const STUCK_SECONDS = 2;          // no progress toward an out-of-range target → give up
 const IGNORE_SECONDS = 6;         // how long an abandoned target is ignored
 const ENGINEER_REPAIR_RADIUS = 260;
+const MISSILE_SPEED = 540;        // px/s at full burn
+const MISSILE_ACCEL = 700;
+const MISSILE_TURN = 3.2;         // radians per second
 
 // Distance from a point to an entity's body (closest point), so attacking a
 // wide building works from either side. z is depth on the isometric field
@@ -119,6 +122,7 @@ export class Unit {
     this.moveY = y;
     this.moveZ = z ?? this.z;
     this.route = null;
+    this.routeFor = null;
     this.routeT = 0;
     this.target = null;
     this.state = State.MOVING;
@@ -186,6 +190,39 @@ export class Unit {
     return [x, (t.z || 0) + (t.d || 0) / 2];
   }
 
+  // Head for a target out of range. Side-on, that's along a route over the
+  // platforms and bridges (and up a keep's stair), so targets up high can be
+  // reached.
+  chase(t, dt) {
+    const [ax, az] = this.aimAt(t);
+    if (this.game.field || this.air || canReach(this, t)) { this.steer(ax, az); return; }
+    this.moveX = ax;
+    this.moveY = t.kind === 'building' ? t.y + t.h : t.y;
+    if (this.routeFor !== t) { this.routeFor = t; this.route = null; }
+    this.steer(this.followRoute(dt) ?? ax);
+  }
+
+  // Side-on: can the unit walk somewhere a target up above it is in range from?
+  // (Remembered for a couple of seconds: it's a route search.)
+  canClimbTo(t) {
+    if (this.game.field || this.air || t.air) return false;
+    const c = this.climb;
+    if (c?.t === t && this.game.time < c.until) return c.ok;
+    const [ax] = this.aimAt(t);
+    const r = t.bounds();
+    const path = this.game.map.route(this.x, this.y, this.surfaceKey(), ax, r.y + r.h, this.h);
+    const end = path?.[path.length - 1];
+    const ok = !!end && end.y - this.h / 2 - (r.y + r.h) <= this.range * 0.95;
+    this.climb = { t, ok, until: this.game.time + 2 + Math.random() };
+    return ok;
+  }
+
+  // canReach, or by climbing.
+  canAttack(t) { return canReach(this, t) || this.canClimbTo(t); }
+
+  // The surface the unit is on, in TileMap.route's terms (null in the air).
+  surfaceKey() { return this.ramp ? `r${this.ramp.id}` : this.onGround ? `t${Math.round(this.y / TILE_SIZE)}` : null; }
+
   giveUp(t) {
     this.ignoreTarget = t;
     this.ignoreUntil = this.game.time + IGNORE_SECONDS;
@@ -222,7 +259,7 @@ export class Unit {
         if (this.def.shot === 'bomb') { this.bombingRun(t); break; }
         const [cx, cy] = this.centre();
         if (scan) {
-          if (!canReach(this, t)) { this.giveUp(t); break; }
+          if (!canReach(this, t) && !this.canClimbTo(t)) { this.giveUp(t); break; }
           // Marching on a building: turn on enemy units that come into range.
           if (t.kind === 'building') {
             const e = this.findEnemyUnit(this.range);
@@ -233,7 +270,7 @@ export class Unit {
           // Out of range: hold position, leash back to post, or chase.
           if (this.hold) { this.vx = 0; if (scan) this.finishTarget(); break; }
           if (this.home != null && this.away(this.home, this.homeZ) > LEASH) { this.giveUp(t); break; }
-          this.steer(...this.aimAt(t));
+          this.chase(t, dt);
           if (this.away(this.stuckX, this.stuckZ) > 6) { this.stuckX = this.x; this.stuckZ = this.z; this.stuckT = 0; }
           else if ((this.stuckT += dt) > STUCK_SECONDS) { this.giveUp(t); break; }
         } else {
@@ -524,7 +561,7 @@ export class Unit {
   // to head for, or null once on the last stretch.
   followRoute(dt) {
     if (this.moveY == null || this.air || this.game.field) return null;
-    const key = this.ramp ? `r${this.ramp.id}` : this.onGround ? `t${Math.round(this.y / TILE_SIZE)}` : null;
+    const key = this.surfaceKey();
     // Not while falling (or stepping off a ledge), though: a plan from mid-air
     // can't know what the unit will land on. Re-plan the moment it does. A
     // frame or two off the ground, e.g. at the foot of a slope, isn't falling.
@@ -737,7 +774,7 @@ export class Building {
     let best = null;
     let bestScore = Infinity;
     for (const u of this.game.units) {
-      if (u.dead || u.faction === this.faction) continue;
+      if (u.dead || u.faction === this.faction || (this.def.airOnly && !u.air)) continue;
       const [ux, uy] = u.centre();
       const d = Math.hypot(this.game.dx(cx, ux), uy - cy, u.z - (this.z + this.d / 2));
       const range = u.air ? this.def.airRange ?? this.def.range : this.def.range;
@@ -811,12 +848,16 @@ export class Projectile {
     this.vsBuildings = opts.vsBuildings || 1;
     this.shooter = opts.shooter || null;
     this.radius = this.kind === 'bullet' ? PROJECTILE_RADIUS : this.kind === 'bomb' ? 5.5 : 4.5;
+    // Missiles leave the rail pointing straight up, then speed up and turn
+    // to chase their target (heading 0 is level, toward it).
+    this.heading = -Math.PI / 2;
+    this.speed = 120;
     // Bombs: released with the bomber's forward speed, then fall.
     this.vx = opts.vx || 0;
     this.vz = opts.vz || 0;
     this.vy = 40;
     this.angle = 0;
-    this.life = this.kind === 'lob' ? 8 : 4;
+    this.life = this.kind === 'lob' ? 8 : this.kind === 'missile' ? 5 : 4;
     this.done = false;
     this.exploded = 0; // >0 while the blast flash is shown
     if (this.kind === 'lob') {
@@ -877,6 +918,7 @@ export class Projectile {
       [this.tx, this.ty] = this.target.centre();
       this.tz = aimZ(this.target);
     }
+    if (this.kind === 'missile') { this.guide(dt); return; }
     const dx = this.game.dx(this.x, this.tx);
     const dy = this.ty - this.y;
     const dz = this.tz - this.z;
@@ -899,6 +941,36 @@ export class Projectile {
     this.y = ny;
     this.z = nz;
     if (wall && wall !== this.target) this.impact(wall);
+  }
+
+  // A guided missile: turns its nose toward the target at a limited rate as
+  // it speeds up, so it climbs off the rail and curves in. If the target is
+  // gone it flies on until it burns out.
+  guide(dt) {
+    const dx = this.game.dx(this.x, this.tx);
+    const dy = this.ty - this.y;
+    const dz = this.tz - this.z;
+    const across = Math.hypot(dx, dz);
+    const dist = Math.hypot(across, dy);
+    this.speed = Math.min(MISSILE_SPEED, this.speed + MISSILE_ACCEL * dt);
+    const step = this.speed * dt;
+    if (!this.target.dead && dist <= step + 4) {
+      [this.x, this.y, this.z] = [this.tx, this.ty, this.tz];
+      this.impact(this.target);
+      return;
+    }
+    if (!this.target.dead) {
+      let turn = Math.atan2(dy, across) - this.heading;
+      turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+      this.heading += Math.max(-MISSILE_TURN * dt, Math.min(MISSILE_TURN * dt, turn));
+      this.ux = across > 0.01 ? dx / across : this.ux ?? 1;
+      this.uz = across > 0.01 ? dz / across : this.uz ?? 0;
+    }
+    const level = Math.cos(this.heading) * step;
+    this.x = this.game.normX(this.x + level * (this.ux ?? 1));
+    this.z += level * (this.uz ?? 0);
+    this.y += Math.sin(this.heading) * step;
+    this.angle = Math.atan2(Math.sin(this.heading), Math.cos(this.heading) * Math.sign((this.ux ?? 1) + (this.uz ?? 0) || 1));
   }
 
   wallOnPath(x0, y0, x1, y1, z0 = 0, z1 = 0) {
@@ -933,6 +1005,12 @@ export class Projectile {
 
   impact(direct) {
     if (direct) this.hit(direct, this.damage);
+    if (this.kind === 'missile') {
+      // An air burst: just the flash, sized for the sky.
+      this.splash = 24;
+      this.exploded = 0.3;
+      return;
+    }
     if (this.splash > 0) {
       // Lobbed shells deal full damage to whatever they land on; everything
       // else inside the blast takes half.

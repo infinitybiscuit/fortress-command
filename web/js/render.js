@@ -108,6 +108,15 @@ export function rampSprite(b) {
   return b.rampSpr;
 }
 
+// The keeps' stairs: drawn like their owner's bridges, but they're part of the map.
+export function drawStairs(ctx, game) {
+  for (const seg of game.map.stairs) {
+    seg.view ||= { seg, faction: seg.owner, game };
+    const s = rampSprite(seg.view);
+    ctx.drawImage(s.c, s.ox, s.oy);
+  }
+}
+
 // A unit's sprite as an image URL, for menus in themes that use sprite icons.
 export function unitIcon(type, faction) {
   const key = `${theme.id}:${sideOf(faction)}:${type}:${faction}`;
@@ -301,7 +310,37 @@ export function drawProjectile(ctx, p) {
   }
   const dx = Math.round(Math.cos(p.angle) * 3);
   const dy = Math.round(Math.sin(p.angle) * 3);
+  if (p.kind === 'missile') { drawMissile(ctx, p, x, y); return; }
   theme.projectile(ctx, p, x, y, dx, dy);
+}
+
+// A guided missile: a smoke trail, a flickering motor and a pointed body
+// along its heading. Themes can recolour it (`missile: { body, tip, flame, smoke }`).
+function drawMissile(ctx, p, x, y) {
+  const m = { body: C.white, tip: C.red, flame: C.yellow, smoke: '#b8b4ac', ...theme.missile };
+  const cx = Math.cos(p.angle);
+  const cy = Math.sin(p.angle);
+  const at = (d) => [x + Math.round(cx * d), y + Math.round(cy * d)];
+  const tick = Math.floor(performance.now() / 60);
+  for (let i = 0; i < 6; i++) {
+    const [sx, sy] = at(-4 - i * 3);
+    ctx.globalAlpha = 0.55 - i * 0.08;
+    const r = i < 2 ? 1 : 2;
+    rect(ctx, sx - (r >> 1) + ((tick + i) % 2), sy - (r >> 1), r, r, m.smoke);
+  }
+  ctx.globalAlpha = 1;
+  const [fx, fy] = at(-3);
+  rect(ctx, fx, fy, 1, 1, tick % 2 ? m.flame : C.white);
+  for (let d = -2; d <= 2; d++) {
+    const [bx, by] = at(d);
+    rect(ctx, bx - 1, by - 1, 3, 3, C.O);
+  }
+  for (let d = -2; d <= 1; d++) {
+    const [bx, by] = at(d);
+    rect(ctx, bx, by, 1, 1, m.body);
+  }
+  const [tx, ty] = at(2);
+  rect(ctx, tx, ty, 1, 1, m.tip);
 }
 
 // ── Effects (visual only) ──────────────────────────────────────────────────

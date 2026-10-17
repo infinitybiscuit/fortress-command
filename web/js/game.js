@@ -8,6 +8,9 @@ import { Unit, Building, Projectile, State, canReach, distTo } from './entities.
 
 const MAX_PROJECTILES = 100;
 
+// 240 → "4:00"
+export const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
 export class Game {
   // mode: a MODES key, or a mode object (online games build their own).
   constructor(mode, events = {}) {
@@ -42,9 +45,14 @@ export class Game {
     this.mode.players.forEach(([hqX, isAi], i) => {
       const p = { faction: i, money: STARTING_MONEY, income: 0, isAi, hq: null, alive: true };
       this.players.push(p);
-      p.hq = this.field
-        ? this.spawnBuilding('hq', spots[i][0], hqY, i, null, spots[i][1])
-        : this.spawnBuilding('hq', hqX, hqY, i);
+      if (this.field) {
+        p.hq = this.spawnBuilding('hq', spots[i][0], hqY, i, null, spots[i][1]);
+        return;
+      }
+      // Side-on, every HQ sits up in a keep on the top row, so it can't be
+      // rushed: attackers have to fight their way up its stair.
+      const top = this.map.addKeep(hqX, this.facing(hqX), i);
+      p.hq = this.spawnBuilding('hq', hqX, top - BUILDING_TYPES.hq.h, i);
     });
     // Everyone starts with two soldiers posted in front of their HQ.
     const y = this.map.groundTop * TILE_SIZE;
@@ -57,8 +65,10 @@ export class Game {
         }
         return;
       }
-      const dir = this.wrap || hx < WORLD_W / 2 ? 1 : -1;
-      for (const off of [122, 162]) this.spawnUnit('soldier', this.normX(hx + dir * off), y, i);
+      // Side-on, they stand guard in the keep beside the HQ, at the top of the stair.
+      const dir = this.facing(p.hq.tx);
+      const top = p.hq.y + p.hq.h;
+      for (const off of [104, 136]) this.spawnUnit('soldier', this.normX(hx + dir * off), top, i).post();
     });
     this.players.forEach((p, i) => { p.income = this.incomeFor(i); });
   }
@@ -72,6 +82,12 @@ export class Game {
     }
     return d;
   }
+
+  // Which way an HQ at tile x looks: toward the middle (always right on looping maps).
+  facing(tx) { return this.wrap || tx * TILE_SIZE < WORLD_W / 2 ? 1 : -1; }
+
+  // Seconds until a building type can be built (0 once it's unlocked).
+  lockedFor(type) { return Math.max(0, (BUILDING_TYPES[type]?.unlockAt ?? 0) - this.time); }
 
   normX(x) { return this.wrap ? ((x % WORLD_W) + WORLD_W) % WORLD_W : x; }
 
@@ -180,6 +196,7 @@ export class Game {
     const d = BUILDING_TYPES[type];
     if (!d || d.isRamp) return "Can't place here!"; // ramps go through tryPlaceRamp
     if (this.field && !(Number.isInteger(tz) && Number.isInteger(tx))) return "Can't place here!";
+    if (this.lockedFor(type) > 0) return `Unlocks at ${clock(d.unlockAt)}!`;
     if (p.money < d.cost) return 'Not enough credits!';
     const pl = this.placementAt(type, tx, ty, playerIdx, tz);
     if (pl.reason === 'zone') return 'Too far from your base!';
@@ -353,6 +370,8 @@ export class Game {
       from = shooter.centre();
       from[1] = shooter.y + 10;
       from[2] = shooter.z + shooter.d / 2;
+      // Missile sites launch from the top of the rail.
+      if (shooter.def.airOnly) { from[1] = shooter.y + 4; opts = { kind: 'missile' }; }
     }
     opts.shooter = shooter;
     this.projectiles.push(new Projectile(this, from, target, damage, shooter.faction, opts));
@@ -466,6 +485,20 @@ export class Game {
 
     if (!mine && p.money >= 200) place('mine', dir > 0 ? hq.tx + hq.wt + 1 : hq.tx - 3);
     if (!barracks && p.money >= 150) barracks = place('barracks', dir > 0 ? hq.tx + hq.wt + 4 : hq.tx - 8);
+    // Fortify the keep: a turret beside the HQ and a wall across the top of
+    // the stair (put back if they're knocked down).
+    if (!this.field && barracks) {
+      for (const [type, rel] of [['turret', 4], ['wall', 7]]) {
+        const d = BUILDING_TYPES[type];
+        const tx = dir > 0 ? hq.tx + rel : hq.tx + hq.wt - rel - d.w;
+        const ty = hq.ty + hq.ht - d.h;
+        if (p.money < d.cost + 50) break;
+        if (this.buildings.some((b) => b.faction === i && b.type === type && b.tx === tx && b.ty === ty)) continue;
+        if (!this.placementAt(type, tx, ty, i).valid) continue;
+        p.money -= d.cost;
+        this.spawnBuilding(type, tx, ty, i);
+      }
+    }
     // Mid-game: add a workshop and save up for vehicles.
     let workshop = this.buildings.find((b) => b.faction === i && b.type === 'workshop');
     if (!workshop && barracks && this.time > 90 && p.money >= 200) {
@@ -473,8 +506,21 @@ export class Game {
     }
     // Late game: an airbase for helicopters and bombers (built before spending on vehicles).
     let airbase = this.buildings.find((b) => b.faction === i && b.type === 'airbase');
-    if (!airbase && workshop && !workshop.constructing && this.time > 180 && p.money >= 300) {
+    if (!airbase && workshop && !workshop.constructing && !this.lockedFor('airbase') && p.money >= 300) {
       airbase = place('airbase', dir > 0 ? hq.tx + hq.wt + 12 : hq.tx - 17);
+    }
+    // Enemy aircraft about: put up a missile site by the HQ (up in the keep
+    // on the side-on map), and a second once they keep coming.
+    const sams = this.buildings.filter((b) => b.faction === i && b.type === 'sam').length;
+    const planes = this.units.filter((u) => u.air && u.faction !== i).length;
+    if (planes > sams * 3 && sams < 2 && p.money >= BUILDING_TYPES.sam.cost) {
+      if (this.field) place('sam');
+      else {
+        const top = hq.ty + hq.ht - BUILDING_TYPES.sam.h;
+        const tx = [dir > 0 ? hq.tx + hq.wt : hq.tx - 2, dir > 0 ? hq.tx - 2 : hq.tx + hq.wt, dir > 0 ? hq.tx + hq.wt + 2 : hq.tx - 4]
+          .find((x) => this.placementAt('sam', x, top, i).valid);
+        if (tx != null) { p.money -= BUILDING_TYPES.sam.cost; this.spawnBuilding('sam', tx, top, i); }
+      }
     }
     const workshopIdle = workshop && !workshop.constructing && !workshop.trainCurrent && !workshop.queue.length;
     const airbaseIdle = airbase && !airbase.constructing && !airbase.trainCurrent && !airbase.queue.length;
@@ -545,13 +591,14 @@ export class Game {
     for (const u of this.units) {
       if (u.faction !== i || u.dead || u.repairRate > 0) continue;
       const busy = u.state === State.ATTACKING && u.target && !u.target.dead;
-      const nearest = (list) => {
+      // climb: also targets up a stair (a route search each, so only for HQs).
+      const nearest = (list, climb = false) => {
         let best = null;
         let bestD = Infinity;
         for (const e of list) {
-          if (e.dead || u.isIgnoring(e) || !canReach(u, e)) continue;
+          if (e.dead || u.isIgnoring(e)) continue;
           const d = distTo(u.x, u.y - u.h / 2, e, u.z);
-          if (d < bestD) { bestD = d; best = e; }
+          if (d < bestD && (climb ? u.canAttack(e) : canReach(u, e))) { bestD = d; best = e; }
         }
         return best;
       };
@@ -559,14 +606,14 @@ export class Game {
       // Defence: units near home turn back on raiders.
       if (threats.length && u.away(hx, hz) < 1500) {
         if (busy && threats.includes(u.target)) continue;
-        const t = nearest(threats);
+        const t = nearest(threats, true);
         if (t) { u.attack(t); continue; }
       }
       // Already fighting a unit, an HQ, or something blocking the way: carry on.
       if (busy && (u.target.kind === 'unit' || u.target.type === 'hq' || u.resume)) continue;
       // Offence: engage enemies close by, else push on the nearest enemy HQ.
       const local = nearest(this.units.filter((e) => e.faction !== i && distTo(u.x, u.y - u.h / 2, e, u.z) < 350));
-      const target = local || nearest(enemyHqs);
+      const target = local || nearest(enemyHqs, true);
       if (target && target !== u.target) u.attack(target);
     }
   }

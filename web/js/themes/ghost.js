@@ -4,7 +4,7 @@
 // of wells). Graveyard soil, crypt-stone ledges, a full moon over the city
 // and fog rolling between the tombstones. Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf, missileRack } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -507,6 +507,18 @@ const BUILD = {
       windowLit(g, 33, 18, 8, 6);
     }
   },
+  sam(g, t, f) {
+    if (ghosts(f)) {
+      // Banshee launcher: a cracked tomb that shrieks out homing spirits
+      outlined(g, [[5, 18, 22, 14, C.stone], [8, 15, 16, 4, C.stoneDark]], [[5, 18, 22, 1, C.stoneLight], [7, 26, 18, 2, t.main], [14, 20, 1, 5, C.O]]);
+      missileRack(g, { x: 13, y: 16, len: 12, rail: C.purpleDark, body: C.ghost, tip: C.slime, fin: C.ghostBlue });
+      g.fillStyle = C.moss; g.fillRect(5, 30, 6, 2); g.fillRect(21, 29, 4, 3);
+    } else {
+      // Proton missile pad: a steel launcher with a containment-grade radar
+      outlined(g, [[3, 22, 26, 10, C.steel], [9, 18, 14, 5, C.pack]], [[3, 22, 26, 1, C.white], [9, 18, 14, 1, C.packLight], [3, 27, 26, 2, t.main]]);
+      missileRack(g, { x: 13, y: 19, len: 13, rail: C.packDark, body: C.white, tip: C.proton, fin: C.protonBlue, dish: [5, 13], mast: C.steel, dishCol: C.white });
+    }
+  },
   airbase(g, t, f) {
     if (ghosts(f)) {
       // A ruined chapel with a bell tower (and the bats that live in it)
@@ -870,7 +882,7 @@ const BUSTERS = {
   soldier: 'Buster', heavy: 'Proton Heavy', scout: 'Kid Who Sees', engineer: 'Parapsychologist', sniper: 'Psychic Medium',
   jeep: 'Spook Wagon', tank: 'Containment Truck', artillery: 'Slime Mortar', helicopter: 'Spook Copter', bomber: 'Trap Blimp',
   hq: 'Old Firehouse', barracks: 'Recruiting Office', turret: 'Proton Tower', wall: 'Laser Fence', mine: 'Containment Unit',
-  workshop: 'Gadget Garage', airbase: 'Rooftop Pad', bridge: 'Steel Gantry',
+  workshop: 'Gadget Garage', airbase: 'Rooftop Pad', sam: 'Proton Missile Pad', bridge: 'Steel Gantry',
 };
 
 export default {
@@ -891,9 +903,9 @@ export default {
         soldier: 'Sheet Ghost', heavy: 'Glutton', scout: 'Headless Horseman', engineer: 'Poltergeist', sniper: 'Girl in the Well',
         jeep: 'Phantom Hearse', tank: 'Marshmallow Giant', artillery: 'Cursed TV', helicopter: 'Clown Doll', bomber: 'Ghost Ship',
         hq: 'Haunted Mansion', barracks: 'Graveyard', turret: 'Grabbing Tree', wall: 'Headstone', mine: 'Cursed Well',
-        workshop: 'Video Store', airbase: 'Bell Tower', bridge: 'Rotten Planks',
+        workshop: 'Video Store', airbase: 'Bell Tower', sam: 'Banshee Launcher', bridge: 'Rotten Planks',
       },
-      icons: { hq: '🏚️', barracks: '🪦', turret: '🌳', wall: '⚰️', mine: '🪣', workshop: '📼', airbase: '🔔', bridge: '🪵' },
+      icons: { hq: '🏚️', barracks: '🪦', turret: '🌳', wall: '⚰️', mine: '🪣', workshop: '📼', airbase: '🔔', bridge: '🪵', sam: '👻' },
       preview: ['soldier', 'heavy', 'tank', 'artillery'],
       win: 'They’re heeere. And they’re staying.',
       lose: 'Seven days? You lasted about seven minutes.',
@@ -905,6 +917,7 @@ export default {
   soldier: buildSoldier,
   vehicle: { jeep: buildWagon, tank: buildTank, artillery: buildArtillery },
   aircraft: { helicopter: buildHeli, bomber: buildBomber },
+  missile: { body: '#e8f0ff', tip: '#8af04a', flame: '#8af04a', smoke: '#a8c8d8' },
   buildings: BUILD,
   drawTile,
   surface,
@@ -922,5 +935,5 @@ export default {
   minimap: { sky: '#1e163a', ground: '#3e3240', platform: '#7a7a88', bridge: '#5e4636', ramp: '#5e4636', surface: '#3a5440' },
   names: BUSTERS,
   spriteIcons: true,
-  icons: { hq: '🚒', barracks: '📞', turret: '⚡', wall: '🚧', mine: '🔋', workshop: '🔧', airbase: '🚁', bridge: '🏗️' },
+  icons: { hq: '🚒', barracks: '📞', turret: '⚡', wall: '🚧', mine: '🔋', workshop: '🔧', airbase: '🚁', bridge: '🏗️', sam: '🚀' },
 };
