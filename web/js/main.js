@@ -66,7 +66,6 @@ let panelKey = '';
 let eliminatedNoted = false; // told this player they're out but the game goes on
 let sellArmed = null;       // { id, until } — sell needs a second tap to confirm
 let squads = {};            // faction → SQUAD_SLOTS lists of unit ids (null = empty slot)
-let squadKey = '';
 const minimapCache = {};
 // 2D (side-on) or isometric. Isometric is a preview feature: it's switched
 // on in Settings, under Preview features, and fixed for the whole game.
@@ -306,12 +305,11 @@ function saveSquad(i) {
   if (!sel.length) { toast('Select some units first, then save them as a squad'); return; }
   squadSlots()[i] = ids(sel);
   toast(`Squad ${i + 1} saved · ${sel.length} unit${sel.length > 1 ? 's' : ''}`, 'info');
-  squadKey = '';
 }
 // Pick a squad; picking the squad that's already selected jumps to it.
 function recallSquad(i) {
   const list = squadUnits(i);
-  if (!list.length) { squadKey = ''; return; }
+  if (!list.length) return;
   const sel = selectedUnits();
   const same = sel.length === list.length && list.every((u) => u.selected);
   if (same) findGroup(list);
@@ -827,7 +825,7 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     const i = +k[1] - 1;
     if (e.shiftKey) saveSquad(i); else recallSquad(i);
-    renderSquads();
+    refreshPanel();
   }
   else if (PANEL_KEYS.has(k)) {
     renderPanel(); // bring the panel up to date first, so the key matches what's about to show
@@ -866,7 +864,8 @@ function renderPanel() {
   const uState = sel.length ? `${sel.length}|${sel.map((u) => u.type[0]).sort().join('')}` : '';
   const armed = !!(b && sellArmed && sellArmed.id === b.id && performance.now() < sellArmed.until);
   const refund = b ? game.sellValue(b) : 0;
-  const key = `${mode}|${afford}|${pendingBuild}|${ghost?.valid}|${bState}|${uState}|${armed}|${refund}`;
+  const squad = squadRow(sel);
+  const key = `${mode}|${afford}|${pendingBuild}|${ghost?.valid}|${bState}|${uState}|${armed}|${refund}|${squad.key}`;
   if (key === panelKey) return;
   panelKey = key;
 
@@ -940,10 +939,17 @@ function renderPanel() {
     const counts = {};
     for (const u of sel) counts[u.type] = (counts[u.type] || 0) + 1;
     const summary = Object.entries(counts).map(([t, n]) => `${iconOf(t)}×${n}`).join('  ');
+    // On a phone the squad row takes the room of the longer hint, so the
+    // battlefield doesn't shrink when units are picked.
+    const hint = finePointer.matches
+      ? `Right-click ground to move (they fight on the way) · right-click an enemy to attack${counts.engineer ? ' · right-click a damaged building or vehicle to repair' : ''}`
+      : squad.html
+        ? `Tap ground to move · an enemy to attack${counts.engineer ? ' · damage to repair' : ''}`
+        : `Tap ground to move (they fight on the way) · tap an enemy to attack${counts.engineer ? ' · tap a damaged building or vehicle to repair' : ''} · hold, then drag, to box a group`;
     panel.innerHTML = `
       <div class="panel-head"><div class="panel-title">${sel.length} selected <span class="panel-sub">${summary}</span></div>
         <button class="small-btn" data-act="deselect">✕</button></div>
-      <div class="hint">${finePointer.matches ? 'Right-click' : 'Tap'} ground to move (they fight on the way) · ${finePointer.matches ? 'right-click' : 'tap'} an enemy to attack${counts.engineer ? ` · ${finePointer.matches ? 'right-click' : 'tap'} a damaged building or vehicle to repair` : ''}${finePointer.matches ? '' : ' · hold, then drag, to box a group'}</div>
+      <div class="hint">${hint}</div>
       <div class="row">
         <button class="act-btn" data-act="stop" data-key="h">✋ Hold<kbd class="key">H</kbd></button>
         <button class="act-btn" data-act="charge" data-key="c">⚔️ Charge<kbd class="key">C</kbd></button>
@@ -952,11 +958,11 @@ function renderPanel() {
       <div class="row">
         <button class="act-btn" data-act="all" data-key="q">🎖️ All units<kbd class="key">Q</kbd></button>
         <button class="act-btn" data-act="find" data-key="f">📍 Find<kbd class="key">F</kbd></button>
-      </div>`;
+      </div>${squad.html ? `<div class="squad-row">${squad.html}</div>` : ''}`;
     return;
   }
 
-  panel.innerHTML = `<div class="panel-head"><div class="panel-title">Build</div><div class="panel-sub">${tap(true)} one, then the map</div><button class="small-btn" data-act="all" data-key="q">🎖️ All units<kbd class="key">Q</kbd></button></div>${buildGrid}${finePointer.matches ? CONTROLS_TIP : ''}`;
+  panel.innerHTML = `<div class="panel-head"><div class="panel-title">Build</div>${squad.html && !finePointer.matches ? `<div class="squad-row">${squad.html}</div>` : `<div class="panel-sub">${tap(true)} one, then the map</div>`}<button class="small-btn" data-act="all" data-key="q">🎖️ ${squad.html && !finePointer.matches ? 'All' : 'All units'}<kbd class="key">Q</kbd></button></div>${squad.html && finePointer.matches ? `<div class="squad-row">${squad.html}</div>` : ''}${buildGrid}${finePointer.matches ? CONTROLS_TIP : ''}`;
 }
 
 panel.addEventListener('click', (e) => {
@@ -1028,36 +1034,34 @@ panel.addEventListener('click', (e) => {
   renderPanel();
 });
 
-// ── Squad bar: tap a squad to select it (again to jump to it); hold or
-// right-click a slot to save the selection there; + saves to a free slot.
-const squadBar = $('squads');
-function renderSquads() {
-  if (!game) return;
-  const sel = selectedUnits();
+// ── Squads in the panel: tap a squad to select it (again to jump to it);
+// hold or right-click one to save the selection over it; + saves to a free slot.
+// Returns { key, html } so the panel only redraws when a squad changes.
+function squadRow(sel) {
   const slots = squadSlots();
   const lists = slots.map((_, i) => squadUnits(i));
   const isSel = (list) => list.length > 0 && list.length === sel.length && list.every((u) => u.selected);
   const free = slots.indexOf(null);
   const plus = sel.length > 0 && free >= 0 && !lists.some(isSel);
-  const key = `${active}|${lists.map((l) => `${l.length}${isSel(l) ? '*' : ''}`).join(',')}|${plus}|${finePointer.matches}`;
-  if (key === squadKey) return;
-  squadKey = key;
-  squadBar.innerHTML = lists.map((list, i) => {
+  const key = `${lists.map((l) => `${l.length}${isSel(l) ? '*' : ''}`).join(',')}|${plus}`;
+  const html = lists.map((list, i) => {
     if (!list.length) return '';
     const counts = {};
     for (const u of list) counts[u.type] = (counts[u.type] || 0) + 1;
     const main = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
-    return `<button class="round-btn squad-btn${isSel(list) ? ' on' : ''}" data-squad="${i}" aria-label="Squad ${i + 1}">
-      <kbd class="key">F${i + 1}</kbd><b>${i + 1}</b><span class="ic">${iconOf(main)}</span>${list.length}</button>`;
-  }).join('') + (plus ? `<button class="round-btn squad-btn add" data-squad="${free}" data-add="1" aria-label="Save as squad">＋ Squad</button>` : '');
+    return `<button class="small-btn squad-btn${isSel(list) ? ' on' : ''}" data-squad="${i}" aria-label="Squad ${i + 1}">`
+      + `<kbd class="key">F${i + 1}</kbd><span class="ic">${iconOf(main)}</span>${list.length}</button>`;
+  }).join('') + (plus ? `<button class="small-btn squad-btn add" data-squad="${free}" data-add="1" aria-label="Save as squad">＋ Squad</button>` : '');
+  return { key, html };
 }
+function refreshPanel() { panelKey = ''; renderPanel(); }
 let squadHold = null;
-squadBar.addEventListener('pointerdown', (e) => {
+panel.addEventListener('pointerdown', (e) => {
   const btn = e.target.closest('[data-squad]');
   if (!btn || e.button !== 0 || !game || paused) return;
   const i = +btn.dataset.squad;
   const h = { i, fired: false };
-  h.timer = setTimeout(() => { h.fired = true; navigator.vibrate?.(15); saveSquad(i); renderSquads(); }, 500);
+  h.timer = setTimeout(() => { h.fired = true; navigator.vibrate?.(15); saveSquad(i); refreshPanel(); }, 500);
   squadHold = h;
 });
 function dropSquadHold() {
@@ -1066,21 +1070,22 @@ function dropSquadHold() {
   squadHold = null;
   return h;
 }
-squadBar.addEventListener('pointerup', (e) => {
+panel.addEventListener('pointerup', (e) => {
   const h = dropSquadHold();
   const btn = e.target.closest('[data-squad]');
   if (!h || h.fired || !btn || +btn.dataset.squad !== h.i || !game || paused) return;
   if (btn.dataset.add) saveSquad(h.i); else recallSquad(h.i);
-  renderSquads();
+  refreshPanel();
 });
-squadBar.addEventListener('pointercancel', dropSquadHold);
-squadBar.addEventListener('pointerleave', dropSquadHold);
-squadBar.addEventListener('contextmenu', (e) => {
-  e.preventDefault();
+panel.addEventListener('pointercancel', dropSquadHold);
+panel.addEventListener('pointerleave', dropSquadHold);
+panel.addEventListener('contextmenu', (e) => {
   const btn = e.target.closest('[data-squad]');
-  if (!btn || !game || paused) return;
+  if (!btn) return;
+  e.preventDefault();
+  if (!game || paused) return;
   saveSquad(+btn.dataset.squad);
-  renderSquads();
+  refreshPanel();
 });
 
 // ── HUD ────────────────────────────────────────────────────────────────────
@@ -1140,7 +1145,6 @@ function startGame(key, opts = {}) {
   markers = [];
   panelKey = '';
   squads = {};
-  squadKey = '';
   $('mode-label').textContent = mode.label;
   $('btn-switch').classList.toggle('hidden', game.humanCount < 2 || online());
   $('btn-restart').classList.toggle('hidden', online());
@@ -2052,7 +2056,7 @@ function frame(now) {
     draw(dt);
     renderHud();
     panelTimer -= dt;
-    if (panelTimer <= 0) { panelTimer = 0.1; renderPanel(); renderSquads(); }
+    if (panelTimer <= 0) { panelTimer = 0.1; renderPanel(); }
   }
   requestAnimationFrame(frame);
 }
