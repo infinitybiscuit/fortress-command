@@ -468,8 +468,9 @@ export class Game {
     const alive = this.players.map((p, i) => (p.alive ? i : -1)).filter((i) => i >= 0);
     const humansAlive = alive.filter((i) => !this.players[i].isAi);
     if (alive.length <= 1) return this.finish(alive.length ? alive[0] : -1);
-    // Once the last human HQ falls there's nobody left to play for.
-    if (this.humanCount > 0 && humansAlive.length === 0) return this.finish(alive[0]);
+    // Offline, once the last human is out there's nobody left to play for.
+    // Online, knocked-out players (the host included) watch the CPUs finish it.
+    if (!this.mode.online && this.humanCount > 0 && humansAlive.length === 0) return this.finish(alive[0]);
   }
 
   finish(winner) {
