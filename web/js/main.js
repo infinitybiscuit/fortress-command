@@ -11,7 +11,7 @@ import {
 import {
   drawBackground, drawTerrain, drawStairs, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
   drawEffects, updateEffects, drawMarker, drawWeather, G, skyTop, setTheme, THEMES, currentTheme, unitIcon,
-  themeSides, sideInfo, sideIcon, setFactionSides, setViewer,
+  themeSides, sideInfo, sideIcon, setFactionSides, setViewer, drawFlag, flagSpot,
 } from './render.js';
 import {
   GROUND_Y, FIELD_BOX, projX, projY, drawIsoBackground, drawIsoWorld, drawIsoZones, drawIsoGhost,
@@ -727,7 +727,7 @@ mini.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType ===
 // WASD or arrow keys pan; the rest are shortcuts for buttons on screen (the
 // panel's buttons carry their key in data-key, and show it with a mouse).
 const keys = new Set();
-const OVERLAYS = ['overlay-title', 'overlay-sides', 'overlay-online', 'overlay-pause', 'overlay-settings', 'overlay-gameover'];
+const OVERLAYS = ['overlay-title', 'overlay-gametype', 'overlay-sides', 'overlay-online', 'overlay-pause', 'overlay-settings', 'overlay-gameover'];
 const openOverlay = () => OVERLAYS.find((o) => !$(o).classList.contains('hidden')) || null;
 const PANEL_KEYS = new Set(['1', '2', '3', '4', '5', '6', '7', '8', '9', 'h', 'c', 'r', 'q', 'f', 'x', 'enter']);
 
@@ -980,7 +980,7 @@ function renderHud() {
 // ── Game lifecycle ─────────────────────────────────────────────────────────
 function showOverlay(id) {
   for (const o of OVERLAYS) $(o).classList.toggle('hidden', o !== id);
-  if (['overlay-title', 'overlay-sides', 'overlay-online'].includes(id)) audio.playMusic('title');
+  if (['overlay-title', 'overlay-gametype', 'overlay-sides', 'overlay-online'].includes(id)) audio.playMusic('title');
   audio.duckMusic(id === 'overlay-pause' || (id === 'overlay-settings' && settingsFrom === 'overlay-pause'));
   showSettings();
 }
@@ -991,7 +991,7 @@ function startGame(key, opts = {}) {
   modeKey = key;
   // Isometric games are played on the square field. Online, the host's
   // choice goes out with the mode, so everyone plays the same map.
-  const mode = opts.mode || { ...MODES[key], field: viewChoice() === 'iso' };
+  const mode = opts.mode || withGameType({ ...MODES[key], field: viewChoice() === 'iso' });
   if (opts.mirror) {
     game = createMirror(mode);
   } else {
@@ -1055,8 +1055,8 @@ function gameOver(winner) {
     const won = winner === active;
     label.textContent = won ? 'VICTORY' : 'DEFEAT';
     label.style.color = won ? 'var(--good)' : 'var(--danger)';
-    let text = won ? `Battle won in ${formatTime(game.time)}.${quip(active, 'win')}`
-      : winner >= 0 ? `${net.names[winner] || PLAYER_NAMES[winner]} (${sideShort(winner) || PLAYER_NAMES[winner]}) won the battle.${quip(active, 'lose')}` : 'Nobody survived.';
+    let text = won ? `${wonIn()}${quip(active, 'win')}`
+      : winner >= 0 ? `${net.names[winner] || PLAYER_NAMES[winner]} (${sideShort(winner) || PLAYER_NAMES[winner]}) ${game.ctf ? 'captured a flag' : 'won the battle'}.${quip(active, 'lose')}` : 'Nobody survived.';
     if (net.role === 'host') again.textContent = 'Back to lobby';
     else {
       text += ' Waiting for the host…';
@@ -1066,21 +1066,23 @@ function gameOver(winner) {
   } else if (game.humanCount > 1) {
     label.textContent = winner >= 0 ? `${PLAYER_NAMES[winner].toUpperCase()} WINS` : 'DRAW';
     label.style.color = winner >= 0 ? `rgb(${PLAYER_COLORS[winner].map((v) => v * 255).join(',')})` : '#fff';
-    sub.textContent = sideShort(winner) && winner >= 0 ? `${sideInfo(winner).name} take${sideInfo(winner).plural ? '' : 's'} the field.${quip(winner, 'win')}` : 'Every rival HQ has fallen.';
+    sub.textContent = sideShort(winner) && winner >= 0 ? `${sideInfo(winner).name} take${sideInfo(winner).plural ? '' : 's'} the field.${quip(winner, 'win')}` : game.ctf ? 'The flag is home.' : 'Every rival HQ has fallen.';
   } else if (winner === 0) {
     label.textContent = 'VICTORY';
     label.style.color = 'var(--good)';
-    sub.textContent = `Battle won in ${formatTime(game.time)}.${quip(0, 'win')}`;
+    sub.textContent = `${wonIn()}${quip(0, 'win')}`;
   } else {
     label.textContent = 'DEFEAT';
     label.style.color = 'var(--danger)';
-    sub.textContent = `Your HQ was destroyed.${quip(0, 'lose')}`;
+    sub.textContent = `${game.ctf ? `${PLAYER_NAMES[winner] || 'The enemy'} captured a flag.` : 'Your HQ was destroyed.'}${quip(0, 'lose')}`;
   }
   // Hot-seat games always end with a winner among the players at the table.
   const humanWon = online() || game.humanCount < 2 ? winner === active : winner >= 0 && !game.players[winner].isAi;
   audio.playMusic(humanWon ? 'victory' : 'defeat');
   showOverlay('overlay-gameover');
 }
+
+const wonIn = () => `${game.ctf ? 'Flag captured' : 'Battle won'} in ${formatTime(game.time)}.`;
 
 // A side's victory or defeat one-liner, with a leading space (or nothing).
 function quip(f, kind) {
@@ -1096,10 +1098,45 @@ function buildModeButtons() {
   wrap.addEventListener('click', (e) => {
     const b = e.target.closest('[data-mode]');
     if (!b) return;
-    if (MODES[b.dataset.mode].online) openLobby();
-    else chooseSides(b.dataset.mode);
+    chooseGameType(b.dataset.mode);
   });
 }
+
+// ── Battle or Capture the Flag ─────────────────────────────────────────────
+// Asked after picking a mode. Online, the host's choice is the room's (and
+// can be changed from the lobby). The last choice is kept for Restart.
+const TYPE_KEY = 'slop-gametype';
+let gameType = (() => { try { return localStorage.getItem(TYPE_KEY) === 'ctf' ? 'ctf' : 'battle'; } catch { return 'battle'; } })();
+let typeFor = null; // the mode key waiting on the choice
+const TYPE_NAMES = { battle: 'Battle', ctf: 'Capture the Flag' };
+
+function setGameType(t) {
+  gameType = t === 'ctf' ? 'ctf' : 'battle';
+  try { localStorage.setItem(TYPE_KEY, gameType); } catch { /* storage unavailable */ }
+}
+
+// A mode set up for the chosen game type.
+function withGameType(mode) {
+  if (gameType !== 'ctf') return mode;
+  return { ...mode, ctf: true, label: `${mode.label} 🚩` };
+}
+
+function chooseGameType(key) {
+  typeFor = key;
+  $('gametype-mode').textContent = MODES[key].label;
+  for (const b of $('gametype-buttons').querySelectorAll('[data-type]')) b.classList.toggle('secondary', b.dataset.type !== gameType);
+  showOverlay('overlay-gametype');
+}
+$('gametype-buttons').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-type]');
+  if (!b || !typeFor) return;
+  setGameType(b.dataset.type);
+  const key = typeFor;
+  typeFor = null;
+  if (MODES[key].online) openLobby();
+  else chooseSides(key);
+});
+$('btn-type-back').addEventListener('click', () => { typeFor = null; showOverlay('overlay-title'); });
 
 // ── Choosing sides ─────────────────────────────────────────────────────────
 // In themes with sides, each human picks one before an offline battle (in
@@ -1217,6 +1254,9 @@ function renderLobby() {
   const view = (isHost ? viewChoice() : net.hostView) === 'iso' ? 'Isometric' : '2D';
   $('lobby-war').innerHTML = `War: <b>${esc(currentTheme().name)}</b>${sideList} · ${view}`;
   $('btn-lobby-theme').classList.toggle('hidden', !isHost);
+  const type = isHost ? gameType : net.hostType || 'battle';
+  $('lobby-type').innerHTML = `Game: <b>${type === 'ctf' ? '🚩 ' : '⚔️ '}${TYPE_NAMES[type]}</b>`;
+  $('btn-lobby-type').classList.toggle('hidden', !isHost);
   const order = seated(net.slots).map((sl) => sl.slot);
   $('lobby-slots').innerHTML = net.slots.map((sl, i) => {
     const f = order.indexOf(i);
@@ -1306,6 +1346,14 @@ $('btn-lobby-theme').addEventListener('click', () => {
   renderLobby();
 });
 
+// The host switches the room between Battle and Capture the Flag.
+$('btn-lobby-type').addEventListener('click', () => {
+  if (net.role !== 'host' || net.phase !== 'lobby') return;
+  setGameType(gameType === 'ctf' ? 'battle' : 'ctf');
+  syncLobby();
+  renderLobby();
+});
+
 // ── Host side ──
 async function hostOnline() {
   const name = playerName();
@@ -1350,7 +1398,7 @@ function syncLobby() {
   ensureSides();
   const slots = net.slots.map(({ kind, name, ready, side }) => ({ kind, name, ready, side }));
   for (const p of net.peers) {
-    if (p.slot >= 0) p.transport.send({ t: 'lobby', theme: currentTheme().id, view: viewChoice(), slots, you: p.slot });
+    if (p.slot >= 0) p.transport.send({ t: 'lobby', theme: currentTheme().id, view: viewChoice(), type: gameType, slots, you: p.slot });
   }
   if (!$('online-lobby').classList.contains('hidden')) renderLobby();
 }
@@ -1480,12 +1528,12 @@ function startOnlineGame() {
   if (!canStart()) return;
   const players = seated(net.slots);
   const layout = ONLINE_LAYOUTS[players.length];
-  const mode = {
+  const mode = withGameType({
     label: layout.label, wrap: layout.wrap, online: true, field: viewChoice() === 'iso',
     players: players.map((sl, i) => [layout.hqs[i], sl.kind === 'cpu']),
     theme: currentTheme().id,
     sides: themeSides() ? players.map((sl) => sl.side) : undefined,
-  };
+  });
   net.names = players.map((sl) => (sl.kind === 'cpu' ? 'CPU' : sl.name));
   for (const p of net.peers) Object.assign(p, { faction: players.findIndex((sl) => sl.slot === p.slot), mapVersion: -1 });
   Object.assign(net, { phase: 'game', snapTimer: 0, away: [] });
@@ -1572,7 +1620,7 @@ function onHostMessage(m) {
     case 'lobby': {
       if (m.theme) useRoomTheme(m.theme);
       const fromGame = net.phase !== 'lobby' || $('online-lobby').classList.contains('hidden');
-      Object.assign(net, { slots: m.slots, mySlot: m.you, hostView: m.view, phase: 'lobby', reconnecting: false });
+      Object.assign(net, { slots: m.slots, mySlot: m.you, hostView: m.view, hostType: m.type, phase: 'lobby', reconnecting: false });
       if (fromGame) {
         game = null;
         paused = true;
@@ -1970,6 +2018,10 @@ function drawFlatScene(dt, bw, bh, camAX, topA, v) {
     drawEffects(lctx, game.effects);
     for (const b of game.buildings) if (onScreen(b)) drawBuilding(lctx, b);
     for (const u of game.units) if (onScreen(u)) drawUnit(lctx, u);
+    for (const f of game.flags) {
+      const [x, y, , carried] = flagSpot(f);
+      if (onScreen({ x })) drawFlag(lctx, f, x, y, carried);
+    }
     for (const p of game.projectiles) drawProjectile(lctx, p);
   });
   if (pendingBuild) {
