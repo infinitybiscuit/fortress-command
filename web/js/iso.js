@@ -937,6 +937,7 @@ export function drawIsoWorld(ctx, game, v) {
     }));
   }
   for (const f of game.flags || []) {
+    if (f.out) continue;
     const [x, fy, z, carried] = flagSpot(f);
     if (!near(x, z, 60)) continue;
     const y = fy - lift(x, z);
@@ -1276,6 +1277,7 @@ export function drawIsoMinimap(ctx, game, cw, ch, v, zones = null) {
     ctx.fillRect(Math.round(X - r), Math.round(Y - r), Math.ceil(2 * r), Math.ceil(2 * r));
   }
   for (const f of game.flags || []) {
+    if (f.out) continue;
     const [x, , z] = flagSpot(f);
     drawFlagMarker(ctx, f, ...P(x, z));
   }

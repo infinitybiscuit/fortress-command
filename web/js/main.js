@@ -1898,7 +1898,7 @@ function frame(now) {
     // Knocked out of a multiplayer game that's still going: keep watching.
     if (online() && !game.over && !eliminatedNoted && game.players[active] && !game.players[active].alive) {
       eliminatedNoted = true;
-      toast('Your HQ fell — you can keep watching', 'info');
+      toast(game.ctf ? 'Your flag was captured — you can keep watching' : 'Your HQ fell — you can keep watching', 'info');
     }
     if (game.mirror && !game.over) {
       const stale = performance.now() - game.lastSnapshotAt > 2000;
@@ -2019,6 +2019,7 @@ function drawFlatScene(dt, bw, bh, camAX, topA, v) {
     for (const b of game.buildings) if (onScreen(b)) drawBuilding(lctx, b);
     for (const u of game.units) if (onScreen(u)) drawUnit(lctx, u);
     for (const f of game.flags) {
+      if (f.out) continue;
       const [x, y, , carried] = flagSpot(f);
       if (onScreen({ x })) drawFlag(lctx, f, x, y, carried);
     }

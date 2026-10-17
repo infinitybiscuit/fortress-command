@@ -447,14 +447,20 @@ export class Game {
     this.map.release(b);
     const owner = this.players[b.faction];
     if (owner.hq !== b) return;
+    this.eliminate(b.faction, `${PLAYER_NAMES[b.faction]} HQ destroyed!`);
+  }
+
+  // A player is out (HQ destroyed, or flag captured): their remaining forces
+  // collapse, and the game ends once one player is left.
+  eliminate(f, text) {
+    const owner = this.players[f];
     owner.hq = null;
     owner.alive = false;
-    // Eliminated players' remaining forces collapse with their HQ.
-    for (const u of this.units) if (u.faction === b.faction) u.dead = true;
-    for (const o of this.buildings) if (o.faction === b.faction && !o.dead) { o.dead = true; this.map.release(o); }
+    for (const u of this.units) if (u.faction === f) u.dead = true;
+    for (const o of this.buildings) if (o.faction === f && !o.dead) { o.dead = true; this.map.release(o); }
     this.buildings = this.buildings.filter((o) => !o.dead);
     this.units = this.units.filter((u) => !u.dead);
-    this.events.onMessage?.(`${PLAYER_NAMES[b.faction]} HQ destroyed!`);
+    this.events.onMessage?.(text);
     this.checkGameOver();
   }
 
@@ -630,6 +636,7 @@ export class Game {
   // there are a few of them) to grab an enemy flag. Carriers run it home.
   commandFlags(i) {
     const own = this.flags[i];
+    if (own.out) return;
     const home = own.home;
     const army = this.units.filter((u) => u.faction === i && !u.dead && u.repairRate === 0 && !u.air);
     const thief = own.carrier && own.carrier.faction !== i ? own.carrier : null;
@@ -652,7 +659,7 @@ export class Game {
     }
     const raiders = army.filter((u) => !u.guard && !carrying(u) && u !== fetcher);
     const threats = this.units.filter((e) => !e.dead && e.faction !== i && Math.hypot(this.dx(e.x, home.x), this.field ? e.z - home.z : e.y - home.y) < 500);
-    const enemyFlags = this.flags.filter((f) => f.faction !== i && !(f.carrier && f.carrier.faction === i));
+    const enemyFlags = this.flags.filter((f) => !f.out && f.faction !== i && !(f.carrier && f.carrier.faction === i));
     const nearestTo = (u, list) => {
       let best = null;
       let bestD = Infinity;

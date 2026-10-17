@@ -321,7 +321,7 @@ export function encodeSnapshot(game) {
       r2(p.exploded), p.splash, p.radius, r1(p.z || 0)]),
   };
   // Capture the Flag: where each flag is, and who (if anyone) has it.
-  if (game.ctf) snap.fl = game.flags.map((f) => [r1(f.x), r1(f.y), r1(f.z), f.carrier ? f.carrier.id : -1, f.atHome ? 1 : 0]);
+  if (game.ctf) snap.fl = game.flags.map((f) => [r1(f.x), r1(f.y), r1(f.z), f.carrier ? f.carrier.id : -1, f.atHome ? 1 : 0, f.out ? 1 : 0]);
   return snap;
 }
 
@@ -398,10 +398,10 @@ export function applySnapshot(g, s) {
     return Object.assign(p, { kind: SHOT_KINDS[kind], nx: x, ny: y, nz: z, angle, exploded, splash, radius });
   });
 
-  s.fl?.forEach(([x, y, z, carrier, atHome], i) => {
+  s.fl?.forEach(([x, y, z, carrier, atHome, out], i) => {
     const f = g.flags[i];
     if (!f) return;
-    Object.assign(f, { x, y, z, atHome: !!atHome, carrier: carrier >= 0 ? g.units.find((u) => u.id === carrier) || null : null });
+    Object.assign(f, { x, y, z, atHome: !!atHome, out: !!out, carrier: carrier >= 0 ? g.units.find((u) => u.id === carrier) || null : null });
   });
 
   if (s.map) { fromBase64(s.map, g.map.tiles); changed = true; }
