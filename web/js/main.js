@@ -1,7 +1,7 @@
 // Slop Wars (web) — app shell: camera, touch input, UI panels and main loop.
 import {
   WORLD_W, MAP_W, MAP_H, TILE_SIZE, GROUND_LEVEL_TILE, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
-  UNIT_ICONS, RAMP_MAX_ANGLE, RAMP_MAX_LEN, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize, ONLINE_LAYOUTS,
+  UNIT_ICONS, RAMP_MAX_ANGLE, RAMP_MAX_LEN, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, SPEEDS, LOW_CREDITS, capitalize, ONLINE_LAYOUTS,
 } from './config.js';
 import { Game, clock } from './game.js';
 import { applyCommand, ref } from './commands.js';
@@ -84,6 +84,11 @@ try {
 const viewChoice = () => (preview && isoPick ? 'iso' : 'flat');
 let iso = false;
 let settingsFrom = 'overlay-title'; // the menu Settings goes back to
+// Game speed (Settings). Only a game that simulates uses it: in multiplayer
+// that's the host's, and guests just follow the host's updates.
+const SPEED_KEY = 'slop-speed';
+let speed = SPEEDS.find((s) => s.id === 'fast');
+try { speed = SPEEDS.find((s) => s.id === localStorage.getItem(SPEED_KEY)) || speed; } catch { /* storage unavailable */ }
 
 // ── Camera ─────────────────────────────────────────────────────────────────
 // scale = screen points per world unit. It's snapped so each art pixel
@@ -1382,7 +1387,8 @@ function renderLobby() {
   const sides = themeSides();
   const sideList = !sides ? '' : sides.length > 4 ? ` · ${sides.length} sides` : ` · ${sides.map((x) => esc(x.short)).join(' vs ')}`;
   const view = (isHost ? viewChoice() : net.hostView) === 'iso' ? 'Isometric' : '2D';
-  $('lobby-war').innerHTML = `War: <b>${esc(currentTheme().name)}</b>${sideList} · ${view}`;
+  const pace = isHost ? speed.name : SPEEDS.find((s) => s.id === net.hostSpeed)?.name || 'Fast';
+  $('lobby-war').innerHTML = `War: <b>${esc(currentTheme().name)}</b>${sideList} · ${view} · ${pace}`;
   $('btn-lobby-theme').classList.toggle('hidden', !isHost);
   const type = isHost ? gameType : net.hostType || 'battle';
   $('lobby-type').innerHTML = `Game: <b>${type === 'ctf' ? '🚩 ' : '⚔️ '}${TYPE_NAMES[type]}</b>`;
@@ -1528,7 +1534,7 @@ function syncLobby() {
   ensureSides();
   const slots = net.slots.map(({ kind, name, ready, side }) => ({ kind, name, ready, side }));
   for (const p of net.peers) {
-    if (p.slot >= 0) p.transport.send({ t: 'lobby', theme: currentTheme().id, view: viewChoice(), type: gameType, slots, you: p.slot });
+    if (p.slot >= 0) p.transport.send({ t: 'lobby', theme: currentTheme().id, view: viewChoice(), speed: speed.id, type: gameType, slots, you: p.slot });
   }
   if (!$('online-lobby').classList.contains('hidden')) renderLobby();
 }
@@ -1750,7 +1756,7 @@ function onHostMessage(m) {
     case 'lobby': {
       if (m.theme) useRoomTheme(m.theme);
       const fromGame = net.phase !== 'lobby' || $('online-lobby').classList.contains('hidden');
-      Object.assign(net, { slots: m.slots, mySlot: m.you, hostView: m.view, hostType: m.type, phase: 'lobby', reconnecting: false });
+      Object.assign(net, { slots: m.slots, mySlot: m.you, hostView: m.view, hostSpeed: m.speed, hostType: m.type, phase: 'lobby', reconnecting: false });
       if (fromGame) {
         game = null;
         paused = true;
@@ -2015,7 +2021,10 @@ function frame(now) {
 
   if (game) {
     if (!paused || online()) {
-      game.update(dt);
+      // Game time runs at the chosen speed, in steps no longer than MAX_DELTA.
+      const gdt = game.mirror ? dt : dt * speed.x;
+      const steps = Math.ceil(gdt / MAX_DELTA - 1e-9) || 1;
+      for (let i = 0; i < steps; i++) game.update(gdt / steps);
       audio.listen(game, active, heard);
     }
     if (net.role === 'host' && net.phase === 'game' && !game.over) {
@@ -2236,6 +2245,7 @@ const SETTINGS = {
 };
 function showSettings() {
   for (const b of document.querySelectorAll('[data-setting]')) {
+    if (b.dataset.setting === 'speed') { b.querySelector('b').textContent = speed.name; continue; }
     const on = SETTINGS[b.dataset.setting]();
     b.classList.toggle('on', on);
     b.setAttribute('aria-checked', on);
@@ -2264,6 +2274,11 @@ $('overlay-settings').addEventListener('click', (e) => {
   else if (k === 'sfx') audio.setSfx(!audio.sfxOn());
   else if (k === 'preview') { preview = !preview; saveView(); }
   else if (k === 'iso') { isoPick = !isoPick; saveView(); }
+  else if (k === 'speed') {
+    speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];
+    try { localStorage.setItem(SPEED_KEY, speed.id); } catch { /* storage unavailable */ }
+    if (net.role === 'host') syncLobby();
+  }
   showSettings();
 });
 for (const b of document.querySelectorAll('[data-open-settings]')) {

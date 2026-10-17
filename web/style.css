@@ -734,3 +734,5 @@ body.mouse .howto .mouse-only { display: block; }
 .preview-box { margin: 0 0 16px; padding: 10px 12px 2px; border: 2px dashed var(--bevel-light); background: rgba(0, 0, 0, 0.25); }
 .settings-note { margin: 0 0 10px; font-family: var(--pixel); font-size: 8px; line-height: 1.6; color: var(--dim); }
 .preview-box .setting { margin-bottom: 8px; }
+.speed-note { margin: -4px 0 0; }
+.setting[data-setting="speed"] b { min-width: 6em; padding: 6px 8px; }
