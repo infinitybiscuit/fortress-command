@@ -4,7 +4,7 @@
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v59 · Hilltop HQs';
+export const VERSION = 'v60 · No Free-for-All';
 
 // Cloudflare Worker (see /relay; it keeps its original name, fortress-relay)
 // that hands out TURN relay credentials, used
@@ -151,14 +151,11 @@ export const MODES = {
   // Up to five phones over the internet. The host's lobby decides who plays;
   // the map comes from ONLINE_LAYOUTS below.
   online: { label: '🌐 Online (2–5 players)', players: [[2, false], [193, false]], online: true },
-  // Free-for-All maps loop: walk off one edge and you come back on the other,
-  // so HQs are spaced evenly around the loop and nobody gets a safe edge.
-  ffa3: { label: 'Free-for-All (3)', players: [[12, false], [79, true], [146, true]], wrap: true },
-  ffa4: { label: 'Free-for-All (4)', players: [[12, false], [62, true], [112, true], [162, true]], wrap: true },
 };
 
-// HQ positions for an online game with 2 to 5 players. Three or more loop
-// like the offline Free-for-All maps.
+// HQ positions for an online game with 2 to 5 players. Three or more loop:
+// walk off one edge and you come back on the other, so HQs are spaced evenly
+// around the loop and nobody gets a safe edge.
 export const ONLINE_LAYOUTS = {
   2: { hqs: [2, 193], wrap: false, label: '🌐 Online 1 vs 1' },
   3: { hqs: [12, 79, 146], wrap: true, label: '🌐 Online FFA (3)' },
