@@ -289,7 +289,7 @@ export async function joinRoom(code) {
 // ── Snapshots (host → guest) ───────────────────────────────────────────────
 const UNIT_KEYS = Object.keys(UNIT_TYPES);
 const BUILD_KEYS = Object.keys(BUILDING_TYPES);
-const SHOT_KINDS = ['bullet', 'shell', 'lob', 'bomb'];
+const SHOT_KINDS = ['bullet', 'shell', 'lob', 'bomb', 'missile'];
 const UI = Object.fromEntries(UNIT_KEYS.map((k, i) => [k, i]));
 const BI = Object.fromEntries(BUILD_KEYS.map((k, i) => [k, i]));
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -401,7 +401,7 @@ export function applySnapshot(g, s) {
     // Rebuild footprint/wall bookkeeping so placement previews match the host.
     g.map.buildingTiles.clear();
     g.map.wallTiles.clear();
-    g.map.ramps.clear();
+    g.map.resetRamps();
     if (!g.field) for (const b of g.buildings) g.map.occupy(b);
   }
   g.players.forEach((p, i) => { p.hq = g.buildings.find((b) => b.type === 'hq' && b.faction === i) || null; });

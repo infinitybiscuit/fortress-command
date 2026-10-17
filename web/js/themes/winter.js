@@ -3,7 +3,7 @@
 // tactics, Molotov cocktails, captured tanks, and a sauna behind every line.
 // Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf, missileRack } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -516,6 +516,19 @@ const BUILD = {
     snowbank(g, 0, 30, 48, 2);
     flag(g, 44, 4, 8, t);
   },
+  sam(g, t, f) {
+    if (soviet(f)) {
+      // Katyusha battery: a rocket rack on an olive lorry bed
+      outlined(g, [[2, 20, 28, 7, C.olive], [22, 14, 8, 7, C.oliveDark]], [[2, 20, 28, 1, C.oliveLight], [23, 15, 5, 3, C.glass], [2, 24, 20, 2, t.main]]);
+      for (const x of [6, 14, 25]) { disc(g, x, 28, 3, C.O); disc(g, x, 28, 2, C.gunDark); }
+      missileRack(g, { x: 5, y: 18, len: 13, n: 3, rail: C.gunDark, body: C.khakiLight, tip: C.red, fin: C.khaki });
+    } else {
+      // Rocket sled: a launcher on skis behind a wall of snow
+      outlined(g, [[8, 22, 16, 4, C.wood], [5, 26, 22, 1, C.woodDark]], [[8, 22, 16, 1, C.woodLight], [10, 24, 12, 1, t.main]]);
+      missileRack(g, { x: 13, y: 21, len: 12, rail: C.woodDark, body: C.white, tip: C.red, fin: t.main, dish: [6, 14], mast: C.wood, dishCol: C.ice });
+      outlined(g, [[0, 27, 32, 5, C.snow]], [[0, 27, 32, 1, C.white], [0, 30, 32, 2, C.snowShade]]);
+    }
+  },
   airbase(g, t) {
     // Ice airfield: a camouflaged hangar tent on a frozen lake, fuel drums, windsock
     g.fillStyle = C.O; g.fillRect(0, 25, 64, 7);
@@ -939,9 +952,9 @@ export default {
         soldier: 'Comrade', heavy: 'Commissar', scout: 'Brass Band', engineer: 'Sapper', sniper: 'Marksman',
         jeep: 'Aerosan', tank: 'T-28 (3 Turrets)', artillery: 'Howitzer', helicopter: 'Ishak (Donkey)', bomber: 'Bread Basket',
         hq: 'Command Izba', barracks: 'Loudspeaker Tent', turret: 'Maxim Nest', wall: 'Barbed Wire', mine: 'Samovar Cart',
-        workshop: 'Tank Depot', airbase: 'Ice Airfield', bridge: 'Log Bridge', ramp: 'Slippery Slope',
+        workshop: 'Tank Depot', airbase: 'Ice Airfield', sam: 'Katyusha Battery', bridge: 'Log Bridge', ramp: 'Slippery Slope',
       },
-      icons: { hq: '🏠', barracks: '📢', wall: '🕸️', mine: '🫖', ramp: '🛷' },
+      icons: { hq: '🏠', barracks: '📢', wall: '🕸️', mine: '🫖', ramp: '🛷', sam: '🚀' },
       win: 'Strike up the band! It finally gets to play.',
       lose: 'The brass band goes home. The tuba stays behind.',
     },
@@ -971,9 +984,9 @@ export default {
     soldier: 'Ski Trooper', heavy: 'Tank Hunter', scout: 'Ski Patrol', engineer: 'Sapper', sniper: 'White Death',
     jeep: 'Reindeer Sled', tank: 'Trophy Tank', artillery: 'Motti Mortar', helicopter: 'Ski Fokker', bomber: 'Blenheim',
     hq: 'Korsu', barracks: 'Sauna', turret: 'Maxim Nest', wall: 'Granite Line', mine: 'Soup Cannon', workshop: 'Trophy Yard',
-    airbase: 'Ice Airfield', bridge: 'Log Bridge', ramp: 'Ski Jump',
+    airbase: 'Ice Airfield', sam: 'Rocket Sled', bridge: 'Log Bridge', ramp: 'Ski Jump',
   },
   // Units are shown with their own sprites in menus.
   spriteIcons: true,
-  icons: { hq: '🪵', barracks: '🧖', turret: '💥', wall: '🪨', mine: '🍲', workshop: '🔧', airbase: '🛩️', bridge: '🌉', ramp: '⛷️' },
+  icons: { hq: '🪵', barracks: '🧖', turret: '💥', wall: '🪨', mine: '🍲', workshop: '🔧', airbase: '🛩️', bridge: '🌉', ramp: '⛷️', sam: '🚀' },
 };

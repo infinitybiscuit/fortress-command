@@ -3,14 +3,13 @@ import {
   WORLD_W, MAP_W, MAP_H, TILE_SIZE, GROUND_LEVEL_TILE, MODES, BUILDING_TYPES, UNIT_TYPES, BUILD_MENU, BUILD_ICONS,
   UNIT_ICONS, RAMP_MAX_ANGLE, RAMP_MAX_LEN, VERSION, PLAYER_COLORS, PLAYER_NAMES, MAX_DELTA, LOW_CREDITS, capitalize, ONLINE_LAYOUTS,
 } from './config.js';
-import { Game } from './game.js';
-import { canReach } from './entities.js';
+import { Game, clock } from './game.js';
 import { applyCommand, ref } from './commands.js';
 import {
   hostRoom, joinRoom, makeRoomCode, connectionRoute, encodeSnapshot, encodeMap, createMirror, applySnapshot, SNAPSHOT_INTERVAL,
 } from './net.js';
 import {
-  drawBackground, drawTerrain, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
+  drawBackground, drawTerrain, drawStairs, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
   drawEffects, updateEffects, drawMarker, drawWeather, G, skyTop, setTheme, THEMES, currentTheme, unitIcon,
   themeSides, sideInfo, sideIcon, setFactionSides, setViewer,
 } from './render.js';
@@ -343,7 +342,7 @@ function handleTap(sx, sy) {
   const enemyBuilding = enemyUnit ? null : pickBuilding(pt, enemy);
   const target = enemyUnit || enemyBuilding;
   if (target && sel.length) {
-    if (!sel.some((u) => canReach(u, target))) { toast("Can't reach that — it's too high up"); return; }
+    if (!sel.some((u) => u.canAttack(target))) { toast("Can't reach that — it's too high up"); return; }
     issue({ c: 'attack', ids: ids(sel), target: ref(target) });
     markAt(target, '#ff4d4d');
     return;
@@ -467,7 +466,7 @@ function handleCommand(sx, sy) {
   const enemy = (e) => e.faction !== active;
   const target = pickUnit(pt, enemy) || pickBuilding(pt, enemy);
   if (target) {
-    if (!sel.some((u) => canReach(u, target))) { toast("Can't reach that — it's too high up"); return; }
+    if (!sel.some((u) => u.canAttack(target))) { toast("Can't reach that — it's too high up"); return; }
     issue({ c: 'attack', ids: ids(sel), target: ref(target) });
     markAt(target, '#ff4d4d');
     return;
@@ -787,7 +786,7 @@ function renderPanel() {
   else if (sel.length) mode = 'units';
 
   // Rebuild DOM only when something visible changes.
-  const afford = BUILD_MENU.map((t) => +(money >= BUILDING_TYPES[t].cost)).join('')
+  const afford = BUILD_MENU.map((t) => +(money >= BUILDING_TYPES[t].cost) + (Math.ceil(game.lockedFor(t)) || '')).join('')
     + Object.keys(UNIT_TYPES).map((t) => +(money >= UNIT_TYPES[t].cost)).join('');
   const bState = b ? `${b.id}|${b.constructing}|${b.queue.join(',')}|${b.trainCurrent}|${Math.round(b.hp)}|${Math.floor(b.progress * 20)}|${b.trainCurrent ? Math.floor((1 - b.trainTimer / b.trainTotal) * 20) : ''}` : '';
   const uState = sel.length ? `${sel.length}|${sel.map((u) => u.type[0]).sort().join('')}` : '';
@@ -837,6 +836,7 @@ function renderPanel() {
         hq: `Command centre. Earns +${BUILDING_TYPES.hq.income}/s. Lose it and you lose.`,
         mine: `Earns +${BUILDING_TYPES.mine.income}/s once built.`,
         turret: 'Fires at enemy units in range, and at aircraft from much further away.',
+        sam: 'Launches guided missiles at enemy aircraft from long range. Ignores ground units.',
         wall: 'Blocks enemy units. Your troops walk through.',
         bridge: 'Walkable span, level or sloped. Units take a slope when sent somewhere up or down it.',
       }[b.type] || '';
@@ -854,10 +854,12 @@ function renderPanel() {
   }
 
   // No bridges on the isometric field: there's nothing to climb.
+  // Locked buildings (the airbase, early on) count down to when they open.
   const buildGrid = `<div class="grid">${BUILD_MENU.filter((t) => !(game.field && BUILDING_TYPES[t].isRamp)).map((t, i) => {
     const d = BUILDING_TYPES[t];
-    return `<button class="tile-btn" data-build="${t}" data-key="${i + 1}" ${money >= d.cost ? '' : 'disabled'}>
-      <kbd class="key">${i + 1}</kbd><span class="ic">${iconOf(t)}</span><span class="nm">${nameOf(t)}</span><span class="ct">💰${d.cost}</span></button>`;
+    const wait = game.lockedFor(t);
+    return `<button class="tile-btn${wait ? ' locked' : ''}" data-build="${t}" data-key="${i + 1}" ${money >= d.cost && !wait ? '' : 'disabled'}>
+      <kbd class="key">${i + 1}</kbd><span class="ic">${iconOf(t)}</span><span class="nm">${nameOf(t)}</span><span class="ct">${wait ? `🔒 ${clock(Math.ceil(wait))}` : `💰${d.cost}`}</span></button>`;
   }).join('')}</div>`;
 
   if (mode === 'units') {
@@ -889,6 +891,7 @@ panel.addEventListener('click', (e) => {
   const p = game.players[active];
   if (btn.dataset.build) {
     const t = btn.dataset.build;
+    if (game.lockedFor(t)) { toast(`${nameOf(t)} unlocks at ${clock(BUILDING_TYPES[t].unlockAt)}`); return; }
     if (p.money < BUILDING_TYPES[t].cost) return;
     clearSelection();
     pendingBuild = t;
@@ -1962,6 +1965,7 @@ function drawFlatScene(dt, bw, bh, camAX, topA, v) {
   game.effects = updateEffects(game.effects, dt);
   eachCopy((vv) => {
     drawTerrain(lctx, game.map, vv);
+    drawStairs(lctx, game);
     const onScreen = (e) => e.x + (e.w || 30) > vv.x - 40 && e.x - 30 < vv.x + vv.w + 40;
     drawEffects(lctx, game.effects);
     for (const b of game.buildings) if (onScreen(b)) drawBuilding(lctx, b);

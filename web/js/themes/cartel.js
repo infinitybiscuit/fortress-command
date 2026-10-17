@@ -2,7 +2,7 @@
 // haciendas, gunmen in loud shirts, homemade armoured trucks and a very
 // legitimate taco stand. Fictional outfits only. Same units and rules, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf, missileRack } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -472,6 +472,20 @@ const BUILD = {
     g.fillStyle = t.main; g.fillRect(4, 3, 40, 4); g.fillStyle = C.O; g.fillRect(4, 7, 40, 1); g.fillRect(3, 2, 1, 6); g.fillRect(44, 2, 1, 6);
     g.fillStyle = C.white; for (let x = 8; x < 40; x += 4) g.fillRect(x, 4, 2, 2);
   },
+  sam(g, t, f) {
+    if (cops(f)) {
+      // Air defence unit: a launcher on a police trailer, lights flashing
+      outlined(g, [[3, 21, 26, 7, C.navy], [10, 17, 12, 5, C.white]], [[3, 21, 26, 1, C.navyLight], [3, 24, 26, 2, t.main], [10, 17, 12, 1, C.white]]);
+      for (const x of [7, 25]) { disc(g, x, 29, 2, C.O); disc(g, x, 29, 1, C.gunDark); }
+      missileRack(g, { x: 13, y: 18, len: 13, rail: C.gunDark, body: C.white, tip: C.red, fin: C.navyLight, dish: [5, 12], mast: C.gunLight, dishCol: C.white });
+      g.fillStyle = C.red; g.fillRect(3, 20, 2, 1); g.fillStyle = '#3a6af0'; g.fillRect(27, 20, 2, 1);
+    } else {
+      // Bottle rocket stand: fireworks on the back of a rusty pickup
+      outlined(g, [[2, 20, 28, 7, C.rust], [22, 14, 8, 7, C.rustDark]], [[2, 20, 28, 1, C.tinLight], [23, 15, 5, 3, C.glass], [2, 24, 20, 2, t.main]]);
+      for (const x of [7, 25]) { disc(g, x, 28, 3, C.O); disc(g, x, 28, 2, C.gunDark); }
+      missileRack(g, { x: 5, y: 18, len: 13, rail: C.gunDark, body: C.neonPink, tip: C.yellow, fin: C.neonTeal });
+    }
+  },
   airbase(g, t) {
     // Jungle airstrip: a quonset hangar, fuel drums, a windsock, a palm
     for (let i = 0; i < 20; i++) {
@@ -862,9 +876,9 @@ export default {
         soldier: 'Vice Cop', heavy: 'SWAT', scout: 'K-9', engineer: 'Forensics', sniper: 'Sharpshooter',
         jeep: 'Police Cruiser', tank: 'SWAT Truck', artillery: 'Riot Van', helicopter: 'Police Chopper', bomber: 'Police Blimp',
         hq: 'Precinct', barracks: 'Police Academy', turret: 'Checkpoint', wall: 'Barricade', mine: 'Donut Shop',
-        workshop: 'Impound Lot', airbase: 'Air Unit', bridge: 'Plank Bridge', ramp: 'Loading Ramp',
+        workshop: 'Impound Lot', airbase: 'Air Unit', sam: 'Air Defence Unit', bridge: 'Plank Bridge', ramp: 'Loading Ramp',
       },
-      icons: { hq: '🚓', barracks: '🎓', turret: '🚨', wall: '🚧', mine: '🍩', workshop: '🚗', airbase: '🚁' },
+      icons: { hq: '🚓', barracks: '🎓', turret: '🚨', wall: '🚧', mine: '🍩', workshop: '🚗', airbase: '🚁', sam: '🚨' },
       win: 'Case closed. Somebody bring the donuts.',
       lose: 'Turn in your badge. And your blazer.',
     },
@@ -893,9 +907,9 @@ export default {
     soldier: 'Gunman', heavy: 'Enforcer', scout: 'Lookout', engineer: 'Mechanic', sniper: 'Sicario',
     jeep: 'Technical', tank: 'Monstruo', artillery: 'Rocket Truck', helicopter: 'Narco Chopper', bomber: 'Smuggler Plane',
     hq: 'Hacienda', barracks: 'Safe House', turret: 'Watchtower', wall: 'Sandbags', mine: 'Taco Stand', workshop: 'Chop Shop',
-    airbase: 'Airstrip', bridge: 'Plank Bridge', ramp: 'Loading Ramp',
+    airbase: 'Airstrip', sam: 'Bottle Rocket Stand', bridge: 'Plank Bridge', ramp: 'Loading Ramp',
   },
   // Units are shown with their own sprites in menus.
   spriteIcons: true,
-  icons: { hq: '🏠', barracks: '🏚️', turret: '🔦', wall: '🧱', mine: '🌮', workshop: '🔧', airbase: '🛬', bridge: '🌉', ramp: '🪜' },
+  icons: { hq: '🏠', barracks: '🏚️', turret: '🔦', wall: '🧱', mine: '🌮', workshop: '🔧', airbase: '🛬', bridge: '🌉', ramp: '🪜', sam: '🎆' },
 };

@@ -1,6 +1,6 @@
 // Procedural terrain + tile occupancy. Ported from archive/godot-era/godot/scripts/game/tilemap.gd.
 import {
-  MAP_W, MAP_H, TILE_SIZE, GROUND_LEVEL_TILE, PLATFORM_ROWS,
+  MAP_W, MAP_H, TILE_SIZE, GROUND_LEVEL_TILE, PLATFORM_ROWS, KEEP,
   TILE_EMPTY, TILE_GROUND, TILE_PLATFORM,
 } from './config.js';
 
@@ -15,6 +15,7 @@ export class TileMap {
     this.buildingTiles = new Map(); // key -> building id (placement overlap check)
     this.wallTiles = new Map();     // key -> owning faction
     this.ramps = new Map();         // building id -> { x1, y1, x2, y2 } walkable slope (x1 < x2)
+    this.stairs = [];               // the keeps' fixed flights: slopes like bridges, but part of the map
     this.version = 0;               // bumped whenever terrain changes (minimap cache)
     this.generate();
   }
@@ -51,6 +52,46 @@ export class TileMap {
   }
 
   set(tx, ty, t) { this.tiles[key(tx, ty)] = t; }
+
+  // A keep for the HQ whose left edge is tile hqX (4 wide): a platform on the
+  // top row to sit it on, and a switchback stair of three flights down to the
+  // ground on the `dir` side (+1 right, -1 left), with a landing at each turn.
+  // The flights are fixed slopes no one owns, so they can't be knocked down
+  // or sold. Returns the row the HQ platform's surface is on.
+  addKeep(hqX, dir, owner) {
+    const top = this.groundTop - Math.max(...PLATFORM_ROWS) - 1;
+    const mid = top + (this.groundTop - top) / 3;
+    const low = top + ((this.groundTop - top) * 2) / 3;
+    // Tile edge e (from the HQ's left edge, facing right) on this map.
+    const edge = (e) => (dir > 0 ? hqX + e : hqX + 4 - e);
+    const span = ([a, b], row, t) => {
+      const [l, r] = [edge(a), edge(b)].sort((p, q) => p - q);
+      for (let tx = l; tx < r; tx++) {
+        const c = this.col(tx);
+        if (c >= 0 && c < MAP_W) for (let ty = row[0]; ty < row[1]; ty++) this.set(c, ty, t);
+      }
+    };
+    span(KEEP.clear, [0, this.groundTop], TILE_EMPTY);
+    span(KEEP.top, [top, top + 1], TILE_PLATFORM);
+    span(KEEP.upper, [mid, mid + 1], TILE_PLATFORM);
+    span(KEEP.lower, [low, low + 1], TILE_PLATFORM);
+    const T = TILE_SIZE;
+    const [s0, s1] = KEEP.stairs;
+    // Each flight as [edge, row] at the keep end and at the far end.
+    for (const [a, b] of [[[s0, top], [s1, mid]], [[s0, low], [s1, mid]], [[s0, low], [s1, this.groundTop]]]) {
+      const [p, q] = [[edge(a[0]) * T, a[1] * T], [edge(b[0]) * T, b[1] * T]].sort((m, n) => m[0] - n[0]);
+      this.stairs.push({ x1: p[0], y1: p[1], x2: q[0], y2: q[1], id: `k${this.stairs.length}`, owner });
+    }
+    this.resetRamps();
+    return top;
+  }
+
+  // Back to just the keeps' stairs (bridges are added again as they're occupied).
+  resetRamps() {
+    this.ramps.clear();
+    for (const s of this.stairs) this.ramps.set(s.id, s);
+    this.version++;
+  }
 
   // In looping maps, columns past either edge wrap around; otherwise the
   // map edges act as solid walls.
@@ -227,7 +268,7 @@ export class TileMap {
     const path = [];
     for (let node = best; node !== -1; node = prev.get(node)) {
       const s = cols[Math.floor(node / 64)][node % 64];
-      path.push({ i: Math.floor(node / 64), x: Math.floor(node / 64) * C + C / 2, key: s.key, drop: drops.has(node) });
+      path.push({ i: Math.floor(node / 64), x: Math.floor(node / 64) * C + C / 2, y: s.y, key: s.key, drop: drops.has(node) });
     }
     return path.reverse();
   }

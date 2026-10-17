@@ -1,6 +1,6 @@
 // Classic theme: early-90s jungle war (the original look).
 import { TILE_SIZE, WORLD_W, WORLD_H } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, missileRack } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -242,6 +242,12 @@ const BUILD = {
     for (let y = 18; y < 32; y += 3) g.fillRect(15, y, 18, 1);
     g.fillStyle = C.yellow; g.fillRect(15, 16, 18, 1);
     outlined(g, [[4, 24, 4, 7, C.red], [9, 24, 4, 7, t.main]], [[4, 26, 4, 1, C.redDark], [9, 26, 4, 1, t.dark]]);
+  },
+  sam(g, t) {
+    // Missile launcher on a turntable, with its tracking radar, behind sandbags
+    outlined(g, [[9, 20, 16, 5, C.metalDark], [12, 17, 10, 4, C.metal]], [[12, 17, 10, 1, C.metalLight], [9, 22, 16, 1, t.main]]);
+    missileRack(g, { x: 13, y: 18, len: 13, rail: C.metalDark, body: C.white, tip: C.red, fin: t.main, dish: [5, 12], mast: C.metal, dishCol: C.metalLight });
+    sandbags(g, 0, 32, 32, 2);
   },
   airbase(g, t) {
     // Arched hangar, control tower, windsock and apron
@@ -496,4 +502,5 @@ export default {
   explosion: { rim: palette.red, body: '#f28a30', core: palette.yellow, smoke: '#5a5148', smoke2: '#7a7266' },
   corpse,
   minimap: { sky: '#3d7fc4', ground: '#7a4a24', platform: '#8f7f62', bridge: '#b98552', ramp: '#a8763e', surface: '#4cb83a' },
+  names: { sam: 'SAM Site' },
 };

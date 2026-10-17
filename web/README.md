@@ -532,6 +532,10 @@ every panel button shows its keyboard shortcut, and the build menu ends with a c
 | Switch player (1 vs 1 Local) | <kbd>Tab</kbd> |
 | Deselect, then pause | <kbd>Esc</kbd>; <kbd>P</kbd> pauses, and <kbd>Esc</kbd> or <kbd>P</kbd> resumes |
 
+## HQ keeps
+
+On the side-on map every HQ starts up in a **keep**: a platform on the top row, with a switchback stair of three flights down to the ground on the side facing the middle of the map (always the right-hand side on looping maps). Nobody can rush an HQ across open ground any more: attackers have to climb the stair, so there's time to fortify it. The keep has room for a turret or missile site beside the HQ and a wall across the top of the stair. The stair is part of the map, so it can't be knocked down or sold. Units ordered to attack something up high find their way up stairs and bridges to get it in range. The CPU puts a turret and a wall in its own keep. The isometric field is unchanged: its hills are scenery only, so HQs stay in the corners.
+
 ## Walls
 
 Walls (💰50, 1000 HP) block enemy units, and your own troops walk straight through them. Bullets do half damage to walls; tank shells and artillery do full damage. Enemies that run into a wall stop and attack it, then carry on with their orders once it falls. Walls also stop direct fire: bullets and tank shells aimed past a wall hit the wall instead. Lobbed artillery shells arc over walls.
@@ -541,7 +545,7 @@ Walls (💰50, 1000 HP) block enemy units, and your own troops walk straight thr
 - **Aggressive:** idle units notice enemies 120px beyond their weapon range (220px minimum) and attack them. Units on a move order fight anything that comes into range, then carry on to their destination. Units heading for a building turn on enemy units that come into range.
 - **Defensive:** units that get shot hit back. When a unit or building is hit, nearby idle friendlies rally to it. After a chase, idle units return to the spot they left, and they give up a chase after 450px. Idle engineers repair damaged buildings and vehicles nearby.
 - **Hold** keeps units in place, and they still fire at anything in range. **Retreat** heads home without stopping to fight.
-- Units give up on targets they can't reach (for example, something on a platform above their range) or that they've been stuck trying to reach for 2 seconds.
+- Units climb stairs and bridges to reach targets up high. They give up on targets they can't reach at all (for example, something on a platform with no way up) or that they've been stuck trying to reach for 2 seconds.
 - **CPU:** units defend their base when it's raided. Otherwise they march on the nearest enemy HQ and fight whatever gets in the way.
 
 ## Vehicles (Workshop)
@@ -556,7 +560,7 @@ Vehicles climb ramps just like infantry, and engineers can repair them. From abo
 
 ## Aircraft (Airbase)
 
-The Airbase costs 300, takes 10s to build and has 300 HP.
+The Airbase costs 300, takes 10s to build and has 300 HP. It's **locked for the first 4 minutes** of a game: its build button shows a 🔒 countdown until then.
 
 | Aircraft | Cost | Build | Role |
 |---|---|---|---|
@@ -565,7 +569,9 @@ The Airbase costs 300, takes 10s to build and has 300 HP.
 
 **Anti-air:** only bullets can hit aircraft, so use infantry, jeeps, helicopters and turrets. Tanks and artillery can't hit aircraft, and ground blasts don't reach them. Bombers fly too high for ground units, so you need turrets (420px anti-air range, 30 damage per shot against aircraft) or helicopters to bring them down. Aircraft take off from the airbase when they're built.
 
-After about 3 minutes the CPU builds an airbase and adds helicopters and bombers to its army.
+**Missile site (🚀 SAM):** 💰175, 6s, 160 HP. Fires guided surface-to-air missiles at enemy aircraft up to 560px away (75 damage each, one every 2.4s). Missiles leave the rail straight up, then speed up and curve in after their target. It ignores ground units, so pair it with turrets and walls. Every theme and side has its own (a Katyusha battery, a firework stand, Hale rockets, a puck launcher and so on).
+
+Once the airbase unlocks at 4 minutes the CPU builds one and adds helicopters and bombers to its army. It puts up a missile site by its HQ when enemy aircraft appear, and a second if they keep coming.
 
 ## Layout
 

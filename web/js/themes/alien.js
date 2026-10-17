@@ -4,7 +4,7 @@
 // Martians in flying saucers and a furry, wisecracking engineer from Melmac.
 // Same units and rules for both sides, new paint.
 import { WORLD_W, WORLD_H, TILE_SIZE } from '../config.js';
-import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf } from '../pixel.js';
+import { G, T, C, canvas, outlined, rect, disc, hash, team, sideOf, missileRack } from '../pixel.js';
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const palette = {
@@ -402,6 +402,20 @@ const BUILD = {
       windowLit(g, 37, 18, 6, 4);
     }
   },
+  sam(g, t, f) {
+    if (aliens(f)) {
+      // Acid spore launcher: a resin mound that flings homing spore pods
+      resin(g, 3, 20, 26, 12);
+      missileRack(g, { x: 12, y: 19, len: 12, rail: C.xenoDark, body: C.egg, tip: C.acid, fin: C.acidDark });
+      g.fillStyle = C.acid; g.fillRect(6, 24, 2, 2); g.fillRect(23, 26, 2, 2);
+      g.fillStyle = t.main; g.fillRect(5, 29, 22, 2);
+    } else {
+      // Missile battery: a hazard-striped pad, launcher and tracking radar
+      outlined(g, [[3, 22, 26, 8, C.metalDark], [9, 18, 14, 5, C.metal]], [[3, 22, 26, 1, C.metal], [9, 18, 14, 1, C.metalLight], [3, 25, 26, 2, t.main]]);
+      hazardStripes(g, 3, 28, 26, 2);
+      missileRack(g, { x: 13, y: 19, len: 13, rail: C.metalDark, body: C.white, tip: C.red, fin: C.olive, dish: [5, 13], mast: C.metal, dishCol: C.metalLight });
+    }
+  },
   airbase(g, t, f) {
     if (aliens(f)) {
       // Saucer dock: a landing ring with a saucer parked on it
@@ -724,7 +738,7 @@ const MARINES = {
   soldier: 'Marine', heavy: 'Smartgunner', scout: 'Tracker', engineer: 'Synthetic', sniper: 'Marksman',
   jeep: 'Recon Buggy', tank: 'APC', artillery: 'Power Loader', helicopter: 'Gunship', bomber: 'Dropship',
   hq: 'Ops Centre', barracks: 'Cryo Bay', turret: 'Sentry Gun', wall: 'Blast Door', mine: 'Atmosphere Processor',
-  workshop: 'Vehicle Bay', airbase: 'Landing Pad', bridge: 'Catwalk',
+  workshop: 'Vehicle Bay', airbase: 'Landing Pad', sam: 'Missile Battery', bridge: 'Catwalk',
 };
 
 export default {
@@ -745,9 +759,9 @@ export default {
         soldier: 'Martian Trooper', heavy: 'Xeno Warrior', scout: 'Facehugger', engineer: 'Melmacian', sniper: 'Spitter',
         jeep: 'Hover Scooter', tank: 'Hive Queen', artillery: 'Egg Launcher', helicopter: 'Flying Saucer', bomber: 'Mothership',
         hq: 'The Hive', barracks: 'Egg Chamber', turret: 'Ray Gun Tower', wall: 'Resin Wall', mine: 'Cow Abductor',
-        workshop: 'Brain Lab', airbase: 'Saucer Dock', bridge: 'Resin Bridge',
+        workshop: 'Brain Lab', airbase: 'Saucer Dock', sam: 'Acid Spore Launcher', bridge: 'Resin Bridge',
       },
-      icons: { hq: '👽', barracks: '🥚', turret: '🔫', wall: '🕸️', mine: '🐄', workshop: '🧠', airbase: '🛸', bridge: '🌉' },
+      icons: { hq: '👽', barracks: '🥚', turret: '🔫', wall: '🕸️', mine: '🐄', workshop: '🧠', airbase: '🛸', bridge: '🌉', sam: '🦠' },
       preview: ['soldier', 'heavy', 'scout', 'tank'],
       win: 'Ack ack ack! (Translation: we won.)',
       lose: 'HA! I kill me. Back to Melmac.',
@@ -759,6 +773,7 @@ export default {
   soldier: buildSoldier,
   vehicle: { jeep: buildJeep, tank: buildTank, artillery: buildArtillery },
   aircraft: { helicopter: buildHeli, bomber: buildBomber },
+  missile: { body: '#e8e4dc', tip: '#d0322a', flame: '#f28a30' },
   buildings: BUILD,
   drawTile,
   surface,
@@ -776,5 +791,5 @@ export default {
   minimap: { sky: '#2a322c', ground: '#4a3e3a', platform: '#6a7078', bridge: '#9aa2aa', ramp: '#9aa2aa', surface: '#6e625a' },
   names: MARINES,
   spriteIcons: true,
-  icons: { hq: '🏢', barracks: '🛌', turret: '🔫', wall: '🚪', mine: '🏭', workshop: '🔧', airbase: '🛬', bridge: '🌉' },
+  icons: { hq: '🏢', barracks: '🛌', turret: '🔫', wall: '🚪', mine: '🏭', workshop: '🔧', airbase: '🛬', bridge: '🌉', sam: '🚀' },
 };

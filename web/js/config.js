@@ -4,7 +4,7 @@
 // values the Godot build actually plays with); cost/train time from game_config.gd.
 
 // Shown on the title and pause screens so it's easy to tell which build is running.
-export const VERSION = 'v58 · Visitor counter';
+export const VERSION = 'v59 · Hilltop HQs';
 
 // Cloudflare Worker (see /relay; it keeps its original name, fortress-relay)
 // that hands out TURN relay credentials, used
@@ -35,6 +35,17 @@ export const FIELD_SPOTS = {
   5: [[46, 6], [86, 35], [71, 82], [21, 82], [6, 35]],
 };
 export const PLATFORM_ROWS = [3, 7, 11];
+// Each HQ starts up on a top-row platform (its keep), reached from the ground
+// by a switchback stair. In tiles, measured from the HQ's left edge for an HQ
+// whose stair faces right (mirrored for one facing left): [from, to) along
+// the map, and the row whose top is the platform's surface.
+export const KEEP = {
+  top: [-2, 8],                  // the HQ platform, on the top row
+  stairs: [8, 12],               // the three flights stack over these columns
+  upper: [12, 16],               // landing between the top two flights
+  lower: [5, 8],                 // landing between the bottom two, under the keep
+  clear: [-3, 18],               // stray platforms here are cleared away
+};
 
 export const TILE_EMPTY = 0;
 export const TILE_GROUND = 1;
@@ -93,7 +104,12 @@ export const BUILDING_TYPES = {
   wall:     { hp: 1000, w: 1, h: 2, cost: 50, buildTime: 3.0, blocksUnits: true, bulletResist: 0.5, noZone: true },
   mine:     { hp: 100, w: 2, h: 2, cost: 200, buildTime: 8.0, income: 15 },
   workshop: { hp: 180, w: 3, h: 2, cost: 200, buildTime: 6.0, canTrain: ['engineer', 'jeep', 'tank', 'artillery'] },
-  airbase:  { hp: 300, w: 4, h: 2, cost: 300, buildTime: 10.0, canTrain: ['helicopter', 'bomber'] },
+  // unlockAt: can't be built until this many seconds into the game.
+  airbase:  { hp: 300, w: 4, h: 2, cost: 300, buildTime: 10.0, canTrain: ['helicopter', 'bomber'], unlockAt: 240 },
+  // Guided surface-to-air missiles: ignores ground units, but reaches aircraft
+  // a long way off and hits them hard.
+  sam:      { hp: 160, w: 2, h: 2, cost: 175, buildTime: 6.0, autoAttack: true, airOnly: true, range: 0, rate: 2.4,
+              airRange: 560, airDamage: 75 },
   // Bridges are planks dragged between two points, level or sloped; cost,
   // health and build time are per tile of length.
   bridge:   { hp: 150, w: 1, h: 1, cost: 15,  buildTime: 3.0, isRamp: true, noZone: true },
@@ -104,9 +120,9 @@ export const BUILDING_TYPES = {
 export const RAMP_MAX_ANGLE = 50;
 export const RAMP_MAX_LEN = 10;
 export const RAMP_LEVEL_SNAP = 8;
-export const BUILD_MENU = ['barracks', 'turret', 'wall', 'mine', 'workshop', 'airbase', 'bridge'];
+export const BUILD_MENU = ['barracks', 'turret', 'wall', 'mine', 'workshop', 'airbase', 'sam', 'bridge'];
 export const BUILD_ICONS = {
-  barracks: '⚔️', turret: '🗼', wall: '🧱', mine: '⛏️', workshop: '🔧', airbase: '🛫', bridge: '🌉',
+  barracks: '⚔️', turret: '🗼', wall: '🧱', mine: '⛏️', workshop: '🔧', airbase: '🛫', sam: '🚀', bridge: '🌉',
 };
 export const UNIT_ICONS = {
   soldier: '🪖', heavy: '🛡️', scout: '🏃', engineer: '🔩', sniper: '🎯', helicopter: '🚁', bomber: '✈️',
