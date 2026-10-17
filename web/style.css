@@ -322,11 +322,6 @@ body.iso #minimap { height: 64px; }
 .lobby-status { margin-bottom: 14px; }
 .menu-btn:disabled { opacity: 0.45; }
 
-/* 2D / isometric choice on the title screen */
-.view-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
-.view-toggle .menu-btn { flex: 1; min-height: 44px; font-size: 11px; color: var(--dim); }
-.view-toggle .menu-btn.on { background: var(--accent); color: var(--text); border-color: #7cc24e #1d3a0f #1d3a0f #7cc24e; }
-
 /* Theme switch on the title screen */
 .theme-btn { width: 100%; margin-top: 12px; }
 .theme-sides { margin: 6px 0 0; min-height: 12px; font-family: var(--pixel); font-size: 8px; color: var(--dim); }
@@ -717,3 +712,13 @@ body.mouse .howto .mouse-only { display: block; }
   .overlay h1 { font-size: 40px; }
   #subtitle { font-size: 11px; }
 }
+
+/* Settings: a switch per line, Preview features in their own box */
+.settings-btn { width: 100%; margin-top: 12px; min-height: 44px; font-size: 11px; }
+.settings-list { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 12px; }
+.setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 48px; padding: 0 16px; font-size: 11px; text-align: left; }
+.setting b { flex: 0 0 auto; min-width: 4.5em; padding: 6px 0; text-align: center; font-weight: inherit; color: var(--dim); background: rgba(0, 0, 0, 0.35); }
+.setting.on b { color: var(--text); background: var(--accent); }
+.preview-box { margin: 0 0 16px; padding: 10px 12px 2px; border: 2px dashed var(--bevel-light); background: rgba(0, 0, 0, 0.25); }
+.settings-note { margin: 0 0 10px; font-family: var(--pixel); font-size: 8px; line-height: 1.6; color: var(--dim); }
+.preview-box .setting { margin-bottom: 8px; }

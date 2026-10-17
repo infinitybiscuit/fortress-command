@@ -29,6 +29,7 @@ for (const k of ['name', 'theme', 'session']) {
   } catch { /* storage unavailable */ }
 }
 
+import * as audio from './audio.js';
 const $ = (id) => document.getElementById(id);
 const canvas = $('world');
 const ctx = canvas.getContext('2d');
@@ -64,13 +65,23 @@ let panelKey = '';
 let eliminatedNoted = false; // told this player they're out but the game goes on
 let sellArmed = null;       // { id, until } — sell needs a second tap to confirm
 const minimapCache = {};
-// 2D (side-on) or isometric. Picked on the title screen and fixed for the
-// whole game; it's only how this device draws the battle, so players in one
-// online game can each use either.
+// 2D (side-on) or isometric. Isometric is a preview feature: it's switched
+// on in Settings, under Preview features, and fixed for the whole game.
+// Online, the host's choice goes to everyone.
 const VIEW_KEY = 'slop-view';
-let viewChoice = 'flat';
-try { if (localStorage.getItem(VIEW_KEY) === 'iso') viewChoice = 'iso'; } catch { /* storage unavailable */ }
+const PREVIEW_KEY = 'slop-preview';
+let isoPick = false;    // the Isometric view switch
+let preview = false;    // Preview features shown and used
+try {
+  isoPick = localStorage.getItem(VIEW_KEY) === 'iso';
+  // Before Settings, isometric was a title-screen choice: keep it for anyone
+  // who picked it by switching Preview features on for them.
+  const p = localStorage.getItem(PREVIEW_KEY);
+  preview = p == null ? isoPick : p === 'on';
+} catch { /* storage unavailable */ }
+const viewChoice = () => (preview && isoPick ? 'iso' : 'flat');
 let iso = false;
+let settingsFrom = 'overlay-title'; // the menu Settings goes back to
 
 // ── Camera ─────────────────────────────────────────────────────────────────
 // scale = screen points per world unit. It's snapped so each art pixel
@@ -201,6 +212,7 @@ function toast(text, kind = 'error') {
   const el = $('toast');
   el.textContent = text;
   el.className = `toast show ${kind === 'info' ? 'info' : ''}`;
+  if (kind !== 'info') audio.sfx('error');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.className = 'toast'; }, 1600);
 }
@@ -209,7 +221,7 @@ function setStatus(text) { statusText = text; $('status').textContent = text; }
 // ── Online session ─────────────────────────────────────────────────────────
 // role: null offline, 'host' (runs the game and the lobby, plays Blue) or
 // 'guest'. The host keeps one connection per guest in `peers`; a guest's only
-// connection is `host`. `slots` is the lobby: up to four seats, each
+// connection is `host`. `slots` is the lobby: up to five seats, each
 // { kind: 'host' | 'human' | 'cpu' | 'open' | 'closed', name, ready }.
 //
 // Phones drop off networks all the time (a lift, a Wi-Fi/5G hand-over, the
@@ -271,6 +283,7 @@ function selectBuilding(b) {
 function selectUnits(list) {
   clearSelection();
   for (const u of list) u.selected = true;
+  if (list.length) audio.sfx('select');
 }
 
 function cancelPlacement() { pendingBuild = null; ghost = null; rampStart = null; hoverReason = ''; }
@@ -300,6 +313,7 @@ function pickBuilding(pt, pred) {
 const markAt = (e, color) => {
   const [x, y] = e.centre();
   markers.push({ x, y, z: iso ? (e.z || 0) + (e.d || 0) / 2 : 0, t: 0.6, color });
+  audio.sfx('order');
 };
 
 // ── Tap handling ───────────────────────────────────────────────────────────
@@ -714,7 +728,7 @@ mini.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType ===
 // WASD or arrow keys pan; the rest are shortcuts for buttons on screen (the
 // panel's buttons carry their key in data-key, and show it with a mouse).
 const keys = new Set();
-const OVERLAYS = ['overlay-title', 'overlay-sides', 'overlay-online', 'overlay-pause', 'overlay-gameover'];
+const OVERLAYS = ['overlay-title', 'overlay-sides', 'overlay-online', 'overlay-pause', 'overlay-settings', 'overlay-gameover'];
 const openOverlay = () => OVERLAYS.find((o) => !$(o).classList.contains('hidden')) || null;
 const PANEL_KEYS = new Set(['1', '2', '3', '4', '5', '6', '7', '8', '9', 'h', 'c', 'r', 'q', 'f', 'x', 'enter']);
 
@@ -723,9 +737,11 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
   const overlay = openOverlay();
+  if (k === 'm' && !e.repeat) { toggleMusic(); return; }
   if (overlay) {
     // Esc or P closes the pause menu.
     if (overlay === 'overlay-pause' && (k === 'escape' || k === 'p')) $('btn-resume').click();
+    if (overlay === 'overlay-settings' && k === 'escape') $('btn-settings-back').click();
     return;
   }
   if (!game || game.over) return;
@@ -960,7 +976,10 @@ function renderHud() {
 
 // ── Game lifecycle ─────────────────────────────────────────────────────────
 function showOverlay(id) {
-  for (const o of ['overlay-title', 'overlay-sides', 'overlay-online', 'overlay-pause', 'overlay-gameover']) $(o).classList.toggle('hidden', o !== id);
+  for (const o of OVERLAYS) $(o).classList.toggle('hidden', o !== id);
+  if (['overlay-title', 'overlay-sides', 'overlay-online'].includes(id)) audio.playMusic('title');
+  audio.duckMusic(id === 'overlay-pause' || (id === 'overlay-settings' && settingsFrom === 'overlay-pause'));
+  showSettings();
 }
 
 // opts: { mode } replaces MODES[key] (online games), { mirror } makes a
@@ -969,7 +988,7 @@ function startGame(key, opts = {}) {
   modeKey = key;
   // Isometric games are played on the square field. Online, the host's
   // choice goes out with the mode, so everyone plays the same map.
-  const mode = opts.mode || { ...MODES[key], field: viewChoice === 'iso' };
+  const mode = opts.mode || { ...MODES[key], field: viewChoice() === 'iso' };
   if (opts.mirror) {
     game = createMirror(mode);
   } else {
@@ -998,6 +1017,7 @@ function startGame(key, opts = {}) {
   $('btn-restart').classList.toggle('hidden', online());
   $('btn-quit').textContent = online() ? 'Leave game' : 'Main Menu';
   showOverlay(null);
+  audio.playMusic('battle');
   paused = false;
   iso = !!mode.field;
   document.body.classList.toggle('iso', iso);
@@ -1053,6 +1073,9 @@ function gameOver(winner) {
     label.style.color = 'var(--danger)';
     sub.textContent = `Your HQ was destroyed.${quip(0, 'lose')}`;
   }
+  // Hot-seat games always end with a winner among the players at the table.
+  const humanWon = online() || game.humanCount < 2 ? winner === active : winner >= 0 && !game.players[winner].isAi;
+  audio.playMusic(humanWon ? 'victory' : 'defeat');
   showOverlay('overlay-gameover');
 }
 
@@ -1188,7 +1211,7 @@ function renderLobby() {
   if (isHost) ensureSides();
   const sides = themeSides();
   const sideList = !sides ? '' : sides.length > 4 ? ` · ${sides.length} sides` : ` · ${sides.map((x) => esc(x.short)).join(' vs ')}`;
-  const view = (isHost ? viewChoice : net.hostView) === 'iso' ? 'Isometric' : '2D';
+  const view = (isHost ? viewChoice() : net.hostView) === 'iso' ? 'Isometric' : '2D';
   $('lobby-war').innerHTML = `War: <b>${esc(currentTheme().name)}</b>${sideList} · ${view}`;
   $('btn-lobby-theme').classList.toggle('hidden', !isHost);
   const order = seated(net.slots).map((sl) => sl.slot);
@@ -1291,7 +1314,7 @@ async function hostOnline() {
       net.room = await hostRoom(code, onGuestConnected);
       Object.assign(net, {
         role: 'host', phase: 'lobby', mySlot: 0, peers: [],
-        slots: [{ kind: 'host', name }, { kind: 'open' }, { kind: 'open' }, { kind: 'open' }],
+        slots: [{ kind: 'host', name }, { kind: 'open' }, { kind: 'open' }, { kind: 'open' }, { kind: 'open' }],
       });
       lobbyView('lobby');
       return;
@@ -1324,7 +1347,7 @@ function syncLobby() {
   ensureSides();
   const slots = net.slots.map(({ kind, name, ready, side }) => ({ kind, name, ready, side }));
   for (const p of net.peers) {
-    if (p.slot >= 0) p.transport.send({ t: 'lobby', theme: currentTheme().id, view: viewChoice, slots, you: p.slot });
+    if (p.slot >= 0) p.transport.send({ t: 'lobby', theme: currentTheme().id, view: viewChoice(), slots, you: p.slot });
   }
   if (!$('online-lobby').classList.contains('hidden')) renderLobby();
 }
@@ -1455,7 +1478,7 @@ function startOnlineGame() {
   const players = seated(net.slots);
   const layout = ONLINE_LAYOUTS[players.length];
   const mode = {
-    label: layout.label, wrap: layout.wrap, online: true, field: viewChoice === 'iso',
+    label: layout.label, wrap: layout.wrap, online: true, field: viewChoice() === 'iso',
     players: players.map((sl, i) => [layout.hqs[i], sl.kind === 'cpu']),
     theme: currentTheme().id,
     sides: themeSides() ? players.map((sl) => sl.side) : undefined,
@@ -1792,12 +1815,28 @@ setInterval(() => {
 let last = performance.now();
 let panelTimer = 0;
 
+// Is something close enough to the view to be heard? Like onScreen, with a
+// margin, for anything with a position (shells, wrecks, buildings).
+function heard(e) {
+  const v = view();
+  const pad = 80 / cam.scale;
+  const w = e.w || 0;
+  if (!iso) return Math.abs(game.dx(v.x + v.w / 2, e.x + w / 2)) <= v.w / 2 + pad + w / 2;
+  const z = (e.z || 0) + (e.d || 0) / 2;
+  const X = projX(e.x + w / 2, z);
+  const Y = projY(e.x + w / 2, e.y, z);
+  return X >= v.x - pad && X <= v.x + v.w + pad && Y >= v.y - pad && Y <= v.y + v.h + pad;
+}
+
 function frame(now) {
   const dt = Math.min((now - last) / 1000, MAX_DELTA);
   last = now;
 
   if (game) {
-    if (!paused || online()) game.update(dt);
+    if (!paused || online()) {
+      game.update(dt);
+      audio.listen(game, active, heard);
+    }
     if (net.role === 'host' && net.phase === 'game' && !game.over) {
       net.snapTimer -= dt;
       if (net.snapTimer <= 0) {
@@ -1968,6 +2007,7 @@ const TAGLINES = {
 // comes back when they leave the room.
 function applyTheme(id, persist = true) {
   const t = setTheme(id);
+  audio.setMusicTheme(t.id);
   document.body.dataset.theme = t.id;
   $('btn-theme').textContent = `Theme: ${t.name}`;
   $('tagline').textContent = TAGLINES[t.id] || TAGLINES.classic;
@@ -1989,22 +2029,63 @@ $('btn-theme').addEventListener('click', () => {
 });
 applyTheme(savedTheme());
 
-// 2D or isometric, for the next game started from this device.
-function showView() {
-  for (const b of $('view-toggle').querySelectorAll('[data-view]')) {
-    const on = b.dataset.view === viewChoice;
+// ── Settings ───────────────────────────────────────────────────────────────
+// Opened from the title screen or the pause menu, and kept on this device:
+// music, sound effects, and Preview features (new things still being tried
+// out, which reveal their own switches). Browsers only allow sound after a
+// tap or a key press, so the first one anywhere switches the sound on.
+const SETTINGS = {
+  music: () => audio.musicOn(),
+  sfx: () => audio.sfxOn(),
+  preview: () => preview,
+  iso: () => isoPick,
+};
+function showSettings() {
+  for (const b of document.querySelectorAll('[data-setting]')) {
+    const on = SETTINGS[b.dataset.setting]();
     b.classList.toggle('on', on);
     b.setAttribute('aria-checked', on);
+    b.querySelector('b').textContent = on ? 'On' : 'Off';
   }
+  $('preview-box').classList.toggle('hidden', !preview);
+  // Mid-game the view can't change until the next one.
+  $('iso-note').textContent = game && !game.over && settingsFrom === 'overlay-pause'
+    ? 'Used from the next game you start.' : 'Used when the game starts. Online, the host\'s choice is used.';
 }
-$('view-toggle').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-view]');
+function toggleMusic() {
+  audio.setMusic(!audio.musicOn());
+  showSettings();
+}
+function saveView() {
+  try {
+    localStorage.setItem(VIEW_KEY, isoPick ? 'iso' : 'flat');
+    localStorage.setItem(PREVIEW_KEY, preview ? 'on' : 'off');
+  } catch { /* storage unavailable */ }
+}
+$('overlay-settings').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-setting]');
   if (!b) return;
-  viewChoice = b.dataset.view;
-  try { localStorage.setItem(VIEW_KEY, viewChoice); } catch { /* storage unavailable */ }
-  showView();
+  const k = b.dataset.setting;
+  if (k === 'music') audio.setMusic(!audio.musicOn());
+  else if (k === 'sfx') audio.setSfx(!audio.sfxOn());
+  else if (k === 'preview') { preview = !preview; saveView(); }
+  else if (k === 'iso') { isoPick = !isoPick; saveView(); }
+  showSettings();
 });
-showView();
+for (const b of document.querySelectorAll('[data-open-settings]')) {
+  b.addEventListener('click', () => {
+    settingsFrom = openOverlay() || 'overlay-title';
+    showOverlay('overlay-settings');
+  });
+}
+$('btn-settings-back').addEventListener('click', () => showOverlay(settingsFrom));
+for (const ev of ['pointerup', 'touchend', 'keydown']) window.addEventListener(ev, audio.unlock, { capture: true, passive: true });
+document.addEventListener('click', (e) => {
+  audio.unlock();
+  if (e.target.closest?.('button')) audio.sfx('click');
+}, true);
+showSettings();
+audio.playMusic('title');
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 // Read-only handle for automated browser tests.

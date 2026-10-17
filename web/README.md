@@ -33,8 +33,33 @@ The art style is a homage to early-90s home-computer war games: chunky, crisp pi
   - Buildings: a sandbagged HQ bunker, a corrugated barracks hut, a sandbag gun nest, a sandbag-and-barbed-wire wall, a mine pithead, a workshop garage, and an airbase hangar with a control tower.
   - Grass, dirt and rock tiles, jungle trees and clouds.
 - **Life and damage:** buildings rise behind scaffolding while under construction, smoke and burn when damaged, and have small animations (flag, pithead wheel, chimney smoke, tower beacon).
-- **2D or isometric:** the title screen picks the view for the next game. **Isometric** is a Syndicate-style diorama seen from above at an angle, played on its own map: a square field (96 tiles each way) with no platforms or player-built bridges, and a fresh landscape every game: rolling hills, a river with bridges where the roads cross it, roads joining the bases, forests and rocks. Wading the river halves a unit's speed, roads speed it up by a fifth, and forests slow it a little; nothing can be built in the water. Hills are scenery only (buildings sit on a soil foundation where the ground slopes). The landscape comes from a seed in the game mode, so online players all get the host's. HQs start in the corners (opposite corners in 1 vs 1), units move anywhere across the field, and buildings are solid 3D shapes with square footprints, built inside a square zone around your base. Each one is carved from its art: the side-on picture is its front, the same picture mirrored is its side, and whatever fits both makes the building, so roofs slope, towers stand up and rooftop details are real blocks. The side wall isn't a copy of the front: it repeats the stretch of the front with no door. Units and vehicles are small 3D models too, made the same way from their sprites (soldiers slim, vehicles wide, aircraft round, aeroplanes with wings), and they turn smoothly to face where they're going or what they're shooting at. Units behind a building show through it faintly, and aircraft cast a shadow on the ground. Every mode works, including online, where the host's choice (shown in the lobby) is used by everyone. The minimap shows the field as a diamond, the same way round as the view.
+- **2D or isometric:** the title screen picks the view for the next game. **Isometric** is a Syndicate-style diorama seen from above at an angle, played on its own map: a square field (96 tiles each way) with no platforms or player-built bridges, and a fresh landscape every game: rolling hills, a river with bridges where the roads cross it, roads joining the bases, forests and rocks. Wading the river halves a unit's speed, roads speed it up by a fifth, and forests slow it a little; nothing can be built in the water. Hills are scenery only (buildings sit on a soil foundation where the ground slopes). The landscape comes from a seed in the game mode, so online players all get the host's. HQs start in the corners (opposite corners in 1 vs 1, round a pentagon in a five-player online game), units move anywhere across the field, and buildings are solid 3D shapes with square footprints, built inside a square zone around your base. Each one is carved from its art: the side-on picture is its front, the same picture mirrored is its side, and whatever fits both makes the building, so roofs slope, towers stand up and rooftop details are real blocks. The side wall isn't a copy of the front: it repeats the stretch of the front with no door. Units and vehicles are small 3D models too, made the same way from their sprites (soldiers slim, vehicles wide, aircraft round, aeroplanes with wings), and they turn smoothly to face where they're going or what they're shooting at. Units behind a building show through it faintly, and aircraft cast a shadow on the ground. Every mode works, including online, where the host's choice (shown in the lobby) is used by everyone. The minimap shows the field as a diamond, the same way round as the view.
 - **UI:** the olive/khaki interface uses the bundled [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) pixel font (SIL Open Font License, see `vendor/fonts/`).
+
+## Music and sound
+
+An original chiptune soundtrack and sound effects in the style of 8-bit NES war games, synthesised live
+with the Web Audio API (no audio files), in [`js/audio.js`](js/audio.js). Like the NES sound chip it
+uses two pulse-wave channels (lead melody and fast arpeggios), a triangle-wave bass and a noise drum kit.
+- **Music:** every theme has its own tune, played on the menus (it changes as you flick through the themes) and in battle; Classic has a separate title theme and battle theme. Short victory and defeat jingles end the game, and the music plays quieter behind the pause menu. The theme tunes are in [`js/songs.js`](js/songs.js), written as chords, a melody and drum patterns:
+
+  | Theme | Style |
+  | --- | --- |
+  | Classic | heroic D-minor title anthem and a driving battle march |
+  | Rise of the Robots | cold, clipped E-minor machine march with high arpeggios |
+  | Medieval | Dorian lute-and-tabor marching song with a galloping bass |
+  | Gangsters | swinging 1930s speakeasy tune with a walking bass |
+  | Warring States | pentatonic flute over war drums and a gong |
+  | Steam Shogun | Japanese *in* scale over a chugging train beat |
+  | Winter War | breakneck Finnish humppa (oom-pah accordion) |
+  | Cartel Wars | mariachi trumpet ranchera |
+  | Trade Wars | pompous brass-band march |
+  | Civil War | fife and drum |
+  | Ghost Wars | wailing theremin over a haunted music box |
+  | Alien Wars | wobbling, off-kilter alien signals |
+- **Effects:** gunfire, tank shells, artillery, falling bombs, explosions, soldiers falling, buildings collapsing, placing and finishing buildings, new units, orders, selections, error buzzes, button clicks and a klaxon when your HQ is under fire. Battle sounds only play for what's on or near the screen, and each is rate-limited so big fights don't turn into noise.
+- **Switches:** *Music* and *Sound FX* on the title screen and pause menu, remembered on the device. <kbd>M</kbd> toggles music on a PC.
+- Browsers only allow sound after a tap or key press, so the music starts on the first touch. On iPhone the game also plays a silent audio track from that tap, so it is heard even with the ring/silent switch on silent. Online, each player hears their own game.
 
 ## Themes
 
@@ -425,21 +450,22 @@ In **Free-for-All (3)** and **(4)**, the battlefield is a loop. Walk, drive or f
 
 Every player in every mode starts with two soldiers in front of their HQ.
 
-## Online (2–4 players)
+## Online (2–5 players)
 
 Play friends on their own devices, anywhere with internet:
 
-1. Everyone opens the game, taps **🌐 Online (2–4 players)** and types a name.
+1. Everyone opens the game, taps **🌐 Online (2–5 players)** and types a name.
 2. One player taps **Host a game** and gets a 5-letter room code. **Share invite** opens the iOS share sheet with a link that drops friends straight into the lobby.
 3. The others type the code and tap **Join**, or open the invite link.
 
-**Lobby.** The lobby has four seats. The host sits in the first one, and each player who joins takes the next **Open** seat. The host can tap an empty seat to switch it between **Open**, **CPU** and **Closed**, and can remove a player with ✕. Each guest taps **Ready**. **Start game** lights up once there are at least two players (people or CPU) and every guest is ready.
+**Lobby.** The lobby has five seats. The host sits in the first one, and each player who joins takes the next **Open** seat. The host can tap an empty seat to switch it between **Open**, **CPU** and **Closed**, and can remove a player with ✕. Each guest taps **Ready**. **Start game** lights up once there are at least two players (people or CPU) and every guest is ready.
 
 **The battle.** The map depends on how many seats are filled:
 - 2 players get the normal 1 vs 1 map.
-- 3 or 4 players get the looping Free-for-All map.
+- 3, 4 or 5 players get the looping Free-for-All map.
+- In isometric view everyone gets the square field: two in opposite corners, three or four round the corners, five round a pentagon.
 
-Colours follow seat order: Blue, Red, Green, Yellow. Everyone uses the normal controls. Online games can't be paused. ⏸ opens the menu, but the battle keeps going. The latency shows under your name; the host sees their slowest guest. If your HQ falls while others fight on, you can keep watching. When the battle ends, the host taps **Back to lobby** to bring everyone back for another round. New players can join then too.
+Colours follow seat order: Blue, Red, Green, Yellow, Purple. Everyone uses the normal controls. Online games can't be paused. ⏸ opens the menu, but the battle keeps going. The latency shows under your name; the host sees their slowest guest. If your HQ falls while others fight on, you can keep watching. When the battle ends, the host taps **Back to lobby** to bring everyone back for another round. New players can join then too.
 
 **How it works.** The phones connect directly to each other (WebRTC, via the bundled [PeerJS](https://peerjs.com) library). A matchmaking server only introduces them: our own Cloudflare Worker (see [`../relay`](../relay/README.md)), or PeerJS's free public server if ours doesn't answer. The host's phone runs the game, and each guest connects to the host. Guests send their orders and receive the battlefield state about 12 times a second, smoothed between updates. Both players must be on the same app version; the menu shows it.
 

@@ -53,13 +53,10 @@
       <h1>SLOP WARS</h1>
       <p id="subtitle">The Next Generation</p>
       <p class="tagline" id="tagline">Build. Train. Conquer.</p>
-      <div class="view-toggle" id="view-toggle" role="radiogroup" aria-label="View">
-        <button class="menu-btn secondary" data-view="flat" role="radio">2D</button>
-        <button class="menu-btn secondary" data-view="iso" role="radio">Isometric</button>
-      </div>
       <div class="menu-buttons" id="mode-buttons"></div>
       <button class="menu-btn secondary theme-btn" id="btn-theme">Theme: Classic</button>
       <p class="theme-sides" id="theme-sides"></p>
+      <button class="menu-btn secondary settings-btn" data-open-settings>⚙ Settings</button>
       <details class="howto">
         <summary>How to play</summary>
         <ul class="touch-only">
@@ -69,7 +66,7 @@
           <li>Tap a <b>Barracks</b>, <b>Workshop</b> or <b>Airbase</b> to train units.</li>
           <li>The <b>Build</b> menu shows when nothing is selected (tap ✕ to clear a selection). Pick a structure, tap where it goes, then tap again (or <b>Place</b>) to build. Green means valid.</li>
           <li><b>Bridges</b> extend sideways off platforms. Stack <b>ramps</b> into stairs that units climb automatically.</li>
-          <li>Pick <b>2D</b> or <b>Isometric</b> above the game modes to choose how the battle looks. It's set when the game starts.</li>
+          <li>Music, sound effects and <b>Preview features</b> (new things still being tried out, such as the <b>Isometric</b> view) are in <b>⚙ Settings</b>.</li>
           <li>Destroy every enemy HQ to win.</li>
         </ul>
         <ul class="mouse-only">
@@ -78,8 +75,8 @@
           <li><b>WASD</b> or the <b>arrow keys</b> pan, as does dragging with the right or middle button. The <b>wheel</b> zooms. <kbd>Space</kbd> jumps back to your HQ.</li>
           <li>Pick a structure with <kbd>1</kbd>–<kbd>8</kbd> or a click, point at the battlefield and click to build. Green means valid; right-click or <kbd>Esc</kbd> cancels.</li>
           <li>Select a <b>Barracks</b>, <b>Workshop</b> or <b>Airbase</b> and press <kbd>1</kbd>–<kbd>4</kbd> to train. With units selected: <kbd>H</kbd> hold, <kbd>C</kbd> charge, <kbd>R</kbd> retreat, <kbd>F</kbd> find. <kbd>X</kbd> twice sells a building.</li>
-          <li><kbd>Esc</kbd> clears your selection, then pauses. <kbd>P</kbd> pauses.</li>
-          <li>Pick <b>2D</b> or <b>Isometric</b> above the game modes to choose how the battle looks. It's set when the game starts. Isometric battles are fought on a square field with a new landscape every game: hills, a river (slow to wade, so use the bridges), roads (quick) and forests (a little slow). Send units anywhere across it. Online, the host's choice is used.</li>
+          <li><kbd>Esc</kbd> clears your selection, then pauses. <kbd>P</kbd> pauses. <kbd>M</kbd> turns the music on or off.</li>
+          <li>Music, sound effects and <b>Preview features</b> are in <b>⚙ Settings</b>. Turn on Preview features to try the <b>Isometric</b> view, set when the game starts. Isometric battles are fought on a square field with a new landscape every game: hills, a river (slow to wade, so use the bridges), roads (quick) and forests (a little slow). Send units anywhere across it. Online, the host's choice is used.</li>
           <li>Destroy every enemy HQ to win.</li>
         </ul>
       </details>
@@ -103,7 +100,7 @@
     <div class="overlay-card">
       <h2 class="online-title">ONLINE<br>BATTLE</h2>
       <div id="online-home">
-        <p class="tagline">Play friends on their own phones — up to 4 players. One of you hosts, the others join with the room code.</p>
+        <p class="tagline">Play friends on their own phones — up to 5 players. One of you hosts, the others join with the room code.</p>
         <div class="menu-buttons">
           <input id="player-name" class="code-input name-input" maxlength="12" placeholder="YOUR NAME" autocomplete="off"
             autocorrect="off" spellcheck="false" enterkeyhint="done" aria-label="Your name">
@@ -144,9 +141,29 @@
       <div class="menu-buttons">
         <button class="menu-btn" id="btn-resume">Resume</button>
         <button class="menu-btn" id="btn-restart">Restart</button>
+        <button class="menu-btn secondary" data-open-settings>⚙ Settings</button>
         <button class="menu-btn secondary" id="btn-quit">Main Menu</button>
       </div>
       <p class="version"></p>
+    </div>
+  </div>
+
+  <div id="overlay-settings" class="overlay hidden">
+    <div class="overlay-card">
+      <h2 class="online-title">SETTINGS</h2>
+      <div class="settings-list">
+        <button class="menu-btn secondary setting" data-setting="music" role="switch" aria-checked="true"><span>♪ Music</span><b>On</b></button>
+        <button class="menu-btn secondary setting" data-setting="sfx" role="switch" aria-checked="true"><span>Sound FX</span><b>On</b></button>
+        <button class="menu-btn secondary setting" data-setting="preview" role="switch" aria-checked="false"><span>Preview features</span><b>Off</b></button>
+      </div>
+      <div class="preview-box hidden" id="preview-box">
+        <p class="settings-note">New features still being tried out. They may change, or break.</p>
+        <button class="menu-btn secondary setting" data-setting="iso" role="switch" aria-checked="false"><span>Isometric view</span><b>Off</b></button>
+        <p class="settings-note" id="iso-note">Used from the next game you start.</p>
+      </div>
+      <div class="menu-buttons">
+        <button class="menu-btn" id="btn-settings-back">Back</button>
+      </div>
     </div>
   </div>
 
