@@ -180,6 +180,22 @@
 
   <div id="rotate-hint">Rotate your phone to portrait</div>
 
+  <!-- Cloudflare Web Analytics (free, cookieless visit counts).
+       Paste the site token from Cloudflare dashboard > Analytics & Logs >
+       Web Analytics > Add a site (enter infinitybiscuit.github.io) into
+       CF_ANALYTICS_TOKEN below. Left blank, nothing is loaded. Only runs over
+       HTTPS, so local testing on http://localhost is never counted. -->
+  <script>
+    (function () {
+      var CF_ANALYTICS_TOKEN = '30fbf39b76584b70ad444a1a736a535b';
+      if (!CF_ANALYTICS_TOKEN || location.protocol !== 'https:') return;
+      var s = document.createElement('script');
+      s.defer = true;
+      s.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+      s.setAttribute('data-cf-beacon', JSON.stringify({ token: CF_ANALYTICS_TOKEN }));
+      document.head.appendChild(s);
+    })();
+  </script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>
