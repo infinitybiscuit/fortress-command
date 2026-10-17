@@ -5,6 +5,7 @@ import {
 import { TileMap } from './tilemap.js';
 import { Terrain } from './terrain.js';
 import { Unit, Building, Projectile, State, canReach, distTo } from './entities.js';
+import { makeFlags, updateFlags, sendHome, flagCarriedBy } from './flags.js';
 
 const MAX_PROJECTILES = 100;
 
@@ -33,6 +34,9 @@ export class Game {
     this.aiTimer = 0;
     this.over = false;
     this.time = 0;
+    // Capture the Flag: HQs can't be destroyed; bring an enemy flag home to win.
+    this.ctf = !!this.mode.ctf;
+    this.flags = [];
 
     const hqY = this.map.groundTop - BUILDING_TYPES.hq.h;
     const spots = FIELD_SPOTS[this.mode.players.length];
@@ -71,6 +75,7 @@ export class Game {
       for (const off of [104, 136]) this.spawnUnit('soldier', this.normX(hx + dir * off), top, i).post();
     });
     this.players.forEach((p, i) => { p.income = this.incomeFor(i); });
+    if (this.ctf) this.flags = makeFlags(this);
   }
 
   // Signed horizontal offset from a to b (shortest way round on looping maps).
@@ -427,6 +432,7 @@ export class Game {
     for (const u of this.units) u.update(dt);
     for (const b of this.buildings) b.update(dt);
     for (const pr of this.projectiles) pr.update(dt);
+    if (this.ctf) updateFlags(this);
 
     this.projectiles = this.projectiles.filter((p) => !p.done);
     this.units = this.units.filter((u) => !u.dead);
@@ -580,6 +586,7 @@ export class Game {
   // CPU army orders: defend the base when it's threatened, otherwise march on
   // the nearest enemy HQ and fight whatever gets in the way.
   commandArmy(i) {
+    if (this.ctf) { this.commandFlags(i); return; }
     const hq = this.players[i].hq;
     const mine = this.buildings.filter((b) => b.faction === i);
     const threats = this.units.filter((e) => !e.dead && e.faction !== i
@@ -615,6 +622,71 @@ export class Game {
       const local = nearest(this.units.filter((e) => e.faction !== i && distTo(u.x, u.y - u.h / 2, e, u.z) < 350));
       const target = local || nearest(enemyHqs, true);
       if (target && target !== u.target) u.attack(target);
+    }
+  }
+
+  // Capture the Flag orders: run down whoever has our flag, fetch it back if
+  // it's lying about, keep a couple of guards by it, and send the rest (once
+  // there are a few of them) to grab an enemy flag. Carriers run it home.
+  commandFlags(i) {
+    const own = this.flags[i];
+    const home = own.home;
+    const army = this.units.filter((u) => u.faction === i && !u.dead && u.repairRate === 0 && !u.air);
+    const thief = own.carrier && own.carrier.faction !== i ? own.carrier : null;
+    const carrying = (u) => !!flagCarriedBy(this, u);
+    const goTo = (u, x, y, z) => {
+      if (u.state === State.MOVING && Math.abs(this.dx(u.moveX, x)) < 24 && Math.abs((u.moveZ ?? 0) - z) < 24) return;
+      u.moveTo(x, y, this.field ? z : null);
+    };
+    const far = (u, x, z) => u.away(x, z);
+
+    let guards = army.filter((u) => u.guard);
+    for (const u of army) {
+      if (guards.length >= 2) break;
+      if (!u.guard && !carrying(u)) { u.guard = true; guards.push(u); }
+    }
+    // Our flag is lying out on the field: the nearest free unit fetches it.
+    let fetcher = null;
+    if (!own.carrier && !own.atHome) {
+      fetcher = army.filter((u) => !carrying(u)).sort((a, b) => far(a, own.x, own.z) - far(b, own.x, own.z))[0] || null;
+    }
+    const raiders = army.filter((u) => !u.guard && !carrying(u) && u !== fetcher);
+    const threats = this.units.filter((e) => !e.dead && e.faction !== i && Math.hypot(this.dx(e.x, home.x), this.field ? e.z - home.z : e.y - home.y) < 500);
+    const enemyFlags = this.flags.filter((f) => f.faction !== i && !(f.carrier && f.carrier.faction === i));
+    const nearestTo = (u, list) => {
+      let best = null;
+      let bestD = Infinity;
+      for (const e of list) {
+        if (e.dead || u.isIgnoring(e)) continue;
+        const d = distTo(u.x, u.y - u.h / 2, e, u.z);
+        if (d < bestD && u.canAttack(e)) { bestD = d; best = e; }
+      }
+      return best;
+    };
+    const dir = this.facing(this.players[i].hq.tx);
+
+    for (const u of army) {
+      if (carrying(u)) { sendHome(this, u); continue; }
+      if (u === fetcher) { goTo(u, own.x, own.y, own.z); continue; }
+      // Stop the thief before it gets home.
+      if (thief && far(u, thief.x, thief.z) < 1600 && u.canAttack(thief)) { if (u.target !== thief) u.attack(thief); continue; }
+      const fighting = u.state === State.ATTACKING && u.target && !u.target.dead && u.target.kind === 'unit';
+      if (u.guard) {
+        if (fighting) continue;
+        const t = nearestTo(u, threats);
+        if (t) { u.attack(t); continue; }
+        const k = guards.indexOf(u);
+        const [gx, gz] = this.field ? this.fieldExit(this.players[i].hq, 40, (k - 0.5) * 50) : [this.normX(home.x + dir * (90 + k * 28)), home.z];
+        if (far(u, gx, gz) > 40) goTo(u, gx, home.y, gz);
+        continue;
+      }
+      if (fighting) continue;
+      const local = nearestTo(u, this.units.filter((e) => e.faction !== i && distTo(u.x, u.y - u.h / 2, e, u.z) < 320));
+      if (local) { u.attack(local); continue; }
+      // Wait for a few to gather before going after a flag.
+      if (raiders.length < 3 || !enemyFlags.length) continue;
+      const fl = enemyFlags.slice().sort((a, b) => far(u, a.x, a.z) - far(u, b.x, b.z))[0];
+      goTo(u, fl.x, fl.carrier ? fl.carrier.y : fl.y, fl.z);
     }
   }
 }

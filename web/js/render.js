@@ -343,6 +343,57 @@ function drawMissile(ctx, p, x, y) {
   rect(ctx, tx, ty, 1, 1, m.tip);
 }
 
+// ── Flags (Capture the Flag) ───────────────────────────────────────────────
+// Where a flag is drawn: over its carrier's head (eased, on a guest), else
+// where it stands or lies.
+export function flagSpot(f) {
+  const c = f.carrier;
+  return c && !c.dead ? [c.x, c.y - c.h, c.z, true] : [f.x, f.y, f.z || 0, false];
+}
+
+// A team-coloured pennant on a pole, waving. (x, y) is the foot of the pole in
+// world units; on a carrier the pole is shorter.
+export function drawFlag(ctx, f, x, y, carried = false) {
+  const t = team(f.faction);
+  const X = A(x);
+  const Y = A(y);
+  const pole = carried ? 16 : 26;
+  const wave = Math.floor(performance.now() / 180 + f.faction) % 2;
+  if (!carried) rect(ctx, X - 3, Y, 7, 1, C.shadow);
+  rect(ctx, X - 1, Y - pole, 3, pole, C.O);
+  rect(ctx, X, Y - pole, 1, pole, '#d8d0b8');
+  rect(ctx, X - 1, Y - pole - 2, 3, 2, '#f2d36b');
+  // Cloth: 12 wide, 8 tall, outlined, its free end flapping between two shapes.
+  const top = Y - pole;
+  rect(ctx, X + 1, top - 1, 13, 10, C.O);
+  rect(ctx, X + 2, top, 11, 8, t.main);
+  rect(ctx, X + 2, top, 11, 2, t.light);
+  rect(ctx, X + 2, top + 6, 11, 2, t.dark);
+  rect(ctx, X + 6 + wave * 2, top + 2, 2, 4, t.dark);
+  if (wave) rect(ctx, X + 12, top + 3, 2, 2, C.O);
+  else rect(ctx, X + 13, top, 1, 8, t.main);
+}
+
+// The minimap marker for a flag: a bright square with a ring that pulses, so
+// it's easy to spot.
+export function drawFlagMarker(ctx, f, X, Y) {
+  const t = team(f.faction);
+  const k = (Math.sin(performance.now() / 160) + 1) / 2;
+  const d = Math.min(2, globalThis.devicePixelRatio || 1); // the minimap is in device pixels
+  const sq = (r, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(X - r), Math.round(Y - r), Math.round(2 * r), Math.round(2 * r)); };
+  ctx.save();
+  ctx.globalAlpha = 0.35 + 0.65 * (1 - k);
+  ctx.strokeStyle = t.light;
+  ctx.lineWidth = 1.5 * d;
+  ctx.beginPath();
+  ctx.arc(X, Y, (3.5 + k * 5) * d, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  sq(3 * d, '#fff');
+  sq(2 * d, t.main);
+  ctx.restore();
+}
+
 // ── Effects (visual only) ──────────────────────────────────────────────────
 export function updateEffects(effects, dt) {
   for (const e of effects) e.t += dt;
@@ -520,6 +571,10 @@ export function drawMinimap(ctx, game, cw, ch, view, terrainCache, zones = null)
   for (const u of game.units) {
     ctx.fillStyle = team(u.faction).light;
     ctx.fillRect(Math.floor(u.x * sx) - 1, Math.floor((u.y - UNIT_H) * sy), u.vehicle ? 5 : 3, Math.max(3, Math.ceil(UNIT_H * sy)));
+  }
+  for (const f of game.flags || []) {
+    const [x, y] = flagSpot(f);
+    for (const shift of game.wrap ? [-WORLD_W, 0, WORLD_W] : [0]) drawFlagMarker(ctx, f, (x + shift) * sx, Math.min(ch - 8, Math.max(8, (y - 12) * sy)));
   }
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 2;

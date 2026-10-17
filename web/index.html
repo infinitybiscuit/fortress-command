@@ -67,7 +67,7 @@
           <li>The <b>Build</b> menu shows when nothing is selected (tap ✕ to clear a selection). Pick a structure, tap where it goes, then tap again (or <b>Place</b>) to build. Green means valid.</li>
           <li><b>Bridges</b> extend sideways off platforms. Stack <b>ramps</b> into stairs that units climb automatically.</li>
           <li>Music, sound effects and <b>Preview features</b> (new things still being tried out, such as the <b>Isometric</b> view) are in <b>⚙ Settings</b>.</li>
-          <li>Destroy every enemy HQ to win.</li>
+          <li><b>Battle</b>: destroy every enemy HQ to win. <b>Capture the Flag</b>: HQs can't be destroyed. Walk any unit into an enemy flag to grab it, then bring it back to your HQ. Kill the carrier and the flag drops; pick up your own dropped flag and that unit takes it home. Flags pulse on the map.</li>
         </ul>
         <ul class="mouse-only">
           <li><b>Click</b> one of your units to select it, <b>drag a box</b> to select a group, <b>shift-click</b> to add or remove one. <b>Double-click</b> grabs every unit of that type on screen. <kbd>Q</kbd> selects your whole army.</li>
@@ -77,7 +77,7 @@
           <li>Select a <b>Barracks</b>, <b>Workshop</b> or <b>Airbase</b> and press <kbd>1</kbd>–<kbd>4</kbd> to train. With units selected: <kbd>H</kbd> hold, <kbd>C</kbd> charge, <kbd>R</kbd> retreat, <kbd>F</kbd> find. <kbd>X</kbd> twice sells a building.</li>
           <li><kbd>Esc</kbd> clears your selection, then pauses. <kbd>P</kbd> pauses. <kbd>M</kbd> turns the music on or off.</li>
           <li>Music, sound effects and <b>Preview features</b> are in <b>⚙ Settings</b>. Turn on Preview features to try the <b>Isometric</b> view, set when the game starts. Isometric battles are fought on a square field with a new landscape every game: hills, a river (slow to wade, so use the bridges), roads (quick) and forests (a little slow). Send units anywhere across it. In multiplayer, the host's choice is used.</li>
-          <li>Destroy every enemy HQ to win.</li>
+          <li><b>Battle</b>: destroy every enemy HQ to win. <b>Capture the Flag</b>: HQs can't be destroyed. Walk any unit into an enemy flag to grab it, then bring it back to your HQ (<kbd>C</kbd> charges the nearest enemy flag). Kill the carrier and the flag drops; pick up your own dropped flag and that unit takes it home. Flags pulse on the map.</li>
         </ul>
       </details>
       <p class="version"></p>
@@ -96,6 +96,17 @@
     </div>
   </div>
 
+  <div id="overlay-gametype" class="overlay hidden">
+    <div class="overlay-card">
+      <h2 class="online-title">CHOOSE<br>YOUR GAME</h2>
+      <p class="tagline" id="gametype-mode"></p>
+      <div class="menu-buttons" id="gametype-buttons">
+        <button class="menu-btn type-btn" data-type="battle">⚔️ Battle<span class="type-blurb">Destroy every enemy HQ to win.</span></button>
+        <button class="menu-btn type-btn" data-type="ctf">🚩 Capture the Flag<span class="type-blurb">Grab an enemy flag and bring it back to your HQ. HQs can't be destroyed.</span></button>
+        <button class="menu-btn secondary" id="btn-type-back">Back</button>
+      </div>
+    </div>
+  </div>
   <div id="overlay-online" class="overlay hidden">
     <div class="overlay-card">
       <h2 class="online-title">MULTIPLAYER<br>BATTLE</h2>
@@ -124,6 +135,7 @@
         <p class="lobby-label">ROOM CODE</p>
         <div class="room-code" id="room-code"></div>
         <div class="lobby-war"><span id="lobby-war"></span><button class="small-btn hidden" id="btn-lobby-theme">Change ▸</button></div>
+        <div class="lobby-war"><span id="lobby-type"></span><button class="small-btn hidden" id="btn-lobby-type">Change ▸</button></div>
         <ul class="lobby-slots" id="lobby-slots"></ul>
         <p class="tagline lobby-status" id="lobby-status"></p>
         <div class="menu-buttons">

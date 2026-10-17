@@ -44,6 +44,9 @@ export function canReach(u, t) {
   return gapAbove <= u.range * 0.95;
 }
 
+// HQs can't be harmed in Capture the Flag.
+export const invulnerable = (e) => e.kind === 'building' && e.type === 'hq' && !!e.game?.ctf;
+
 // Only bullet-firing units (infantry, jeeps, helicopters) can shoot at aircraft.
 export function canHitAir(u) {
   return u.kind === 'unit' && u.repairRate === 0 && (u.def.shot ?? 'bullet') === 'bullet';
@@ -130,6 +133,12 @@ export class Unit {
 
   attack(target) {
     if (this.dead || !target || target.dead) return;
+    // An HQ that can't be harmed: just head over there instead.
+    if (invulnerable(target) && target.faction !== this.faction) {
+      const [x] = target.centre();
+      this.moveTo(x, target.y + target.h, this.game.field ? target.z + target.d / 2 : null);
+      return;
+    }
     this.resume = null;
     this.home = null;
     this.stuckT = 0;
@@ -363,7 +372,7 @@ export class Unit {
     let best = null;
     let bestD = radius;
     for (const b of this.game.buildings) {
-      if (b.dead || b.faction === this.faction || this.isIgnoring(b)) continue;
+      if (b.dead || b.faction === this.faction || this.isIgnoring(b) || invulnerable(b)) continue;
       const d = distTo(cx, cy, b, this.z);
       if (d <= bestD && canReach(this, b)) { bestD = d; best = b; }
     }
@@ -816,6 +825,7 @@ export class Building {
 
   takeDamage(amount, source) {
     if (this.dead) return;
+    if (invulnerable(this)) { if (source && !source.dead) this.game.callForHelp(this, source); return; }
     this.hp -= amount;
     this.flash = 0.15;
     if (this.hp <= 0) { this.hp = 0; this.dead = true; return; }

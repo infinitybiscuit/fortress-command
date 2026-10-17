@@ -15,6 +15,7 @@ import { TILE_SIZE, MAP_H, GROUND_LEVEL_TILE, FIELD_SIZE, FIELD_TILES } from './
 import { G, T, C, A, canvas, hash, rect, team } from './pixel.js';
 import {
   currentTheme, buildingSprite, unitSprite, tile, drawProjectile, drawEffects, brackets, hpBar, progressBar,
+  drawFlag, drawFlagMarker, flagSpot,
 } from './render.js';
 
 export const GROUND_Y = (MAP_H - GROUND_LEVEL_TILE) * TILE_SIZE;
@@ -935,6 +936,13 @@ export function drawIsoWorld(ctx, game, v) {
       xray: () => drawUnit3d(ctx, u, ux, uy, true),
     }));
   }
+  for (const f of game.flags || []) {
+    const [x, fy, z, carried] = flagSpot(f);
+    if (!near(x, z, 60)) continue;
+    const y = fy - lift(x, z);
+    const h = GROUND_Y - y;
+    items.push(item(x - 4, x + 4, z - 4, z + 4, h, h + 36, () => at(ctx, x, y, z, () => drawFlag(ctx, f, x, y, carried))));
+  }
   for (const e of game.effects || []) {
     const z = e.z || 0;
     if (!near(e.x, z)) continue;
@@ -1266,6 +1274,10 @@ export function drawIsoMinimap(ctx, game, cw, ch, v, zones = null) {
     const [X, Y] = P(u.x, u.z);
     const r = u.vehicle || u.air ? 2 : 1.5;
     ctx.fillRect(Math.round(X - r), Math.round(Y - r), Math.ceil(2 * r), Math.ceil(2 * r));
+  }
+  for (const f of game.flags || []) {
+    const [x, , z] = flagSpot(f);
+    drawFlagMarker(ctx, f, ...P(x, z));
   }
   // The part of the field on screen.
   ctx.strokeStyle = '#fff';
