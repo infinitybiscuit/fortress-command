@@ -444,17 +444,17 @@ Some themes split their armies into **sides**: the Union or the Confederacy in C
 
 **For theme authors:** list `sides: [{ id, name, short, blurb, names?, icons?, win?, lose?, preview? }]` (`preview` picks which units the side's picker card shows) on the theme. Sprite and building painters call `sideOf(f)` (from `pixel.js`) to draw a faction's side, building painters receive the faction as a third argument, and `background` receives the viewing player's side. A theme with fewer than two sides never shows the picker.
 
-## Looping map (online, 3–5 players)
+## Looping map (multiplayer, 3–5 players)
 
 In online games with three or more players, the battlefield is a loop. Walk, drive or fly off one edge and you come back on the other, and the camera pans endlessly. HQs are spaced evenly around the loop, so every player has a neighbour on each side and nobody gets a safe corner. Units, shots, artillery, aircraft, the minimap and build zones all work across the seam. Orders take the short way round. In 1 vs 1 modes the map still has edges.
 
 Every player in every mode starts with two soldiers in front of their HQ.
 
-## Online (2–5 players)
+## Multiplayer (2–5 players, online)
 
 Play friends on their own devices, anywhere with internet:
 
-1. Everyone opens the game, taps **🌐 Online (2–5 players)** and types a name.
+1. Everyone opens the game, taps **🌐 Multiplayer (2–5 players)** and types a name.
 2. One player taps **Host a game** and gets a 5-letter room code. **Share invite** opens the iOS share sheet with a link that drops friends straight into the lobby.
 3. The others type the code and tap **Join**, or open the invite link.
 

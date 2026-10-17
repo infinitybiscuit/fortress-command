@@ -2054,7 +2054,7 @@ function showSettings() {
   $('preview-box').classList.toggle('hidden', !preview);
   // Mid-game the view can't change until the next one.
   $('iso-note').textContent = game && !game.over && settingsFrom === 'overlay-pause'
-    ? 'Used from the next game you start.' : 'Used when the game starts. Online, the host\'s choice is used.';
+    ? 'Used from the next game you start.' : 'Used when the game starts. In multiplayer, the host\'s choice is used.';
 }
 function toggleMusic() {
   audio.setMusic(!audio.musicOn());
