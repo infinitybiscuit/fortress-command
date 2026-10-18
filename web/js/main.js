@@ -6,7 +6,7 @@ import {
 import { Game, clock } from './game.js';
 import { applyCommand, ref } from './commands.js';
 import {
-  hostRoom, joinRoom, makeRoomCode, connectionRoute, encodeSnapshot, encodeMap, createMirror, applySnapshot, SNAPSHOT_INTERVAL,
+  hostRoom, joinRoom, makeRoomCode, connectionRoute, encodeSnapshot, snapshotFor, encodeMap, createMirror, applySnapshot, SNAPSHOT_INTERVAL,
 } from './net.js';
 import {
   drawBackground, drawTerrain, drawStairs, drawUnit, drawBuilding, drawProjectile, drawGhost, drawMinimap, drawBuildZones,
@@ -242,7 +242,11 @@ const net = {
 const LINK_TIMEOUT = 8000; // ms of silence before a connection counts as dead
 const AWAY_GRACE = 45000;  // ms a dropped player's army waits before the CPU steps in
 const REJOIN_WINDOW = 60000; // ms a guest keeps trying to reconnect
-const SLOW_LINK = 64 * 1024; // queued bytes beyond which the host skips an update
+const SLOW_LINK = 24 * 1024; // queued bytes beyond which the host skips an update
+// A guest's updates slow down as its ping rises (queued updates delay the
+// ping too), down to two a second, so a congested link drains instead of
+// backing up until the connection drops.
+const snapshotGap = (pingMs) => Math.min(0.5, SNAPSHOT_INTERVAL * Math.max(1, (pingMs ?? 0) / 250));
 const SESSION_KEY = 'slop-session';
 const HOST_WAIT = 'Waiting for the host…';
 const RECONNECTING = 'Connection lost — reconnecting…';
@@ -1546,9 +1550,10 @@ function canStart() {
 
 function onGuestConnected(transport) {
   if (net.role !== 'host') { transport.close(); return; }
-  const peer = { transport, slot: -1, faction: -1, name: 'Player', pingMs: null, token: null, lastSeen: performance.now(), mapVersion: -1 };
+  const peer = { transport, slot: -1, faction: -1, name: 'Player', pingMs: null, token: null, lastSeen: performance.now(), base: null, wait: 0 };
   net.peers.push(peer);
   transport.on('message', (m) => { peer.lastSeen = performance.now(); onPeerMessage(peer, m); });
+  transport.on('alive', () => { peer.lastSeen = performance.now(); });
   transport.on('close', () => dropPeer(peer));
 }
 
@@ -1621,7 +1626,7 @@ function rejoin(peer, seat) {
     net.peers = net.peers.filter((p) => p !== seat);
     seat.transport.close();
   } else net.away = net.away.filter((a) => a !== seat);
-  Object.assign(peer, { token: seat.token, name: seat.name, slot: seat.slot, faction: seat.faction, mapVersion: -1 });
+  Object.assign(peer, { token: seat.token, name: seat.name, slot: seat.slot, faction: seat.faction, base: null, wait: 0 });
   const p = game.players[peer.faction];
   if (p.alive) p.isAi = false;
   peer.transport.send({ t: 'welcome', token: peer.token });
@@ -1671,24 +1676,27 @@ function startOnlineGame() {
     sides: themeSides() ? players.map((sl) => sl.side) : undefined,
   });
   net.names = players.map((sl) => (sl.kind === 'cpu' ? 'CPU' : sl.name));
-  for (const p of net.peers) Object.assign(p, { faction: players.findIndex((sl) => sl.slot === p.slot), mapVersion: -1 });
+  for (const p of net.peers) Object.assign(p, { faction: players.findIndex((sl) => sl.slot === p.slot), base: null, wait: 0 });
   Object.assign(net, { phase: 'game', snapTimer: 0, away: [] });
   startGame('online', { mode, you: 0 });
   for (const p of net.peers) p.transport.send({ t: 'start', mode, you: p.faction, names: net.names });
 }
 
-// One update to every guest. A guest whose link is backed up misses this one
-// rather than queueing more behind it; anyone missing the terrain gets it.
+// One update to every guest that's due one. Each gets only what changed since
+// its last update (everything, with the terrain, the first time). A guest
+// whose link is backed up misses this one rather than queueing more behind it.
 function sendSnapshots() {
-  const snap = encodeSnapshot(game);
+  const frame = encodeSnapshot(game);
   let map = null;
   for (const p of net.peers) {
-    if (p.faction < 0 || (p.transport.buffered?.() ?? 0) > SLOW_LINK) continue;
-    if (p.mapVersion !== game.map.version) {
-      map ??= encodeMap(game);
-      p.transport.send({ ...snap, map });
-      p.mapVersion = game.map.version;
-    } else p.transport.send(snap);
+    if (p.faction < 0) continue;
+    p.wait -= SNAPSHOT_INTERVAL;
+    if (p.wait > 1e-6 || (p.transport.buffered?.() ?? 0) > SLOW_LINK) continue;
+    p.wait = Math.max(p.wait, -SNAPSHOT_INTERVAL) + snapshotGap(p.pingMs);
+    const msg = snapshotFor(frame, p.base);
+    if (!p.base) msg.map = map ??= encodeMap(game);
+    p.transport.send(msg);
+    p.base = frame;
   }
 }
 
@@ -1726,6 +1734,7 @@ function attachHost(transport) {
     net.lastHostMsg = performance.now();
     onHostMessage(m);
   });
+  transport.on('alive', () => { if (net.host === transport) net.lastHostMsg = performance.now(); });
   transport.on('close', () => { if (net.host === transport) onHostLost(); });
 }
 

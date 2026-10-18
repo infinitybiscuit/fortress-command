@@ -1,4 +1,4 @@
-// Online play. One phone hosts and runs the simulation; up to three others
+// Online play. One phone hosts and runs the simulation; up to four others
 // join with a room code, send their orders as commands and render snapshots of
 // the host's game. Phones connect peer-to-peer over WebRTC (PeerJS) in a star
 // around the host; a matchmaking server only introduces the devices.
@@ -100,9 +100,9 @@ export function makeRoomCode() {
 // Both expose { send(obj), close(), on('message' | 'close', fn) }.
 
 class Emitter {
-  constructor() { this.handlers = { message: [], close: [] }; }
-  on(ev, fn) { this.handlers[ev].push(fn); }
-  emit(ev, arg) { for (const fn of this.handlers[ev]) fn(arg); }
+  constructor() { this.handlers = {}; }
+  on(ev, fn) { (this.handlers[ev] ||= []).push(fn); }
+  emit(ev, arg) { for (const fn of this.handlers[ev] || []) fn(arg); }
 }
 
 let peerLib = null;
@@ -142,6 +142,7 @@ function wrapConnection(conn, peer) {
   const pieces = new Map();
   conn.on('data', (d) => {
     if (d?.t !== PIECE) { t.emit('message', d); return; }
+    t.emit('alive'); // part of a long message: the link is still working
     const got = pieces.get(d.id) || [];
     got.push(d.d);
     if (got.length < d.n) { pieces.set(d.id, got); return; }
@@ -305,24 +306,87 @@ function fromBase64(str, out) {
   for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
 }
 
-// The terrain only goes out when it changes (or to a player who has just
-// (re)connected) — see encodeMap.
+// Updates go out up to a dozen times a second to every guest, and a big
+// battle has hundreds of units and shots, so they're kept small:
+// - each guest only gets the rows that changed since its last update, plus
+//   the ids that have gone (the first update after joining has everything);
+// - rows use whole-pixel positions, ids as the gap from the previous row's
+//   id, and leave off trailing zeros (the decoder fills them back in);
+// - the terrain never changes once a game starts, so it only goes out with
+//   that first full update — see encodeMap.
+// This relies on the channel delivering every message in order, which both
+// transports do; a guest that misses one reconnects and starts over.
+const ri = Math.round;
+const KINDS = { u: 9, b: 15, pr: 8 }; // row lengths, id included
+function trim(row) {
+  while (row.length && row[row.length - 1] === 0) row.pop();
+  return row;
+}
+function rowsById(list, row) {
+  return new Map(list.map((e) => {
+    const r = trim(row(e));
+    return [e.id, { r, s: JSON.stringify(r) }];
+  }));
+}
+// Rows padded back out to n fields, with ids restored from the gaps.
+function ungap(rows = [], n) {
+  let id = 0;
+  return rows.map((r) => {
+    const out = r.slice();
+    while (out.length < n) out.push(0);
+    id += out[0];
+    out[0] = id;
+    return out;
+  });
+}
+
+// This moment of the host's game, shared by every guest's update.
 export function encodeSnapshot(game) {
-  const snap = {
-    t: 'snap',
+  const frame = {
     time: r1(game.time),
     pl: game.players.map((p) => [Math.floor(p.money), p.income, p.alive ? 1 : 0]),
-    u: game.units.map((u) => [u.id, UI[u.type], u.faction, r1(u.x), r1(u.y), Math.ceil(u.hp), u.facing,
-      u.flash > 0 ? 1 : 0, r2(u.cooldownTimer), r1(u.z)]),
-    b: game.buildings.map((b) => [b.id, BI[b.type], b.faction, b.tx, b.ty, Math.ceil(b.hp), r2(b.progress),
-      b.constructing ? 1 : 0, b.queue.map((t) => UI[t]), b.trainCurrent ? UI[b.trainCurrent] : -1,
-      r2(b.trainTimer), b.trainTotal, b.flash > 0 ? 1 : 0, b.seg ? [b.seg.x1, b.seg.y1, b.seg.x2, b.seg.y2].map(r1) : 0, b.tz]),
-    pr: game.projectiles.map((p) => [p.id, SHOT_KINDS.indexOf(p.kind), r1(p.x), r1(p.y), r2(p.angle),
-      r2(p.exploded), p.splash, p.radius, r1(p.z || 0)]),
+    u: rowsById(game.units, (u) => [UI[u.type], u.faction, ri(u.x), ri(u.y), Math.ceil(u.hp),
+      u.facing > 0 ? 1 : 0, u.flash > 0 ? 1 : 0, ri(u.z)]),
+    b: rowsById(game.buildings, (b) => [BI[b.type], b.faction, b.tx, b.ty, Math.ceil(b.hp), b.tz || 0,
+      r2(b.progress), b.constructing ? 1 : 0, b.flash > 0 ? 1 : 0, b.trainCurrent ? UI[b.trainCurrent] + 1 : 0,
+      r1(b.trainTimer), b.trainTotal, b.queue.length ? b.queue.map((t) => UI[t]) : 0,
+      b.seg ? [b.seg.x1, b.seg.y1, b.seg.x2, b.seg.y2].map(r1) : 0]),
+    // Splash only matters to the guest once a shot has gone off.
+    pr: rowsById(game.projectiles, (p) => [SHOT_KINDS.indexOf(p.kind), ri(p.x), ri(p.y), r1(p.angle),
+      ri(p.z || 0), r2(p.exploded), p.exploded > 0 ? p.splash : 0]),
   };
   // Capture the Flag: where each flag is, and who (if anyone) has it.
-  if (game.ctf) snap.fl = game.flags.map((f) => [r1(f.x), r1(f.y), r1(f.z), f.carrier ? f.carrier.id : -1, f.atHome ? 1 : 0, f.out ? 1 : 0]);
-  return snap;
+  if (game.ctf) frame.fl = game.flags.map((f) => [ri(f.x), ri(f.y), ri(f.z), f.carrier ? f.carrier.id : -1, f.atHome ? 1 : 0, f.out ? 1 : 0]);
+  return frame;
+}
+
+// The update for one guest, given the frame it was last sent (null if it
+// hasn't had one yet). Returns the message; the frame becomes its new base.
+export function snapshotFor(frame, base) {
+  const msg = { t: 'snap', time: frame.time, pl: frame.pl };
+  if (frame.fl) msg.fl = frame.fl;
+  if (!base) msg.full = 1;
+  for (const k of Object.keys(KINDS)) {
+    const was = base?.[k];
+    const rows = [];
+    let prev = 0;
+    for (const [id, row] of frame[k]) {
+      if (was?.get(id)?.s === row.s) continue;
+      rows.push([id - prev, ...row.r]);
+      prev = id;
+    }
+    msg[k] = rows;
+    if (!was) continue;
+    const gone = [];
+    prev = 0;
+    for (const id of was.keys()) {
+      if (frame[k].has(id)) continue;
+      gone.push(id - prev);
+      prev = id;
+    }
+    if (gone.length) msg[k + 'x'] = gone;
+  }
+  return msg;
 }
 
 export function encodeMap(game) { return toBase64(game.map.tiles); }
@@ -336,8 +400,10 @@ export function createMirror(mode) {
   g.projectiles = [];
   g.mirror = true;
   g.lastSnapshotAt = performance.now();
+  g.snapGap = SNAPSHOT_INTERVAL;
+  g.synced = false;
   g.update = (dt) => {
-    const k = Math.min(1, dt * 14);
+    const k = Math.min(1, dt * Math.max(3, 1.2 / g.snapGap));
     for (const e of [...g.units, ...g.projectiles]) {
       if (e.nx == null) continue;
       e.x += (e.nx - e.x) * k;
@@ -349,19 +415,38 @@ export function createMirror(mode) {
   return g;
 }
 
+// Fold an update's rows into a list of entities: changed ones are updated
+// (or made) by update(existing, row), and anything gone — or, in a full
+// update, anything not listed — is dropped. Returns the dropped ones.
+function merge(list, s, k, update) {
+  const rows = new Map(ungap(s[k], KINDS[k]).map((r) => [r[0], r]));
+  const gone = new Set(ungap((s[k + 'x'] || []).map((id) => [id]), 1).map((r) => r[0]));
+  const kept = [];
+  const dropped = [];
+  for (const e of list) {
+    const r = rows.get(e.id);
+    if (r) { kept.push(update(e, r)); rows.delete(e.id); } else if (s.full || gone.has(e.id)) dropped.push(e);
+    else kept.push(e);
+  }
+  for (const r of rows.values()) kept.push(update(null, r));
+  return { kept, dropped };
+}
+
 export function applySnapshot(g, s) {
+  if (s.full) g.synced = true;
+  else if (!g.synced) return; // a leftover from before (re)joining
+  const now = performance.now();
+  // Ease over about as long as updates are arriving apart, so a guest on a
+  // slowed-down link still sees smooth movement.
+  g.snapGap += (Math.min(0.6, (now - g.lastSnapshotAt) / 1000) - g.snapGap) * 0.2;
   g.time = s.time;
-  g.lastSnapshotAt = performance.now();
+  g.lastSnapshotAt = now;
   s.pl.forEach(([money, income, alive], i) => {
     if (!g.players[i]) return;
     Object.assign(g.players[i], { money, income, alive: !!alive });
   });
 
-  const units = new Map(g.units.map((u) => [u.id, u]));
-  const alive = new Set(s.u.map((r) => r[0]));
-  for (const u of g.units) if (!alive.has(u.id)) g.effects.push(deathEffect(u));
-  g.units = s.u.map(([id, ti, f, x, y, hp, facing, flash, cd, z = 0]) => {
-    let u = units.get(id);
+  const units = merge(g.units, s, 'u', (u, [id, ti, f, x, y, hp, facing, flash, z]) => {
     if (!u) {
       u = new Unit(g, UNIT_KEYS[ti], x, y, f);
       u.id = id;
@@ -369,15 +454,15 @@ export function applySnapshot(g, s) {
     }
     // Ease toward the new position; jump if it's far (e.g. just spawned).
     if (Math.hypot(u.x - x, u.y - y, u.z - z) > 160) { u.x = x; u.y = y; u.z = z; }
-    Object.assign(u, { nx: x, ny: y, nz: z, hp, facing, cooldownTimer: cd });
+    Object.assign(u, { nx: x, ny: y, nz: z, hp, facing: facing ? 1 : -1 });
     if (flash) u.flash = 0.15;
     return u;
   });
+  for (const u of units.dropped) g.effects.push(deathEffect(u));
+  g.units = units.kept;
 
-  const blds = new Map(g.buildings.map((b) => [b.id, b]));
-  let changed = s.b.length !== g.buildings.length;
-  g.buildings = s.b.map(([id, ti, f, tx, ty, hp, progress, constructing, queue, cur, timer, total, flash, seg, tz = 0]) => {
-    let b = blds.get(id);
+  let changed = false;
+  const blds = merge(g.buildings, s, 'b', (b, [id, ti, f, tx, ty, hp, tz, progress, constructing, flash, cur, timer, total, queue, seg]) => {
     if (!b) {
       b = new Building(g, BUILD_KEYS[ti], tx, ty, f, g.field ? tz : null);
       b.id = id;
@@ -385,18 +470,19 @@ export function applySnapshot(g, s) {
       changed = true;
     }
     Object.assign(b, {
-      hp, progress, constructing: !!constructing, queue: queue.map((q) => UNIT_KEYS[q]),
-      trainCurrent: cur >= 0 ? UNIT_KEYS[cur] : null, trainTimer: timer, trainTotal: total,
+      hp, progress, constructing: !!constructing, queue: queue ? queue.map((q) => UNIT_KEYS[q]) : [],
+      trainCurrent: cur ? UNIT_KEYS[cur - 1] : null, trainTimer: timer, trainTotal: total,
     });
     if (flash) b.flash = 0.15;
     return b;
   });
+  if (blds.dropped.length) changed = true;
+  g.buildings = blds.kept;
 
-  const shots = new Map(g.projectiles.map((p) => [p.id, p]));
-  g.projectiles = s.pr.map(([id, kind, x, y, angle, exploded, splash, radius, z = 0]) => {
-    const p = shots.get(id) || { id, x, y, z };
-    return Object.assign(p, { kind: SHOT_KINDS[kind], nx: x, ny: y, nz: z, angle, exploded, splash, radius });
-  });
+  g.projectiles = merge(g.projectiles, s, 'pr', (p, [id, kind, x, y, angle, z, exploded, splash]) => {
+    p ||= { id, x, y, z };
+    return Object.assign(p, { kind: SHOT_KINDS[kind], nx: x, ny: y, nz: z, angle, exploded, splash });
+  }).kept;
 
   s.fl?.forEach(([x, y, z, carrier, atHome, out], i) => {
     const f = g.flags[i];
