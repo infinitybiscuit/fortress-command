@@ -325,7 +325,7 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
     - **Burned Bridge** (Bridge) and **Price Ramp**, where everything only goes up (Ramp).
   - **Effects:** blasts burst into red, white, blue and gold confetti.
   - **Menus:** gold, red and navy. Tagline: "The other countries pay. Believe me."
-  - **Sides:** a four-way trade war, made for online games with several players. Only the USA has a caricature: the other sides satirise policies and products, not people.
+  - **Sides:** a six-way trade war, made for online games with several players. Only the USA has a caricature: the other sides satirise policies and products, not people.
     - **The USA:** everything above.
     - **China:**
       - **Dock Hands**, a **Magnet Gunner** firing rare-earth magnets, a **Panda**, a **Solar Fitter** and a **Bullet Trainer**.
@@ -339,6 +339,14 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
       - **Eurocrats**, a **Rubber Stamper**, a rolling **Brie Runner**, a **Regulator** and a **Sommelier**.
       - A **Vespa Patrol**, a filing-cabinet **Regulation Tank**, a **Champagne Cannon**, a **Red Tape Copter** and a paper-plane **Directive Glider**.
       - The **Berlaymont**, ringed with gold-star flags, a **Committee Room**, an **Approval Desk**, **Red Tape**, a **Fines Office**, a **Factory (Pending)** and a **Shared Helipad**.
+    - **Mexico**:
+      - **Frontera Agents**, a masked **Luchador**, a **Chihuahua** on patrol, an **Albañil** and a **Coyote**.
+      - A **Lowrider**, a **Taco Truck** with a chilli-pepper gun, the **Avocado Launcher**, a **Chupacabra** and a **Piñata Blimp** dropping candy.
+      - A **Palacio Federal**, a **Cantina**, a **Frontera Watchtower**, the **Invoiced Wall** (sent back, twice), an **Avocado Grove** and a **Lowrider Garage**.
+    - **The UK** (the special relationship is ringing, but nobody answers):
+      - **Border Force Officers**, a **Beefeater**, a rolling **Cuppa**, a **Flat Cap** and **Sherlock**.
+      - A **Black Cab**, a **Double Decker** on tracks, **Big Ben** lobbing bongs, a **Spitfire** and the **Brexit Blimp** trailing the border queue.
+      - **The Special Relationship**, **The King's Head** pub, a gun-toting **Phone Box**, a **Queue Barrier** wall, a **Tea Room** and a **Jaguar Plant**.
 
 - **Civil War:** 1861–65, played for laughs, and the first theme where you **choose a side**. The Confederate battle flag is left out: both sides fly flags in their team colour. Fallen soldiers are just knocked flat, with their hat beside them.
   - **Setting:** a summer sky over rolling Virginia farmland with red barns, white churches and zig-zag split-rail fences. Distant cannon smoke puffs up, and picnickers watch from the hill with a parasol and a hamper, as spectators really did at Bull Run. Gunsmoke drifts across the field. The ground is grassy earth, and the platforms are rocky ridges.
@@ -436,7 +444,7 @@ Each theme is one file in `js/themes/`. A theme can also replace the explosion d
 
 ## Choosing sides
 
-Some themes split their armies into **sides**: the Union or the Confederacy in Civil War, Finns or Soviets in Winter War, the Cartel or the Cops in Cartel Wars, the Mob or the Feds in Gangsters, Knights or Vikings in Medieval, Humans or Machines in Rise of the Robots, the USA, China, Canada or the EU in Trade Wars, the Shogunate or the Sky Pirates in Steam Shogun, any of the seven kingdoms in Warring States, the Busters or the Ghosts in Ghost Wars, and the Colonial Marines or the Aliens in Alien Wars. Under the **Theme** button, the title screen shows which sides a theme has.
+Some themes split their armies into **sides**: the Union or the Confederacy in Civil War, Finns or Soviets in Winter War, the Cartel or the Cops in Cartel Wars, the Mob or the Feds in Gangsters, Knights or Vikings in Medieval, Humans or Machines in Rise of the Robots, the USA, China, Canada, the EU, Mexico or the UK in Trade Wars, the Shogunate or the Sky Pirates in Steam Shogun, any of the seven kingdoms in Warring States, the Busters or the Ghosts in Ghost Wars, and the Colonial Marines or the Aliens in Alien Wars. Under the **Theme** button, the title screen shows which sides a theme has.
 
 - **Offline:** tapping a mode opens **Choose your side**. Each card previews that side's troops and vehicles in your team colour. **🎲 Surprise me** picks at random. In **1 vs 1 Local**, Blue picks first and then Red, and Red is steered towards the other side. CPUs take whichever sides are left. Your last pick is remembered for each theme, and **Restart** keeps everyone's sides.
 - **Online:** the host's theme is the room's war for everyone, shown at the top of the lobby, and the host can change it with **Change ▸**. Each seat shows its side. Tap your own side to switch it; the host can also set each CPU's side. Guests see the host's war while they're in the room, and their own theme comes back when they leave.

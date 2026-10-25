@@ -36,6 +36,20 @@ const palette = {
   euBlue: '#1e3a9a', euBlueLight: '#4a6ad0', euBlueDark: '#142868', star: '#f8d830', paper: '#f6f2e2', paperShade: '#d4ccb2',
   cheese: '#f2d060', cheeseDark: '#c8982e', bottle: '#2a5a32', bottleLight: '#4a8a4a', cork: '#d8b878', cabinet: '#9ea6ac', cabinetDark: '#6a7278',
   cabinetLight: '#c8ced4', grey: '#50545e', greyDark: '#363a42', mint: '#8ad8c4', mintDark: '#58a898',
+  // Mexico: frontera green, luchadores, chihuahuas, avocados, piñatas and a wall with an invoice
+  mxVerde: '#3a7a3a', mxVerdeDark: '#2a5a2a', mxKhaki: '#b8a878', mxKhakiDark: '#8a7a50',
+  mxTan: '#c8a468', mxTanDark: '#9a7a4a', mxStraw: '#e8d090', mxStrawDark: '#b89850',
+  mxAvocado: '#5a8a3a', mxAvocadoDark: '#3a5a28', mxAvocadoLight: '#8ab06a', mxPit: '#7a5a3a',
+  mxChili: '#c8322a', mxChiliDark: '#8a2018',
+  mxPinata: '#d8486a', mxPinataDark: '#a03048', mxPinataLight: '#f08aa0',
+  mxChupa: '#5a8a6a', mxChupaDark: '#3a5a44', mxChupaLight: '#8ac0a0',
+  mxAdobe: '#c8925a', mxAdobeDark: '#a06e3a', mxTile: '#b8382a',
+  // The UK: border-force navy, scarlet beefeaters, tea, queues and the special relationship
+  ukScarlet: '#c8282a', ukScarletDark: '#8a1a1c', ukScarletLight: '#f0504a',
+  ukNavy: '#2a3a5a', ukNavyDark: '#182640', ukBlack: '#1e1e22', ukBlackLight: '#4a4a52',
+  ukRaf: '#6a7a4a', ukRafDark: '#4a5a32', ukBlue: '#2a4a9a', ukRed: '#c8282a', ukWhite: '#f4f2ea',
+  ukTea: '#e8e2d0', ukTeaDark: '#b8b0a0', ukPhone: '#c8282a', ukPhoneDark: '#8a1a1c', ukPhoneLight: '#f0504a',
+  ukStone: '#cfc3a0', ukStoneDark: '#a09272',
 };
 const SUIT = [0.2, 0.22, 0.32];
 
@@ -345,6 +359,10 @@ const BUILD = {
       canada: { base: C.log, lite: C.logLight, top: C.serge, rail: C.woodDark, body: C.white, tip: C.serge, fin: C.red },
       // The missile directive: blue cabinet, starry rockets, compliant radar
       eu: { base: C.euBlue, lite: C.euBlueLight, top: C.cabinet, rail: C.euBlueDark, body: C.white, tip: C.star, fin: C.euBlue, dish: true },
+      // Avocado-labelled rockets on an adobe plinth
+      mexico: { base: C.mxAdobe, lite: C.mxAdobeDark, top: C.mxTile, rail: C.mxVerdeDark, body: C.white, tip: C.mxChili, fin: C.mxVerde, dish: true },
+      // Whitehall plinth, scarlet top, union-jack fins
+      uk: { base: C.ukStone, lite: C.white, top: C.ukScarlet, rail: C.ukBlack, body: C.ukWhite, tip: C.ukRed, fin: C.ukBlue, dish: true },
     }[side];
     outlined(g, [[3, 22, 26, 10, look.base], [9, 18, 14, 5, look.top]], [[3, 22, 26, 1, look.lite], [3, 27, 26, 2, t.main]]);
     missileRack(g, { x: 13, y: 19, len: 13, rail: look.rail, body: look.body, tip: look.tip, fin: look.fin, dish: look.dish ? [5, 13] : null, mast: C.steel, dishCol: C.white });
@@ -872,6 +890,151 @@ function euSoldier(type, f, frame) {
   return { c, ax: 8, ay: 16 };
 }
 
+// ── Mexico: infantry ───────────────────────────────────────────────────────
+function mxSoldier(type, f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(20, 17);
+  const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
+  const boots = frame ? [[5, 15, 3, 1], [9, 15, 3, 1]] : [[4, 15, 3, 1], [10, 15, 3, 1]];
+  let parts;
+  let details;
+  if (type === 'scout') {
+    // A chihuahua on patrol, in a team scarf and a tiny sombrero
+    const lg = frame ? [[5, 12, 2, 4], [8, 12, 2, 4], [11, 12, 2, 4], [13, 12, 2, 4]] : [[4, 12, 2, 4], [7, 12, 2, 4], [12, 12, 2, 4], [14, 12, 2, 4]];
+    parts = [
+      ...lg.map((l) => [...l, C.mxTanDark]),
+      [3, 6, 10, 6, C.mxTan], [9, 1, 6, 6, C.mxTan], [6, 1, 4, 3, C.mxTan], [12, 1, 4, 3, C.mxTan],
+      [4, 0, 10, 2, C.mxStraw], [6, 0, 5, 2, C.mxStraw],
+    ];
+    details = [
+      [3, 6, 7, 1, C.mxTanDark], [3, 10, 10, 2, C.mxTanDark], [5, 1, 8, 1, C.mxStrawDark],
+      [12, 3, 1, 1, C.O], [14, 4, 1, 1, C.O], [7, 7, 4, 2, t.main], [7, 9, 1, 2, t.main],
+    ];
+  } else if (type === 'heavy') {
+    // A luchador: mask, shoulder pads and a pad-mounted cannon
+    parts = [
+      ...legs.map((l) => [...l, C.mxVerdeDark]), ...boots.map((b) => [...b, C.boot]),
+      [4, 7, 9, 5, t.main], [3, 5, 4, 3, C.mxChili], [10, 5, 4, 3, C.mxChili],
+      [6, 3, 6, 5, C.skin], [5, 1, 8, 3, t.light], [4, 3, 10, 1, t.dark],
+      [9, 9, 10, 3, C.steel],
+    ];
+    details = [
+      [6, 1, 6, 1, C.white], [10, 5, 1, 1, C.O], [8, 6, 3, 1, C.skinDark], [7, 7, 4, 1, C.mxChili],
+      [9, 9, 10, 1, C.steelLight], [9, 11, 10, 1, C.steelLight], [10, 10, 8, 1, C.steelDark], [18, 10, 1, 1, C.O],
+      [3, 6, 4, 1, C.mxChiliDark], [10, 6, 4, 1, C.mxChiliDark], [5, 8, 2, 3, C.steel],
+    ];
+  } else if (type === 'engineer') {
+    // An albañil: hard hat, hi-vis vest and a trowel
+    parts = [
+      ...legs.map((l) => [...l, C.denim]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.coverall], [6, 3, 6, 5, C.skin], [5, 1, 8, 2, C.mxStraw], [4, 3, 10, 1, t.main],
+      [12, 9, 5, 1, C.steel],
+    ];
+    details = [
+      [6, 1, 6, 1, C.mxStrawDark], [10, 5, 1, 1, C.O], [8, 6, 3, 1, C.hair], [7, 7, 4, 1, C.skinDark],
+      [6, 8, 1, 4, C.hivis], [9, 8, 1, 4, C.hivis], [5, 10, 7, 1, C.hivis], [5, 9, 2, 1, t.main],
+      [12, 9, 5, 1, C.steelLight], [16, 10, 1, 1, C.steel],
+    ];
+  } else if (type === 'sniper') {
+    // A coyote: wide-brimmed hat, duster and a scoped rifle
+    parts = [
+      ...legs.map((l) => [...l, C.mxKhakiDark]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.mxKhaki], [6, 3, 6, 5, C.skin], [4, 2, 10, 1, C.mxTan], [6, 0, 6, 2, C.mxTan],
+      [9, 9, 10, 1, C.gun], [12, 7, 4, 1, C.gun],
+    ];
+    details = [
+      [6, 1, 6, 1, C.mxKhakiDark], [8, 0, 2, 1, C.mxStraw], [10, 5, 1, 1, C.O], [7, 7, 4, 1, C.skinDark],
+      [7, 4, 4, 2, C.red], [8, 5, 2, 1, C.redDark], [12, 8, 1, 1, C.gun], [13, 7, 2, 1, C.glassDark],
+      [18, 9, 1, 1, C.O], [5, 9, 2, 1, t.main],
+    ];
+  } else {
+    // A frontera agent: green border uniform, peaked cap and a passport in hand
+    parts = [
+      ...legs.map((l) => [...l, C.mxVerdeDark]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.mxVerde], [6, 3, 6, 5, C.skin], [5, 1, 8, 2, C.mxVerdeDark], [10, 3, 3, 1, C.mxVerde],
+      [10, 9, 8, 1, C.gun], [10, 10, 2, 2, C.gun],
+    ];
+    details = [
+      [5, 2, 8, 1, t.main], [7, 1, 2, 1, C.gold], [10, 5, 1, 1, C.O], [7, 7, 4, 1, C.skinDark],
+      [5, 9, 2, 1, t.main], [8, 9, 1, 1, C.gold], [5, 10, 7, 1, C.mxVerdeDark], [17, 9, 1, 1, C.O],
+      [6, 8, 1, 4, C.hivis], [9, 8, 1, 4, C.hivis],
+    ];
+  }
+  outlined(g, parts, details);
+  return { c, ax: 8, ay: 16 };
+}
+
+// ── The UK: infantry ───────────────────────────────────────────────────────
+function ukSoldier(type, f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(20, 17);
+  const legs = frame ? [[6, 12, 2, 3], [9, 12, 2, 3]] : [[5, 12, 2, 3], [10, 12, 2, 3]];
+  const boots = frame ? [[5, 15, 3, 1], [9, 15, 3, 1]] : [[4, 15, 3, 1], [10, 15, 3, 1]];
+  let parts;
+  let details;
+  if (type === 'scout') {
+    // A cuppa: a steaming cup of tea on the move, in a team-colour scarf
+    const lg = frame ? [[6, 12, 3, 4], [10, 12, 3, 4]] : [[4, 12, 3, 4], [12, 12, 3, 4]];
+    parts = [
+      ...lg.map((l) => [...l, C.teaDark]),
+      [3, 4, 13, 7, C.ukTea], [1, 5, 3, 6, C.ukTea], [4, 2, 11, 3, C.ukTea], [6, 0, 2, 2, C.ukTea],
+    ];
+    details = [
+      [4, 3, 9, 1, C.ukTeaDark], [3, 5, 13, 1, t.main], [5, 7, 9, 2, '#8a5a32'], [6, 8, 7, 1, '#6a4228'],
+      [3, 5, 1, 4, C.ukTeaDark], [6, 2, 2, 1, C.smoke],
+    ];
+  } else if (type === 'heavy') {
+    // A beefeater: scarlet tunic, tall hat and a halberd-cannon
+    parts = [
+      ...legs.map((l) => [...l, C.ukNavyDark]), ...boots.map((b) => [...b, C.boot]),
+      [4, 7, 9, 5, C.ukScarlet], [6, 3, 6, 5, C.skin], [5, 0, 8, 3, C.ukNavyDark],
+      [9, 9, 10, 3, C.steel],
+    ];
+    details = [
+      [6, 1, 6, 1, C.gold], [5, 3, 8, 1, C.ukScarletDark], [10, 5, 1, 1, C.O], [8, 6, 3, 1, C.skinDark],
+      [7, 7, 4, 1, C.gold], [9, 9, 10, 1, C.steelLight], [9, 11, 10, 1, C.steelLight], [10, 10, 8, 1, C.steelDark],
+      [18, 10, 1, 1, C.O], [5, 8, 2, 3, C.steel], [5, 11, 7, 1, C.ukScarletDark],
+    ];
+  } else if (type === 'engineer') {
+    // A flat cap: brown cap, overalls and a big wrench
+    parts = [
+      ...legs.map((l) => [...l, C.denim]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.ukNavy], [6, 3, 6, 5, C.skin], [5, 1, 8, 2, C.mxKhaki], [4, 3, 10, 1, C.mxKhakiDark],
+      [12, 9, 5, 1, C.steel],
+    ];
+    details = [
+      [6, 1, 6, 1, C.mxKhakiDark], [10, 5, 1, 1, C.O], [8, 6, 3, 1, C.hair], [7, 7, 4, 1, C.skinDark],
+      [5, 9, 2, 1, t.main], [12, 9, 5, 1, C.steelLight], [16, 10, 1, 1, C.steel], [6, 8, 1, 4, C.ukScarlet],
+    ];
+  } else if (type === 'sniper') {
+    // Sherlock: deerstalker, magnifying-glass scope and an umbrella rifle
+    parts = [
+      ...legs.map((l) => [...l, C.ukNavyDark]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.woodDark], [6, 3, 6, 5, C.skin], [5, 1, 8, 2, C.mxKhaki], [5, 2, 2, 2, C.mxKhaki],
+      [9, 9, 10, 1, C.gun], [12, 7, 4, 1, C.gun],
+    ];
+    details = [
+      [6, 1, 6, 1, C.mxKhakiDark], [10, 5, 1, 1, C.O], [7, 7, 4, 1, C.skinDark], [8, 6, 2, 1, C.skinDark],
+      [12, 8, 1, 1, C.gun], [13, 7, 2, 1, C.glassDark], [18, 9, 1, 1, C.O], [7, 4, 2, 1, C.ukScarlet],
+      [5, 9, 2, 1, t.main],
+    ];
+  } else {
+    // A border force officer: navy uniform, peaked cap and a passport
+    parts = [
+      ...legs.map((l) => [...l, C.ukNavyDark]), ...boots.map((b) => [...b, C.boot]),
+      [5, 8, 7, 4, C.ukNavy], [6, 3, 6, 5, C.skin], [5, 1, 8, 2, C.ukNavyDark], [10, 3, 3, 1, C.ukNavy],
+      [10, 9, 8, 1, C.gun], [10, 10, 2, 2, C.gun],
+    ];
+    details = [
+      [5, 2, 8, 1, t.main], [7, 1, 2, 1, C.gold], [10, 5, 1, 1, C.O], [7, 7, 4, 1, C.skinDark],
+      [5, 9, 2, 1, t.main], [8, 9, 1, 1, C.gold], [5, 10, 7, 1, C.ukNavyDark], [17, 9, 1, 1, C.O],
+      [6, 8, 1, 4, C.ukScarlet], [9, 8, 1, 4, C.ukScarlet], [5, 11, 2, 1, C.gold],
+    ];
+  }
+  outlined(g, parts, details);
+  return { c, ax: 8, ay: 16 };
+}
+
 // ── China: vehicles and aircraft ───────────────────────────────────────────
 // EV runabout: a cheap little electric hatchback with a roof gun and a trailing plug.
 function chinaEV(f, frame) {
@@ -1145,12 +1308,182 @@ function euPaperPlane(f) {
   return { c, ax: 23, ay: 16 };
 }
 
-const SOLDIER = { usa: usaSoldier, china: chinaSoldier, canada: canadaSoldier, eu: euSoldier };
-const JEEP = { usa: buildGolfCart, china: chinaEV, canada: canadaZamboni, eu: euVespa };
-const TANK = { usa: buildGoldTank, china: chinaContainerTank, canada: canadaSyrupTank, eu: euCabinetTank };
-const ARTY = { usa: buildLauncher, china: chinaCatapult, canada: canadaPuckLauncher, eu: euChampagne };
-const HELI = { usa: buildSpinCopter, china: chinaDrone, canada: canadaGoose, eu: euCopter };
-const BOMBER = { usa: buildBlimp, china: chinaDragon, canada: canadaBushPlane, eu: euPaperPlane };
+// ── Mexico: vehicles and aircraft ──────────────────────────────────────────
+// Lowrider: a chrome-trimmed lowrider with a machine gun on the trunk.
+function mxLowrider(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(30, 18);
+  outlined(g, [
+    [2, 10, 24, 4, C.mxVerde], [4, 6, 14, 4, C.mxVerde], [18, 9, 8, 3, C.mxVerde], [23, 6, 4, 4, C.mxVerde],
+    [26, 7, 2, 1, C.gun],
+  ], [
+    [5, 7, 5, 2, C.glassDark], [12, 7, 4, 2, C.glassDark], [2, 11, 24, 1, t.main], [2, 12, 24, 1, C.mxVerdeDark],
+    [18, 10, 8, 1, C.mxVerdeDark], [23, 6, 4, 1, C.mxVerdeDark], [27, 7, 1, 1, C.O], [24, 7, 2, 1, C.gunLight],
+  ]);
+  wheel(g, 7, 14, 2, frame, C.gold);
+  wheel(g, 20, 14, 2, frame, C.gold);
+  return { c, ax: 14, ay: 17 };
+}
+
+// Taco truck: an armoured taco truck, its gun a giant chilli pepper.
+function mxTacoTank(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(38, 22);
+  outlined(g, [
+    [2, 15, 32, 5, '#3a2a1e'], [4, 9, 28, 6, C.mxKhaki], [8, 4, 20, 5, C.mxKhaki], [24, 8, 10, 2, C.mxChili],
+    [6, 6, 4, 3, C.mxChili], [10, 6, 4, 3, C.mxChili],
+  ], [
+    [4, 9, 28, 1, t.main], [8, 4, 20, 1, t.main], [10, 5, 16, 2, C.mxKhakiDark], [12, 10, 14, 3, C.mxKhakiDark],
+    [6, 6, 4, 1, C.mxChiliDark], [10, 6, 4, 1, C.mxChiliDark], [24, 8, 10, 1, C.mxChiliDark], [33, 8, 1, 2, C.O],
+    [14, 12, 6, 2, C.mxVerde], [6, 10, 2, 1, C.mxStraw],
+  ]);
+  for (let i = 0; i < 6; i++) {
+    const x = 5 + i * 5;
+    g.fillStyle = C.mxKhakiDark; g.fillRect(x, 16, 3, 3);
+    g.fillStyle = C.gunLight; g.fillRect(x + (frame ? 0 : 2), 16 + (frame ? 0 : 2), 1, 1);
+  }
+  return { c, ax: 18, ay: 21 };
+}
+
+// Avocado launcher: lobs the avocados the tariffs made everyone miss.
+function mxAvocadoLauncher(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(32, 19);
+  outlined(g, [
+    [2, 11, 24, 3, C.wood], [6, 4, 12, 7, C.mxAvocado], [4, 2, 8, 4, C.mxAvocado], [10, 0, 5, 3, C.mxAvocadoLight],
+    [1, 6, 7, 5, C.mxAvocado],
+  ], [
+    [2, 11, 24, 1, t.main], [6, 4, 12, 1, C.mxAvocadoDark], [8, 6, 8, 3, C.mxPit], [5, 5, 1, 1, C.mxAvocadoLight],
+    [1, 6, 7, 1, C.mxAvocadoDark], [3, 7, 1, 3, C.mxAvocadoDark],
+  ]);
+  wheel(g, 8, 15, 3, frame, C.mxAvocado);
+  wheel(g, 20, 15, 3, frame, C.mxAvocado);
+  return { c, ax: 15, ay: 18 };
+}
+
+// Chupacabra: a flying beast with red eyes and a searchlight (rotor spins live).
+function mxChupacabra(f) {
+  const t = team(f);
+  const [c, g] = canvas(32, 16);
+  outlined(g, [
+    [9, 5, 15, 6, C.mxChupa], [5, 7, 5, 3, C.mxChupa], [1, 6, 5, 2, C.mxChupaDark], [20, 2, 2, 2, C.gun],
+    [13, 12, 1, 2, C.gun], [21, 12, 1, 2, C.gun], [22, 4, 4, 4, C.mxChupaLight],
+  ], [
+    [24, 5, 1, 1, C.red], [23, 6, 2, 1, C.red], [5, 8, 3, 1, t.main], [22, 8, 2, 1, C.yellow], [23, 9, 1, 2, C.yellow],
+    [12, 6, 8, 1, C.mxChupaDark],
+  ]);
+  return { c, ax: 16, ay: 13 };
+}
+
+// Piñata blimp: a star piñata drifting over the battlefield, dropping candy.
+function mxPinata(f) {
+  const t = team(f);
+  const [c, g] = canvas(46, 21);
+  outlined(g, [
+    [10, 5, 26, 10, C.mxPinata], [6, 8, 5, 4, C.mxPinata], [36, 8, 5, 4, C.mxPinata], [16, 1, 14, 4, C.mxPinata],
+    [8, 3, 5, 3, C.mxPinata], [34, 3, 5, 3, C.mxPinata], [14, 14, 18, 4, C.gold],
+  ], [
+    [10, 13, 26, 1, C.mxPinataDark], [16, 2, 14, 1, C.mxPinataLight], [20, 6, 6, 6, C.mxPinataLight],
+    [22, 8, 2, 2, C.mxStraw], [16, 9, 4, 1, C.mxPinataDark], [26, 9, 4, 1, C.mxPinataDark],
+    [15, 15, 2, 1, C.glass], [19, 15, 2, 1, C.glass], [23, 15, 2, 1, C.glass], [27, 15, 2, 1, C.glass],
+    [18, 16, 10, 1, t.main], [10, 12, 26, 1, t.main],
+  ]);
+  return { c, ax: 23, ay: 16 };
+}
+
+// ── The UK: vehicles and aircraft ──────────────────────────────────────────
+// Black cab: a London taxi with a roof sign and a gun on the roof.
+function ukBlackCab(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(30, 18);
+  outlined(g, [
+    [2, 9, 24, 5, C.ukBlack], [6, 4, 15, 5, C.ukBlack], [19, 8, 7, 3, C.ukBlack], [24, 6, 4, 4, C.ukBlack],
+    [24, 7, 3, 1, C.gun],
+  ], [
+    [8, 5, 5, 3, C.glass], [14, 5, 5, 3, C.glass], [11, 3, 4, 1, C.yellow], [2, 11, 24, 1, t.main],
+    [19, 8, 7, 1, C.ukBlackLight], [2, 10, 24, 1, C.ukBlackLight], [27, 7, 1, 1, C.O],
+  ]);
+  wheel(g, 7, 14, 2, frame);
+  wheel(g, 20, 14, 2, frame);
+  return { c, ax: 14, ay: 17 };
+}
+
+// Double decker: a red Routemaster bus on tracks, gun on the top deck.
+function ukBusTank(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(38, 22);
+  outlined(g, [
+    [2, 15, 32, 5, '#3a2a1e'], [4, 11, 30, 4, C.ukScarlet], [6, 5, 26, 6, C.ukScarlet], [8, 3, 22, 2, C.ukScarletLight],
+    [26, 7, 10, 2, C.steel],
+  ], [
+    [6, 5, 26, 1, t.main], [10, 7, 18, 2, C.glassDark], [10, 13, 20, 2, C.glassDark], [8, 4, 22, 1, t.light],
+    [6, 12, 26, 1, C.ukScarletDark], [4, 13, 30, 1, C.ukScarletDark], [35, 7, 1, 2, C.O], [24, 8, 2, 1, C.ukScarlet],
+    [12, 15, 2, 1, C.gold], [20, 15, 2, 1, C.gold], [28, 15, 2, 1, C.gold],
+  ]);
+  for (let i = 0; i < 6; i++) {
+    const x = 5 + i * 5;
+    g.fillStyle = C.ukBlack; g.fillRect(x, 16, 3, 3);
+    g.fillStyle = C.ukBlackLight; g.fillRect(x + (frame ? 0 : 2), 16 + (frame ? 0 : 2), 1, 1);
+  }
+  return { c, ax: 18, ay: 21 };
+}
+
+// Big Ben: a clock tower on wheels that lobs bongs.
+function ukBigBen(f, frame) {
+  const t = team(f);
+  const [c, g] = canvas(32, 19);
+  outlined(g, [
+    [2, 11, 24, 3, C.ukStone], [10, 4, 12, 7, C.ukStone], [7, 1, 18, 3, C.ukStone], [14, 0, 2, 1, C.gold],
+    [24, 6, 6, 3, C.steel],
+  ], [
+    [12, 5, 8, 5, C.white], [15, 7, 2, 2, C.O], [2, 11, 24, 1, t.main], [9, 12, 10, 1, C.ukStoneDark],
+    [12, 6, 8, 1, C.ukStoneDark], [14, 1, 10, 1, C.ukStoneDark], [29, 6, 1, 3, C.O], [24, 6, 6, 1, C.steelLight],
+  ]);
+  g.fillStyle = C.O; g.fillRect(16, 8, 1, 2); g.fillRect(17, 9, 2, 1);
+  wheel(g, 8, 15, 3, frame, C.gold);
+  wheel(g, 20, 15, 3, frame, C.gold);
+  return { c, ax: 15, ay: 18 };
+}
+
+// Spitfire: an RAF fighter with roundels and a team tail.
+function ukSpitfire(f) {
+  const t = team(f);
+  const [c, g] = canvas(32, 16);
+  outlined(g, [
+    [10, 4, 14, 5, C.ukRaf], [4, 6, 7, 3, C.ukRaf], [1, 6, 4, 2, C.ukRafDark], [23, 5, 7, 2, C.ukRaf],
+    [10, 2, 10, 2, C.ukRafDark], [12, 12, 1, 2, C.gun], [19, 12, 1, 2, C.gun],
+  ], [
+    [13, 3, 3, 2, C.glass], [10, 5, 14, 1, t.main], [15, 6, 3, 1, C.ukWhite], [16, 6, 1, 1, C.ukRed],
+    [19, 6, 3, 1, C.ukWhite], [20, 6, 1, 1, C.ukRed], [6, 7, 4, 1, C.ukWhite], [7, 7, 1, 1, C.ukRed],
+    [24, 5, 4, 2, t.main], [25, 6, 3, 1, C.ukWhite],
+  ]);
+  return { c, ax: 16, ay: 13 };
+}
+
+// Brexit blimp: a union-jack airship trailing the border queue.
+function ukBrexitBlimp(f) {
+  const t = team(f);
+  const [c, g] = canvas(46, 21);
+  outlined(g, [
+    [8, 5, 30, 10, C.ukWhite], [4, 7, 5, 5, C.ukWhite], [37, 7, 5, 6, C.ukWhite], [16, 14, 14, 4, C.gold],
+  ], [
+    [8, 8, 30, 1, C.ukBlue], [8, 11, 30, 1, C.ukBlue], [13, 5, 1, 10, C.ukBlue], [19, 5, 1, 10, C.ukBlue],
+    [23, 5, 1, 10, C.ukBlue], [29, 5, 1, 10, C.ukBlue], [8, 9, 30, 1, C.ukRed], [8, 10, 30, 1, C.ukRed],
+    [16, 5, 1, 2, C.ukRed], [16, 13, 1, 2, C.ukRed], [22, 5, 1, 2, C.ukRed], [22, 13, 1, 2, C.ukRed],
+    [8, 13, 30, 1, C.ukBlue], [17, 15, 2, 1, C.glass], [21, 15, 2, 1, C.glass], [25, 15, 2, 1, C.glass],
+    [16, 2, 22, 1, C.ukRed],
+  ]);
+  g.fillStyle = C.O; g.fillRect(20, 17, 1, 3);
+  g.fillStyle = C.grey; g.fillRect(18, 20, 6, 2); g.fillStyle = C.skin; g.fillRect(19, 18, 4, 2);
+  return { c, ax: 23, ay: 16 };
+}
+
+const SOLDIER = { usa: usaSoldier, china: chinaSoldier, canada: canadaSoldier, eu: euSoldier, mexico: mxSoldier, uk: ukSoldier };
+const JEEP = { usa: buildGolfCart, china: chinaEV, canada: canadaZamboni, eu: euVespa, mexico: mxLowrider, uk: ukBlackCab };
+const TANK = { usa: buildGoldTank, china: chinaContainerTank, canada: canadaSyrupTank, eu: euCabinetTank, mexico: mxTacoTank, uk: ukBusTank };
+const ARTY = { usa: buildLauncher, china: chinaCatapult, canada: canadaPuckLauncher, eu: euChampagne, mexico: mxAvocadoLauncher, uk: ukBigBen };
+const HELI = { usa: buildSpinCopter, china: chinaDrone, canada: canadaGoose, eu: euCopter, mexico: mxChupacabra, uk: ukSpitfire };
+const BOMBER = { usa: buildBlimp, china: chinaDragon, canada: canadaBushPlane, eu: euPaperPlane, mexico: mxPinata, uk: ukBrexitBlimp };
 const pick = (table, f) => table[sideId(f)] || table.usa;
 const buildSoldier = (type, f, frame) => pick(SOLDIER, f)(type, f, frame);
 
@@ -1181,6 +1514,22 @@ function rotor(ctx, u, x, y) {
     const k = (performance.now() / 900) % 1;
     const px = s > 0 ? x - 24 - Math.round(k * 10) : x + 23 + Math.round(k * 10);
     ctx.globalAlpha = 1 - k; rect(ctx, px, y - 12 + Math.round(k * 6) + (tick % 2), 3, 2, C.paper); ctx.globalAlpha = 1;
+  } else if (side === 'mexico' && u.type === 'helicopter') {
+    // A single chupacabra rotor
+    const px = s > 0 ? x + 2 : x - 3;
+    if (tick % 2) rect(ctx, px - 9, y - 13, 18, 1, C.gunLight); else rect(ctx, px - 3, y - 13, 6, 1, C.gun);
+  } else if (side === 'mexico') {
+    // The piñata's streamers flutter
+    const tx = s > 0 ? x - 24 : x + 23;
+    rect(ctx, tx, y - 4 + (tick % 4 < 2 ? 0 : 1), 2, 1, team(u.faction).light);
+  } else if (side === 'uk' && u.type === 'helicopter') {
+    // Spitfire propeller
+    const px = s > 0 ? x - 16 : x + 15;
+    if (tick % 2) rect(ctx, px, y - 13, 1, 9, C.smoke); else rect(ctx, px, y - 10, 1, 3, C.smoke);
+  } else if (side === 'uk') {
+    // The border queue shuffles along beneath the blimp
+    const q = Math.floor(performance.now() / 500) % 4;
+    rect(ctx, s > 0 ? x - 10 + q : x + 6 - q, y - 6, 2, 1, C.ukScarlet);
   } else {
     usaRotor(ctx, u, x, y);
   }
@@ -1461,7 +1810,195 @@ const EU_BUILD = {
   },
 };
 
-const SIDE_BUILD = { china: CHINA_BUILD, canada: CANADA_BUILD, eu: EU_BUILD };
+// ── Mexico: buildings ──────────────────────────────────────────────────────
+function mxFlag(g, x, y, t) {
+  // A tricolour flag in team colours
+  g.fillStyle = C.O; g.fillRect(x - 1, y - 1, 10, 7);
+  g.fillStyle = C.white; g.fillRect(x, y, 8, 5);
+  g.fillStyle = t.main; g.fillRect(x, y, 3, 5); g.fillRect(x + 5, y, 3, 5);
+  g.fillStyle = t.dark; g.fillRect(x + 3, y + 1, 2, 3);
+}
+function sombrero(g, x, y, col = C.mxStraw) {
+  g.fillStyle = C.O; g.fillRect(x - 4, y + 1, 13, 2);
+  g.fillStyle = col; g.fillRect(x - 3, y + 1, 11, 1);
+  g.fillStyle = C.O; g.fillRect(x - 2, y - 2, 9, 4);
+  g.fillStyle = col; g.fillRect(x - 1, y - 2, 7, 3);
+  g.fillStyle = C.O; g.fillRect(x, y - 3, 5, 1);
+  g.fillStyle = C.mxStrawDark; g.fillRect(x, y - 3, 3, 1);
+}
+const MEXICO_BUILD = {
+  hq(g, t) {
+    // Palacio Federal: a painted colonial palace with arches and a bell tower
+    outlined(g, [[2, 20, 24, 28, C.mxAdobe], [38, 20, 24, 28, C.mxAdobe], [24, 12, 16, 36, C.mxAdobe]], [
+      [2, 20, 24, 1, C.mxAdobeDark], [38, 20, 24, 1, C.mxAdobeDark], [24, 12, 16, 1, C.mxAdobeDark], [2, 46, 60, 2, C.mxAdobeDark],
+    ]);
+    for (const [x0, w] of [[2, 24], [38, 24]]) {
+      for (let k = 0; k < 4; k++) { g.fillStyle = C.O; g.fillRect(x0 + k - 1, 19 - k, w - 2 * k + 2, 3); }
+      for (let k = 0; k < 4; k++) { g.fillStyle = C.mxTile; g.fillRect(x0 + k, 20 - k, w - 2 * k, 1); }
+    }
+    for (const x of [6, 14, 22]) { g.fillStyle = C.O; g.fillRect(x + 4, 26, 7, 10); g.fillStyle = '#2a1a14'; g.fillRect(x + 5, 26, 5, 10); }
+    for (const x of [42, 50, 58]) { g.fillStyle = C.O; g.fillRect(x - 2, 26, 7, 10); g.fillStyle = '#2a1a14'; g.fillRect(x - 1, 26, 5, 10); }
+    // bell tower on the centre
+    outlined(g, [[29, 3, 6, 9, C.mxAdobe]], [[29, 3, 6, 1, C.mxAdobeDark]]);
+    g.fillStyle = C.O; g.fillRect(28, 6, 8, 2); g.fillStyle = C.mxTile; g.fillRect(29, 7, 6, 1);
+    outlined(g, [[28, 10, 12, 6, C.mxAdobe]], [[28, 10, 12, 1, C.mxAdobeDark]]);
+    g.fillStyle = C.O; g.fillRect(32, 26, 8, 11); g.fillStyle = C.woodDark; g.fillRect(33, 26, 6, 11); g.fillStyle = C.wood; g.fillRect(35, 26, 1, 11);
+    g.fillStyle = C.O; g.fillRect(40, 2, 1, 17); mxFlag(g, 42, 3, t);
+  },
+  barracks(g, t) {
+    // Cantina: an adobe bar with a barrel out front and the team sign
+    outlined(g, [[2, 12, 44, 20, C.mxAdobe]], [[2, 12, 44, 1, C.mxAdobeDark], [2, 30, 44, 2, C.mxAdobeDark]]);
+    for (let x = 4; x < 44; x += 6) { g.fillStyle = C.O; g.fillRect(x, 14, 4, 4); g.fillStyle = C.glassDark; g.fillRect(x + 1, 15, 2, 2); }
+    outlined(g, [[10, 20, 20, 12, C.mxAdobe]], [[14, 22, 8, 8, C.mxTile]]);
+    g.fillStyle = C.O; g.fillRect(24, 0, 14, 6); g.fillStyle = t.main; g.fillRect(25, 1, 12, 4);
+    g.fillStyle = C.white; g.fillRect(27, 2, 3, 1);
+    sombrero(g, 6, 4, C.mxStraw);
+    barrel(g, 36, 24, t.main);
+    g.fillStyle = C.O; g.fillRect(38, 18, 1, 10); g.fillRect(39, 17, 5, 5); g.fillStyle = t.main; g.fillRect(39, 18, 4, 3);
+  },
+  turret(g, t) {
+    // Frontera watchtower: a border tower with a searchlight and the flag
+    outlined(g, [[8, 20, 10, 12, C.mxAdobe], [6, 12, 14, 8, C.mxAdobe]], [[6, 12, 14, 1, C.mxAdobeDark], [8, 20, 10, 1, C.mxAdobeDark]]);
+    outlined(g, [[11, 5, 5, 7, C.gun], [7, 7, 10, 2, C.gun]], [[11, 5, 5, 1, C.gunLight], [7, 8, 10, 1, C.gunLight], [16, 7, 1, 2, C.O]]);
+    g.fillStyle = C.O; g.fillRect(11, 0, 1, 5); mxFlag(g, 3, 0, t);
+    g.fillStyle = C.yellow; g.fillRect(8, 14, 2, 1);
+  },
+  wall(g, t) {
+    // The Invoiced Wall: concrete with a bill stapled on, paid nowhere
+    g.fillStyle = C.O; g.fillRect(0, 2, 16, 30);
+    g.fillStyle = C.concrete; g.fillRect(1, 3, 14, 29);
+    g.fillStyle = C.concreteDark; for (let y = 6; y < 30; y += 5) g.fillRect(1, y, 14, 1);
+    g.fillStyle = t.main; g.fillRect(0, 26, 16, 1);
+    // the invoice
+    g.fillStyle = C.O; g.fillRect(4, 5, 9, 12);
+    g.fillStyle = C.paper; g.fillRect(5, 6, 7, 10);
+    g.fillStyle = C.paperShade; for (let y = 8; y < 15; y += 2) g.fillRect(6, y, 5, 1);
+    g.fillStyle = C.red; g.fillRect(6, 13, 5, 2); g.fillStyle = C.paper; g.fillRect(7, 13, 3, 2); g.fillStyle = C.red; g.fillRect(8, 14, 1, 1);
+    g.fillStyle = C.mxChili; g.fillRect(5, 5, 1, 1); g.fillRect(11, 5, 1, 1); g.fillRect(5, 15, 1, 1); g.fillRect(11, 15, 1, 1);
+  },
+  mine(g, t) {
+    // Avocado Grove: the income comes from the avocados the tariffs fought over
+    g.fillStyle = C.O; g.fillRect(14, 20, 3, 12); g.fillStyle = C.woodDark; g.fillRect(15, 20, 1, 12);
+    disc(g, 15, 16, 8, C.O); disc(g, 15, 16, 7, C.mxVerde);
+    disc(g, 10, 12, 3, C.O); disc(g, 10, 12, 2, C.mxAvocado); disc(g, 22, 14, 3, C.O); disc(g, 22, 14, 2, C.mxAvocado);
+    g.fillStyle = C.O; g.fillRect(11, 12, 2, 2); g.fillStyle = C.mxAvocadoLight; g.fillRect(12, 12, 1, 1);
+    g.fillStyle = C.O; g.fillRect(23, 14, 2, 2); g.fillStyle = C.mxAvocadoLight; g.fillRect(24, 14, 1, 1);
+    g.fillStyle = C.O; g.fillRect(28, 22, 6, 8); g.fillStyle = t.main; g.fillRect(29, 23, 4, 6);
+    g.fillStyle = C.gold; g.fillRect(30, 24, 2, 4);
+    outlined(g, [[3, 24, 8, 7, C.mxStraw]], [[4, 25, 6, 5, C.mxStrawDark], [6, 26, 2, 3, C.mxVerde]]);
+    g.fillStyle = C.O; g.fillRect(0, 30, 34, 2); g.fillStyle = C.pebble; g.fillRect(0, 31, 34, 1);
+  },
+  workshop(g, t) {
+    // Lowrider Garage: a garage with a lowrider in the bay and the team sign
+    outlined(g, [[2, 8, 44, 24, C.mxKhaki]], [[2, 8, 44, 1, C.mxKhakiDark], [2, 30, 44, 2, C.mxKhakiDark]]);
+    g.fillStyle = C.O; g.fillRect(6, 12, 16, 14); g.fillStyle = C.gunDark; g.fillRect(7, 13, 14, 12);
+    outlined(g, [[9, 19, 10, 3, C.mxVerde], [10, 17, 7, 2, C.mxVerde]], [[11, 17, 4, 1, C.glassDark], [9, 20, 10, 1, t.main], [9, 21, 10, 1, C.mxVerdeDark]]);
+    g.fillStyle = C.O; g.fillRect(10, 22, 2, 2); g.fillRect(16, 22, 2, 2);
+    g.fillStyle = C.O; g.fillRect(28, 18, 12, 8); g.fillStyle = C.steelDark; g.fillRect(29, 19, 10, 6); g.fillStyle = C.steel; g.fillRect(32, 21, 4, 2);
+    g.fillStyle = C.O; g.fillRect(26, 0, 16, 7); g.fillStyle = t.main; g.fillRect(27, 1, 14, 5);
+    g.fillStyle = C.gold; g.fillRect(30, 2, 3, 1); g.fillRect(35, 2, 3, 1);
+    g.fillStyle = C.white; g.fillRect(30, 4, 8, 1);
+  },
+};
+
+// ── The UK: buildings ───────────────────────────────────────────────────────
+function unionJack(g, x, y, w, h) {
+  // A small union jack (blue field, white crosses, red centres)
+  g.fillStyle = C.O; g.fillRect(x - 1, y - 1, w + 2, h + 2);
+  g.fillStyle = C.ukBlue; g.fillRect(x, y, w, h);
+  const hw = Math.floor(w / 2), hh = Math.floor(h / 2);
+  g.fillStyle = C.ukWhite;
+  g.fillRect(x, y + hh - 1, w, 2);
+  g.fillRect(x + hw - 1, y, 2, h);
+  for (let i = 0; i < h; i++) { g.fillRect(x + i, y + i, 1, 1); g.fillRect(x + w - 1 - i, y + i, 1, 1); }
+  g.fillStyle = C.ukRed;
+  g.fillRect(x, y + hh, w, 1);
+  g.fillRect(x + hw, y, 1, h);
+}
+function phoneBox(g, x, y) {
+  // A red telephone box
+  g.fillStyle = C.O; g.fillRect(x - 1, y - 1, 7, 14);
+  g.fillStyle = C.ukPhone; g.fillRect(x, y, 5, 12);
+  g.fillStyle = C.ukPhoneDark; g.fillRect(x, y, 5, 2); g.fillRect(x + 1, y + 2, 1, 8);
+  g.fillStyle = C.glass; g.fillRect(x + 2, y + 3, 2, 5);
+  g.fillStyle = C.ukPhoneLight; g.fillRect(x, y + 2, 1, 8);
+}
+const UK_BUILD = {
+  hq(g, t) {
+    // The Special Relationship: a Whitehall block nobody answers at
+    outlined(g, [[2, 20, 24, 28, C.ukStone], [38, 20, 24, 28, C.ukStone], [25, 14, 14, 34, C.ukStone]], [
+      [2, 20, 24, 1, C.white], [38, 20, 24, 1, C.white], [25, 14, 14, 1, C.white], [2, 46, 60, 2, C.ukStoneDark],
+    ]);
+    for (const [x0, w] of [[2, 24], [38, 24]]) {
+      for (let k = 0; k < 4; k++) { g.fillStyle = C.O; g.fillRect(x0 + k - 1, 19 - k, w - 2 * k + 2, 3); }
+      for (let k = 0; k < 4; k++) { g.fillStyle = C.ukStoneDark; g.fillRect(x0 + k, 20 - k, w - 2 * k, 1); }
+    }
+    for (const [x0, w] of [[3, 22], [39, 22]]) {
+      for (let y = 24; y < 44; y += 5) for (let x = x0; x < x0 + w; x += 4) { g.fillStyle = C.O; g.fillRect(x, y, 3, 3); g.fillStyle = C.ukNavyDark; g.fillRect(x + 1, y + 1, 1, 1); }
+    }
+    // the hotline, ringing away
+    g.fillStyle = C.O; g.fillRect(29, 24, 6, 9); g.fillStyle = C.ukPhone; g.fillRect(30, 25, 4, 7);
+    g.fillStyle = C.ukPhoneDark; g.fillRect(30, 25, 4, 1); g.fillStyle = C.glass; g.fillRect(31, 27, 2, 3);
+    g.fillStyle = C.O; g.fillRect(30, 35, 2, 6); g.fillRect(32, 33, 1, 8);
+    g.fillStyle = C.O; g.fillRect(28, 37, 12, 11); g.fillStyle = C.woodDark; g.fillRect(29, 38, 10, 10); g.fillStyle = C.wood; g.fillRect(33, 38, 1, 10);
+    g.fillStyle = C.O; g.fillRect(31, 0, 1, 14); unionJack(g, 40, 2, 7, 5);
+    phoneBox(g, 6, 30);
+  },
+  barracks(g, t) {
+    // The King's Head: a pub with a sign, hanging baskets and barrels
+    outlined(g, [[2, 10, 44, 22, C.brick]], [[2, 10, 44, 1, C.brickLight], [2, 30, 44, 2, C.brickDark]]);
+    g.fillStyle = C.brickDark;
+    for (let y = 12; y < 30; y += 3) { g.fillRect(2, y, 44, 1); for (let x = 2 + (y % 2 ? 2 : 5); x < 46; x += 6) g.fillRect(x, y - 2, 1, 2); }
+    outlined(g, [[20, 16, 8, 16, C.woodDark]], [[26, 26, 1, 1, C.gold]]);
+    g.fillStyle = C.O; g.fillRect(8, 4, 16, 8); g.fillStyle = t.main; g.fillRect(9, 5, 14, 6);
+    g.fillStyle = C.white; g.fillRect(12, 6, 3, 1); g.fillRect(17, 8, 3, 1);
+    g.fillStyle = C.O; g.fillRect(18, 0, 12, 5); g.fillStyle = C.ukBlack; g.fillRect(19, 1, 10, 3); g.fillStyle = C.gold; g.fillRect(22, 2, 4, 1);
+    barrel(g, 4, 24, t.main); barrel(g, 38, 24, t.main);
+    g.fillStyle = C.O; g.fillRect(2, 8, 44, 1); g.fillStyle = t.main; g.fillRect(2, 8, 44, 1);
+  },
+  turret(g, t) {
+    // Phone Box: a red kiosk with a gun on top, ringing for the special relationship
+    phoneBox(g, 5, 12);
+    outlined(g, [[6, 8, 10, 4, C.gun], [14, 9, 12, 2, C.gun]], [[6, 8, 10, 1, C.gunLight], [6, 10, 10, 1, t.main], [25, 9, 1, 2, C.O]]);
+    g.fillStyle = C.O; g.fillRect(7, 4, 2, 4);
+    g.fillStyle = C.gold; g.fillRect(6, 2, 4, 2); g.fillRect(7, 1, 2, 1);
+    g.fillStyle = C.yellow; g.fillRect(3, 2, 2, 1); g.fillRect(1, 3, 2, 1);
+  },
+  wall(g, t) {
+    // The Queue Barrier: velvet-roped posts blocking the border, queue behind
+    g.fillStyle = C.O; g.fillRect(0, 2, 16, 30);
+    g.fillStyle = C.gunDark; g.fillRect(1, 3, 14, 29);
+    g.fillStyle = C.gunLight; g.fillRect(1, 3, 2, 29); g.fillRect(1, 3, 14, 2);
+    g.fillStyle = C.red; g.fillRect(0, 6, 16, 2); g.fillRect(0, 16, 16, 2); g.fillRect(0, 26, 16, 2);
+    g.fillStyle = C.gold; g.fillRect(2, 4, 2, 2); g.fillRect(12, 4, 2, 2); g.fillRect(2, 14, 2, 2); g.fillRect(12, 14, 2, 2); g.fillRect(2, 24, 2, 2); g.fillRect(12, 24, 2, 2);
+    for (let i = 0; i < 3; i++) { g.fillStyle = C.grey; g.fillRect(3 + i * 4, 20 - i * 2, 3, 2); g.fillStyle = C.skin; g.fillRect(4 + i * 4, 18 - i * 2, 2, 2); }
+    g.fillStyle = t.main; g.fillRect(0, 26, 16, 1);
+  },
+  mine(g, t) {
+    // The Tea Room: income from the nation's favourite export
+    outlined(g, [[2, 14, 20, 18, C.ukTea]], [[2, 14, 20, 1, C.ukTeaDark], [2, 30, 20, 2, C.ukTeaDark]]);
+    g.fillStyle = C.O; g.fillRect(4, 17, 7, 7); g.fillStyle = C.glass; g.fillRect(5, 18, 5, 5);
+    g.fillStyle = C.O; g.fillRect(13, 20, 4, 4); g.fillStyle = C.wood; g.fillRect(14, 21, 2, 2);
+    g.fillStyle = C.O; g.fillRect(15, 10, 5, 3); g.fillRect(14, 13, 8, 1);
+    g.fillStyle = C.ukTea; g.fillRect(15, 11, 5, 2); g.fillStyle = C.ukTeaDark; g.fillRect(15, 11, 5, 1);
+    g.fillStyle = C.smoke; g.fillRect(16, 7, 1, 1); g.fillRect(19, 8, 1, 1); g.fillRect(17, 5, 1, 1);
+    g.fillStyle = t.main; g.fillRect(3, 10, 6, 2);
+    g.fillStyle = C.O; g.fillRect(21, 26, 8, 2); g.fillStyle = C.ukTeaDark; g.fillRect(22, 26, 6, 1);
+  },
+  workshop(g, t) {
+    // Jaguar Plant: a car factory turning out taxis and buses
+    outlined(g, [[2, 10, 44, 22, C.ukBlackLight]], [[2, 10, 44, 1, C.white], [2, 30, 44, 2, C.ukBlack]]);
+    g.fillStyle = C.O; g.fillRect(4, 13, 40, 5); g.fillStyle = C.glass; g.fillRect(5, 14, 38, 3); g.fillStyle = C.glassDark; for (let x = 7; x < 43; x += 6) g.fillRect(x, 14, 1, 3);
+    g.fillStyle = C.O; g.fillRect(16, 0, 16, 7); g.fillStyle = t.main; g.fillRect(17, 1, 14, 5);
+    unionJack(g, 19, 2, 5, 3);
+    outlined(g, [[6, 22, 9, 4, C.ukBlack], [8, 20, 5, 2, C.ukBlack]], [[9, 20, 3, 1, C.glass], [6, 23, 9, 1, t.main]]);
+    g.fillStyle = C.O; g.fillRect(7, 26, 2, 2); g.fillRect(12, 26, 2, 2);
+    outlined(g, [[30, 21, 12, 5, C.ukScarlet], [32, 19, 8, 2, C.ukScarlet]], [[32, 20, 8, 1, t.light], [31, 23, 10, 1, C.glassDark], [30, 22, 12, 1, t.main]]);
+    g.fillStyle = C.O; g.fillRect(32, 26, 2, 2); g.fillRect(38, 26, 2, 2);
+  },
+};
+
+const SIDE_BUILD = { china: CHINA_BUILD, canada: CANADA_BUILD, eu: EU_BUILD, mexico: MEXICO_BUILD, uk: UK_BUILD };
 
 function puff(ctx, x, y, ms, i) {
   const k = ((ms / 1800) + i * 0.5) % 1;
@@ -1491,6 +2028,14 @@ function animate(ctx, b, x, y) {
     if (b.type === 'hq') { for (const fx of [2, 10, 47, 55]) if ((tick + fx) % 4 < 2) rect(ctx, x + fx + 6, y + 34, 1, 3, C.euBlue); }
     else if (b.type === 'mine') { const k = (ms / 1100) % 1; rect(ctx, x + 29, y + 10 + Math.round(k * 12), 3, 1, C.goldLight); }
     else if (b.type === 'barracks') { if (tick % 10 < 5) rect(ctx, x + 18, y + 16, 1, 1, C.white); }
+  } else if (side === 'mexico') {
+    if (b.type === 'hq') { const k = Math.floor(ms / 600) % 2; rect(ctx, x + 33, y + 7 + k, 2, 1, C.mxTile); }
+    else if (b.type === 'mine') { const k = (ms / 1500) % 1; rect(ctx, x + 12, y + 18 - Math.round(k * 4), 1, 1, C.mxAvocadoLight); }
+    else if (b.type === 'turret') { const k = Math.floor(ms / 400) % 2; rect(ctx, x + 8, y + 14 + k, 2, 1, C.yellow); }
+  } else if (side === 'uk') {
+    if (b.type === 'hq') { const k = Math.floor(ms / 700) % 2; rect(ctx, x + 31, y + 27 + k, 1, 1, C.ukPhoneLight); }
+    else if (b.type === 'mine') { const k = Math.floor(ms / 500) % 2; rect(ctx, x + 17, y + 5 - k, 1, 1, C.smoke); }
+    else if (b.type === 'turret') { const k = Math.floor(ms / 400) % 2; rect(ctx, x + 3 + k, y + 2, 1, 1, C.yellow); }
   }
 }
 
@@ -1499,6 +2044,8 @@ const BODY = {
   china: { soldier: palette.coverall, heavy: palette.coverall, engineer: '#6a6a74', sniper: palette.navy },
   canada: { soldier: palette.serge, engineer: palette.serge, sniper: null, heavy: null },
   eu: { soldier: palette.euBlue, heavy: palette.grey, engineer: palette.grey, sniper: palette.gunDark },
+  mexico: { soldier: palette.mxVerde, heavy: palette.mxChili, engineer: palette.coverall, sniper: palette.mxKhaki },
+  uk: { soldier: palette.ukNavy, heavy: palette.ukScarlet, engineer: palette.ukNavy, sniper: palette.woodDark },
 };
 function corpse(e) {
   const side = sideId(e.f);
@@ -1509,6 +2056,12 @@ function corpse(e) {
     outlined(g, [[1, 2, 10, 3, C.white], [11, 2, 2, 2, C.white]], [[3, 2, 3, 3, C.penguin], [9, 4, 2, 1, C.penguin], [5, 2, 3, 1, t.main]]);
   } else if (e.type === 'scout' && side === 'canada') {
     outlined(g, [[1, 2, 10, 3, C.moose], [11, 2, 2, 3, C.moose], [10, 0, 3, 1, C.antler]], [[3, 2, 3, 1, t.main], [1, 4, 10, 1, C.mooseDark]]);
+  } else if (e.type === 'scout' && side === 'mexico') {
+    // The chihuahua, knocked flat
+    outlined(g, [[1, 2, 10, 3, C.mxTan], [11, 2, 2, 2, C.mxTan]], [[3, 2, 3, 1, t.main], [1, 4, 10, 1, C.mxTanDark]]);
+  } else if (e.type === 'scout' && side === 'uk') {
+    // The cuppa, spilled
+    outlined(g, [[1, 2, 10, 3, C.ukTea]], [[1, 4, 10, 1, C.ukTeaDark], [5, 3, 2, 1, t.main]]);
   } else if (e.type === 'scout') {
     // The cheese wheel, toppled on its side
     outlined(g, [[1, 2, 12, 3, C.cheese]], [[1, 4, 12, 1, C.cheeseDark], [4, 3, 2, 1, C.cheeseDark], [9, 2, 2, 1, C.cheeseDark], [6, 2, 2, 1, t.main]]);
@@ -1571,6 +2124,32 @@ export default {
       icons: { hq: '⭐', barracks: '🪑', turret: '🖋️', wall: '📚', mine: '💶', sam: '📜' },
       win: 'Victory approved, in all twenty-four official languages.',
       lose: 'Defeat noted. A committee will look into it in 2031.',
+    },
+    {
+      id: 'mexico', name: 'Mexico', short: 'Mexico',
+      blurb: 'Frontera agents, luchadores, a chihuahua on patrol and the avocados the tariffs fought over. The wall keeps getting invoiced back.',
+      names: {
+        soldier: 'Frontera Agent', heavy: 'Luchador', scout: 'Chihuahua', engineer: 'Albañil', sniper: 'Coyote',
+        jeep: 'Lowrider', tank: 'Taco Truck', artillery: 'Avocado Launcher', helicopter: 'Chupacabra', bomber: 'Piñata Blimp',
+        hq: 'Palacio Federal', barracks: 'Cantina', turret: 'Frontera Watchtower', wall: 'The Invoiced Wall', mine: 'Avocado Grove',
+        workshop: 'Lowrider Garage', airbase: 'Shared Helipad', sam: 'Avocado SAM',
+      },
+      icons: { hq: '🏰', barracks: '🍹', turret: '🗼', wall: '🧾', mine: '🥑', workshop: '🔧', sam: '🥑' },
+      win: '¡Tremendo! The wall? We sent you the invoice. Twice.',
+      lose: 'The invoice bounced. Someone else is paying for that wall.',
+    },
+    {
+      id: 'uk', name: 'The UK', short: 'UK',
+      blurb: 'Beefeaters, black cabs, a cuppa on patrol and the post-Brexit queue at the border. The special relationship is ringing, but nobody answers.',
+      names: {
+        soldier: 'Border Force Officer', heavy: 'Beefeater', scout: 'Cuppa', engineer: 'Flat Cap', sniper: 'Sherlock',
+        jeep: 'Black Cab', tank: 'Double Decker', artillery: 'Big Ben', helicopter: 'Spitfire', bomber: 'Brexit Blimp',
+        hq: 'The Special Relationship', barracks: 'The King\'s Head', turret: 'Phone Box', wall: 'Queue Barrier', mine: 'Tea Room',
+        workshop: 'Jaguar Plant', airbase: 'Shared Helipad', sam: 'Freedom Missiles (Sorry)',
+      },
+      icons: { hq: '🏛️', barracks: '🍺', turret: '☎️', wall: '🚧', mine: '🫖', workshop: '🚗', sam: '🚀' },
+      win: 'Keep calm and carry on conquering.',
+      lose: 'The queue at the border stretches all the way back to this defeat.',
     },
   ],
   palette,
