@@ -342,11 +342,11 @@ Tap **Theme** on the title screen to switch between looks. The choice is remembe
     - **Mexico**:
       - **Frontera Agents**, a masked **Luchador**, a **Chihuahua** on patrol, an **Albañil** and a **Coyote**.
       - A **Lowrider**, a **Taco Truck** with a chilli-pepper gun, the **Avocado Launcher**, a **Chupacabra** and a **Piñata Blimp** dropping candy.
-      - A **Palacio Federal**, a **Cantina**, a **Frontera Watchtower**, the **Invoiced Wall** (sent back, twice), an **Avocado Grove** and a **Lowrider Garage**.
+      - A **Palacio Federal**, a **Cantina**, a **Frontera Watchtower**, the **Invoiced Wall** (sent back, twice), an **Avocado Grove**, a **Lowrider Garage** and **Avocado Air Freight**, its crates waiting to fly north.
     - **The UK** (the special relationship is ringing, but nobody answers):
       - **Border Force Officers**, a **Beefeater**, a rolling **Cuppa**, a **Flat Cap** and **Sherlock**.
-      - A **Black Cab**, a **Double Decker** on tracks, **Big Ben** lobbing bongs, a **Spitfire** and the **Brexit Blimp** trailing the border queue.
-      - **The Special Relationship**, **The King's Head** pub, a gun-toting **Phone Box**, a **Queue Barrier** wall, a **Tea Room** and a **Jaguar Plant**.
+      - A **Black Cab**, a **Double Decker** on tracks, **Big Ben** lobbing bongs, a **Spitfire** and the **Brexit Blimp** towing the border queue on a rope.
+      - **The Special Relationship**, **The King's Head** pub, a gun-toting **Phone Box**, a **Queue Barrier** wall, a **Tea Room**, a **Jaguar Plant** and **The Third Runway (Planned)**: a bit of tarmac, a refused planning notice and a queue.
 
 - **Civil War:** 1861–65, played for laughs, and the first theme where you **choose a side**. The Confederate battle flag is left out: both sides fly flags in their team colour. Fallen soldiers are just knocked flat, with their hat beside them.
   - **Setting:** a summer sky over rolling Virginia farmland with red barns, white churches and zig-zag split-rail fences. Distant cannon smoke puffs up, and picnickers watch from the hill with a parasol and a hamper, as spectators really did at Bull Run. Gunsmoke drifts across the field. The ground is grassy earth, and the platforms are rocky ridges.

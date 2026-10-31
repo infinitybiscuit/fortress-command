@@ -976,7 +976,7 @@ function ukSoldier(type, f, frame) {
     // A cuppa: a steaming cup of tea on the move, in a team-colour scarf
     const lg = frame ? [[6, 12, 3, 4], [10, 12, 3, 4]] : [[4, 12, 3, 4], [12, 12, 3, 4]];
     parts = [
-      ...lg.map((l) => [...l, C.teaDark]),
+      ...lg.map((l) => [...l, C.ukTeaDark]),
       [3, 4, 13, 7, C.ukTea], [1, 5, 3, 6, C.ukTea], [4, 2, 11, 3, C.ukTea], [6, 0, 2, 2, C.ukTea],
     ];
     details = [
@@ -1520,16 +1520,24 @@ function rotor(ctx, u, x, y) {
     if (tick % 2) rect(ctx, px - 9, y - 13, 18, 1, C.gunLight); else rect(ctx, px - 3, y - 13, 6, 1, C.gun);
   } else if (side === 'mexico') {
     // The piñata's streamers flutter
-    const tx = s > 0 ? x - 24 : x + 23;
-    rect(ctx, tx, y - 4 + (tick % 4 < 2 ? 0 : 1), 2, 1, team(u.faction).light);
+    const tx = s > 0 ? x - 20 : x + 17;
+    rect(ctx, tx, y - 4 + (tick % 4 < 2 ? 0 : 1), 3, 1, team(u.faction).light);
+    rect(ctx, s > 0 ? x - 21 : x + 20, y - 3 + (tick % 4 < 2 ? 1 : 0), 1, 1, C.mxStraw);
   } else if (side === 'uk' && u.type === 'helicopter') {
-    // Spitfire propeller
-    const px = s > 0 ? x - 16 : x + 15;
+    // Spitfire propeller, spinning on the nose
+    const px = s > 0 ? x + 15 : x - 16;
     if (tick % 2) rect(ctx, px, y - 13, 1, 9, C.smoke); else rect(ctx, px, y - 10, 1, 3, C.smoke);
   } else if (side === 'uk') {
-    // The border queue shuffles along beneath the blimp
-    const q = Math.floor(performance.now() / 500) % 4;
-    rect(ctx, s > 0 ? x - 10 + q : x + 6 - q, y - 6, 2, 1, C.ukScarlet);
+    // The border queue dangles on a rope behind the blimp, shuffling forward
+    // one place at a time and never getting any closer
+    const q = Math.floor(performance.now() / 700) % 2;
+    const at = (off, w) => (s > 0 ? x + off : x - off - w);
+    rect(ctx, at(-21, 13), y + 2, 13, 1, C.O);
+    for (let i = 0; i < 4; i++) {
+      const off = -21 + i * 3 + ((q + i) % 2);
+      rect(ctx, at(off, 1), y + 3, 1, 1, C.skin);
+      rect(ctx, at(off, 1), y + 4, 1, 2, i % 2 ? C.grey : C.ukNavy);
+    }
   } else {
     usaRotor(ctx, u, x, y);
   }
@@ -1651,8 +1659,8 @@ function log(g, x, y, w) {
   g.fillStyle = C.O; g.fillRect(x, y, w, 4);
   g.fillStyle = C.log; g.fillRect(x, y + 1, w, 2); g.fillStyle = C.logLight; g.fillRect(x, y + 1, w, 1);
 }
-function barrel(g, x, y, t) {
-  outlined(g, [[x, y, 7, 7, C.syrup]], [[x, y + 1, 7, 1, C.syrupDark], [x, y + 5, 7, 1, C.syrupDark], [x + 1, y, 1, 7, C.syrupLight], [x + 4, y + 2, 2, 3, C.white]]);
+function barrel(g, x, y, t, wood = C.syrup, hoop = C.syrupDark, lite = C.syrupLight) {
+  outlined(g, [[x, y, 7, 7, wood]], [[x, y + 1, 7, 1, hoop], [x, y + 5, 7, 1, hoop], [x + 1, y, 1, 7, lite], [x + 4, y + 2, 2, 3, C.white]]);
   g.fillStyle = t; g.fillRect(x + 4, y + 3, 2, 1);
 }
 const CANADA_BUILD = {
@@ -1853,7 +1861,8 @@ const MEXICO_BUILD = {
     g.fillStyle = C.O; g.fillRect(24, 0, 14, 6); g.fillStyle = t.main; g.fillRect(25, 1, 12, 4);
     g.fillStyle = C.white; g.fillRect(27, 2, 3, 1);
     sombrero(g, 6, 4, C.mxStraw);
-    barrel(g, 36, 24, t.main);
+    // a barrel of tequila, the agave on the label
+    barrel(g, 36, 24, t.main, C.wood, C.woodDark, C.woodLight); g.fillStyle = C.mxAvocado; g.fillRect(40, 26, 1, 1);
     g.fillStyle = C.O; g.fillRect(38, 18, 1, 10); g.fillRect(39, 17, 5, 5); g.fillStyle = t.main; g.fillRect(39, 18, 4, 3);
   },
   turret(g, t) {
@@ -1898,6 +1907,22 @@ const MEXICO_BUILD = {
     g.fillStyle = C.O; g.fillRect(26, 0, 16, 7); g.fillStyle = t.main; g.fillRect(27, 1, 14, 5);
     g.fillStyle = C.gold; g.fillRect(30, 2, 3, 1); g.fillRect(35, 2, 3, 1);
     g.fillStyle = C.white; g.fillRect(30, 4, 8, 1);
+  },
+  airbase(g, t) {
+    // Avocado Air Freight: a tiled cargo hangar, crates of avocados waiting to fly
+    // north, and a windsock that always points at the tariff office
+    outlined(g, [[2, 14, 34, 18, C.mxAdobe]], [[2, 14, 34, 1, C.mxAdobeDark], [2, 30, 34, 2, C.mxAdobeDark]]);
+    for (let k = 0; k < 4; k++) { g.fillStyle = C.O; g.fillRect(1 + k * 2, 13 - k * 2, 36 - k * 4, 2); g.fillStyle = C.mxTile; g.fillRect(2 + k * 2, 13 - k * 2, 34 - k * 4, 1); }
+    g.fillStyle = C.O; g.fillRect(8, 18, 22, 14); g.fillStyle = C.gunDark; g.fillRect(9, 19, 20, 13);
+    g.fillStyle = C.gun; for (let y = 21; y < 32; y += 3) g.fillRect(9, y, 20, 1);
+    g.fillStyle = C.O; g.fillRect(12, 2, 14, 5); g.fillStyle = t.main; g.fillRect(13, 3, 12, 3); g.fillStyle = C.white; g.fillRect(15, 4, 8, 1);
+    // stacked avocado crates on the apron
+    for (const [cx, cy] of [[38, 25], [46, 25], [54, 25], [42, 19], [50, 19], [46, 13]]) {
+      outlined(g, [[cx, cy, 7, 6, C.wood]], [[cx, cy, 7, 1, C.woodLight], [cx, cy + 3, 7, 1, C.woodDark]]);
+      g.fillStyle = C.mxAvocado; g.fillRect(cx + 2, cy + 1, 3, 2); g.fillStyle = C.mxPit; g.fillRect(cx + 3, cy + 1, 1, 1);
+    }
+    g.fillStyle = C.O; g.fillRect(61, 4, 1, 28); g.fillStyle = t.main; g.fillRect(62, 4, 2, 3); g.fillStyle = C.white; g.fillRect(62, 5, 2, 1);
+    g.fillStyle = C.O; g.fillRect(0, 31, 64, 1);
   },
 };
 
@@ -1953,7 +1978,8 @@ const UK_BUILD = {
     g.fillStyle = C.O; g.fillRect(8, 4, 16, 8); g.fillStyle = t.main; g.fillRect(9, 5, 14, 6);
     g.fillStyle = C.white; g.fillRect(12, 6, 3, 1); g.fillRect(17, 8, 3, 1);
     g.fillStyle = C.O; g.fillRect(18, 0, 12, 5); g.fillStyle = C.ukBlack; g.fillRect(19, 1, 10, 3); g.fillStyle = C.gold; g.fillRect(22, 2, 4, 1);
-    barrel(g, 4, 24, t.main); barrel(g, 38, 24, t.main);
+    // ale kegs, steel and warm
+    barrel(g, 4, 24, t.main, C.steel, C.steelDark, C.steelLight); barrel(g, 38, 24, t.main, C.steel, C.steelDark, C.steelLight);
     g.fillStyle = C.O; g.fillRect(2, 8, 44, 1); g.fillStyle = t.main; g.fillRect(2, 8, 44, 1);
   },
   turret(g, t) {
@@ -1996,6 +2022,25 @@ const UK_BUILD = {
     outlined(g, [[30, 21, 12, 5, C.ukScarlet], [32, 19, 8, 2, C.ukScarlet]], [[32, 20, 8, 1, t.light], [31, 23, 10, 1, C.glassDark], [30, 22, 12, 1, t.main]]);
     g.fillStyle = C.O; g.fillRect(32, 26, 2, 2); g.fillRect(38, 26, 2, 2);
   },
+  airbase(g, t) {
+    // The Third Runway: planned since 1968, so far just a bit of tarmac, a
+    // planning notice and a queue for the departure lounge
+    outlined(g, [[0, 26, 56, 6, C.gunDark]], [[0, 26, 56, 1, C.gun]]);
+    g.fillStyle = C.white; for (let x = 3; x < 54; x += 8) g.fillRect(x, 28, 4, 1);
+    // a portakabin terminal
+    outlined(g, [[4, 14, 20, 12, C.ukStone]], [[4, 14, 20, 1, C.white], [4, 24, 20, 2, C.ukStoneDark]]);
+    g.fillStyle = C.O; g.fillRect(7, 17, 6, 4); g.fillRect(16, 17, 5, 9); g.fillStyle = C.glass; g.fillRect(8, 18, 4, 2); g.fillStyle = C.woodDark; g.fillRect(17, 18, 3, 8);
+    g.fillStyle = C.O; g.fillRect(6, 8, 16, 6); g.fillStyle = t.main; g.fillRect(7, 9, 14, 4); g.fillStyle = C.white; g.fillRect(9, 10, 10, 1);
+    unionJack(g, 14, 1, 7, 5); g.fillStyle = C.O; g.fillRect(13, 1, 1, 7);
+    // the planning notice, refused again
+    g.fillStyle = C.O; g.fillRect(32, 12, 1, 14); g.fillRect(27, 8, 13, 9);
+    g.fillStyle = C.paper; g.fillRect(28, 9, 11, 7); g.fillStyle = C.paperShade; g.fillRect(29, 10, 9, 1); g.fillRect(29, 12, 9, 1);
+    g.fillStyle = C.ukRed; for (let i = 0; i < 5; i++) { g.fillRect(31 + i, 10 + i, 1, 1); g.fillRect(35 - i, 10 + i, 1, 1); }
+    // the queue, going nowhere
+    for (let i = 0; i < 4; i++) { const x = 42 + i * 4; outlined(g, [[x, 18, 2, 2, C.skin], [x, 20, 2, 5, i % 2 ? C.ukNavy : C.grey]], [[x, 18, 2, 1, C.hair]]); }
+    g.fillStyle = C.O; g.fillRect(40, 22, 20, 1); g.fillStyle = C.red; g.fillRect(40, 22, 20, 1);
+    g.fillStyle = C.gold; g.fillRect(40, 20, 1, 6); g.fillRect(59, 20, 1, 6);
+  },
 };
 
 const SIDE_BUILD = { china: CHINA_BUILD, canada: CANADA_BUILD, eu: EU_BUILD, mexico: MEXICO_BUILD, uk: UK_BUILD };
@@ -2032,10 +2077,12 @@ function animate(ctx, b, x, y) {
     if (b.type === 'hq') { const k = Math.floor(ms / 600) % 2; rect(ctx, x + 33, y + 7 + k, 2, 1, C.mxTile); }
     else if (b.type === 'mine') { const k = (ms / 1500) % 1; rect(ctx, x + 12, y + 18 - Math.round(k * 4), 1, 1, C.mxAvocadoLight); }
     else if (b.type === 'turret') { const k = Math.floor(ms / 400) % 2; rect(ctx, x + 8, y + 14 + k, 2, 1, C.yellow); }
+    else if (b.type === 'airbase') { rect(ctx, x + 64, y + 4 + (tick % 2), 1, 2, t.main); }
   } else if (side === 'uk') {
     if (b.type === 'hq') { const k = Math.floor(ms / 700) % 2; rect(ctx, x + 31, y + 27 + k, 1, 1, C.ukPhoneLight); }
     else if (b.type === 'mine') { const k = Math.floor(ms / 500) % 2; rect(ctx, x + 17, y + 5 - k, 1, 1, C.smoke); }
     else if (b.type === 'turret') { const k = Math.floor(ms / 400) % 2; rect(ctx, x + 3 + k, y + 2, 1, 1, C.yellow); }
+    else if (b.type === 'airbase') { const k = Math.floor(ms / 1200) % 2; rect(ctx, x + 40 + k, y + 17, 1, 1, C.white); }
   }
 }
 
@@ -2132,9 +2179,9 @@ export default {
         soldier: 'Frontera Agent', heavy: 'Luchador', scout: 'Chihuahua', engineer: 'Albañil', sniper: 'Coyote',
         jeep: 'Lowrider', tank: 'Taco Truck', artillery: 'Avocado Launcher', helicopter: 'Chupacabra', bomber: 'Piñata Blimp',
         hq: 'Palacio Federal', barracks: 'Cantina', turret: 'Frontera Watchtower', wall: 'The Invoiced Wall', mine: 'Avocado Grove',
-        workshop: 'Lowrider Garage', airbase: 'Shared Helipad', sam: 'Avocado SAM',
+        workshop: 'Lowrider Garage', airbase: 'Avocado Air Freight', sam: 'Salsa Picante SAM',
       },
-      icons: { hq: '🏰', barracks: '🍹', turret: '🗼', wall: '🧾', mine: '🥑', workshop: '🔧', sam: '🥑' },
+      icons: { hq: '🏰', barracks: '🍹', turret: '🗼', wall: '🧾', mine: '🥑', workshop: '🔧', airbase: '📦', sam: '🌶️' },
       win: '¡Tremendo! The wall? We sent you the invoice. Twice.',
       lose: 'The invoice bounced. Someone else is paying for that wall.',
     },
@@ -2145,9 +2192,9 @@ export default {
         soldier: 'Border Force Officer', heavy: 'Beefeater', scout: 'Cuppa', engineer: 'Flat Cap', sniper: 'Sherlock',
         jeep: 'Black Cab', tank: 'Double Decker', artillery: 'Big Ben', helicopter: 'Spitfire', bomber: 'Brexit Blimp',
         hq: 'The Special Relationship', barracks: 'The King\'s Head', turret: 'Phone Box', wall: 'Queue Barrier', mine: 'Tea Room',
-        workshop: 'Jaguar Plant', airbase: 'Shared Helipad', sam: 'Freedom Missiles (Sorry)',
+        workshop: 'Jaguar Plant', airbase: 'The Third Runway (Planned)', sam: 'Freedom Missiles (Sorry)',
       },
-      icons: { hq: '🏛️', barracks: '🍺', turret: '☎️', wall: '🚧', mine: '🫖', workshop: '🚗', sam: '🚀' },
+      icons: { hq: '🏛️', barracks: '🍺', turret: '☎️', wall: '🚧', mine: '🫖', workshop: '🚗', airbase: '🛫', sam: '🚀' },
       win: 'Keep calm and carry on conquering.',
       lose: 'The queue at the border stretches all the way back to this defeat.',
     },
