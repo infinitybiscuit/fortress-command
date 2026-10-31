@@ -44,4 +44,4 @@ Every theme must also draw the **`sam`** building (guided anti-air) — `render.
 - `web/` auto-deploys to GitHub Pages on push to `main` touching `web/**` (`.github/workflows/pages.yml`). Static host; the service worker is network-first.
 - `relay/` auto-deploys the Worker via wrangler on `main` pushes touching `relay/**` (`.github/workflows/relay.yml`). Cloudflare/GitHub secrets live only in their respective secret stores — never add them to files.
 - The Worker must keep its name `fortress-relay`: a renamed Worker is a new Worker without the TURN secrets.
-- Keep the branch in sync with `origin/main` before committing: the repo moves fast (a version bump per PR, now at v69).
+- Keep the branch in sync with `origin/main` before committing: the repo moves fast (a version bump per PR, now at v70).
